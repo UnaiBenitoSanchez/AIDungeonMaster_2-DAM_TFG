@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1011522491782",
+    "project_id": "aidungeonmaster-2d5bc",
+    "storage_bucket": "aidungeonmaster-2d5bc.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1011522491782:android:7c7bd73f94377cc56ec807",
+        "android_client_info": {
+          "package_name": "com.example.aidungeonmaster"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAQpAstdhMcLHEEhkVfeUuPEMQ1fScrfNo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

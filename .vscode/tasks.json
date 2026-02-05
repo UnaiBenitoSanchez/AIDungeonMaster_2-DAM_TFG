@@ -1,0 +1,16 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Ejecutar en Móvil",
+            "type": "shell",
+            "command": "./gradlew installDebug",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": [],
+            "detail": "Instala y abre la app en tu dispositivo o emulador"
+        }
+    ]
+}
