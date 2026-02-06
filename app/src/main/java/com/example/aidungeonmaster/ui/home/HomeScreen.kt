@@ -71,12 +71,17 @@ fun HomeScreen(navController: NavHostController, viewModel: HomeViewModel = view
                         CharacterCard(
                             character = character,
                             onClick = {
-                                navController.navigate(Screen.GameSetup.createRoute(userId, character.name))
+                                if (character.gameTheme.isNullOrEmpty()) {
+                                    // CASO A: No tiene partida, va a elegir tema (GameSetup)
+                                    navController.navigate(Screen.GameSetup.createRoute(userId, character.name))
+                                } else {
+                                    // CASO B: Ya tiene partida, va DIRECTO a jugar (GamePlay)
+                                    navController.navigate(
+                                        Screen.GamePlay.createRoute(userId, character.name, character.gameTheme)
+                                    )
+                                }
                             },
-                            onDelete = {
-                                // Guardamos qué personaje queremos borrar para mostrar el aviso
-                                characterToDelete = character
-                            }
+                            onDelete = { characterToDelete = character }
                         )
                     }
                 }
@@ -148,16 +153,19 @@ fun CharacterCard(character: Character, onClick: () -> Unit, onDelete: () -> Uni
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = character.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Text(text = "${character.race} • ${character.characterClass}", style = MaterialTheme.typography.bodyMedium)
+
+                // Mostramos Raza, Clase y TEMA si existe
+                val subtitle = if (!character.gameTheme.isNullOrEmpty()) {
+                    "${character.race} • ${character.characterClass} | ${character.gameTheme}"
+                } else {
+                    "${character.race} • ${character.characterClass} (Sin partida)"
+                }
+
+                Text(text = subtitle, style = MaterialTheme.typography.bodyMedium)
             }
 
-            // BOTÓN DE BORRAR
             IconButton(onClick = onDelete) {
-                Icon(
-                    imageVector = Icons.Default.Delete,
-                    contentDescription = "Borrar",
-                    tint = MaterialTheme.colorScheme.outline
-                )
+                Icon(Icons.Default.Delete, "Borrar", tint = MaterialTheme.colorScheme.outline)
             }
         }
     }

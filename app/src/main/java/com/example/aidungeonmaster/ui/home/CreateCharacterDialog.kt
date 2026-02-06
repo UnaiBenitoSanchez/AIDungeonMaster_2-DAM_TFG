@@ -60,7 +60,7 @@ fun CreateCharacterDialog(
                         Text("Generando...")
                     }
                 } else {
-                    Text("Generar Personaje ✨")
+                    Text("Generar Personaje")
                 }
             }
         },

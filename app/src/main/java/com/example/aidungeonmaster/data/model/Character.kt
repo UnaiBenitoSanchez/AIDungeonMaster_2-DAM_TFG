@@ -6,5 +6,6 @@ data class Character(
     val race: String = "",
     val characterClass: String = "",
     val stats: Map<String, Int> = emptyMap(),
-    val physicalTraits: String = ""
+    val physicalTraits: String = "",
+    val gameTheme: String? = null
 )

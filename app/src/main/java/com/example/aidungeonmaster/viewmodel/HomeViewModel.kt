@@ -100,4 +100,20 @@ class HomeViewModel : ViewModel() {
         onLogout()
     }
 
+    fun updateCharacterTheme(characterId: String, theme: String) {
+        val userId = auth.currentUser?.uid ?: return
+        viewModelScope.launch {
+            try {
+                db.collection("users")
+                    .document(userId)
+                    .collection("characters")
+                    .document(characterId)
+                    .update("gameTheme", theme)
+                    .await()
+            } catch (e: Exception) {
+                Log.e("APP_ERROR", "Error actualizando tema: ${e.message}")
+            }
+        }
+    }
+
 }

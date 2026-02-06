@@ -17,16 +17,24 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.example.aidungeonmaster.navigation.Screen
+import com.example.aidungeonmaster.viewmodel.HomeViewModel
 
 @Composable
 fun GameSetupScreen(
     navController: NavHostController,
     userId: String,
-    characterName: String
+    characterName: String,
+    homeViewModel: HomeViewModel = viewModel()
 ) {
     val themes = listOf("Fantasía Épica", "Terror Gótico", "Cyberpunk", "Misterio")
+
+    // Necesitamos el ID del personaje para actualizarlo.
+    // Lo buscamos en la lista que ya tiene el HomeViewModel.
+    val characters by homeViewModel.characters.collectAsState()
+    val characterId = characters.find { it.name == characterName }?.id ?: ""
 
     Column(
         modifier = Modifier
@@ -42,13 +50,26 @@ fun GameSetupScreen(
         )
         Spacer(modifier = Modifier.height(20.dp))
         Text("Selecciona la temática de tu partida:", color = Color.Gray)
+        Text("Nota: Esta será la historia permanente de este héroe.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f))
+
         Spacer(modifier = Modifier.height(24.dp))
 
         themes.forEach { theme ->
             ThemeButtonCustom(
                 theme = theme,
                 onClick = {
-                    navController.navigate(Screen.GamePlay.createRoute(userId, characterName, theme))
+                    if (characterId.isNotEmpty()) {
+                        // 1. Guardamos el tema en el personaje (Firebase)
+                        homeViewModel.updateCharacterTheme(characterId, theme)
+
+                        // 2. Navegamos a la partida
+                        navController.navigate(Screen.GamePlay.createRoute(userId, characterName, theme)) {
+                            // Limpiamos esta pantalla del historial para que no pueda volver a elegir tema
+                            popUpTo(Screen.Home.route)
+                        }
+                    }
                 }
             )
         }
