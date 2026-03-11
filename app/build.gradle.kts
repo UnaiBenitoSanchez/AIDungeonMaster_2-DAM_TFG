@@ -83,4 +83,24 @@ dependencies {
     implementation("io.coil-kt:coil-compose:2.5.0")
 
     implementation("androidx.compose.material:material-icons-extended")
+
+    // --- ARSENAL PARA EL QR ---
+    // CameraX (Librerías base y vista)
+    val cameraxVersion = "1.3.1" // O la última versión estable
+    implementation("androidx.camera:camera-core:$cameraxVersion")
+    implementation("androidx.camera:camera-camera2:$cameraxVersion")
+    implementation("androidx.camera:camera-lifecycle:$cameraxVersion")
+    implementation("androidx.camera:camera-view:$cameraxVersion")
+
+    // ML Kit Barcode Scanning (Para detectar el QR)
+    implementation("com.google.mlkit:barcode-scanning:17.2.0")
+
+    // Iconos extendidos de Material (para el candado, mochila, etc.)
+    implementation("androidx.compose.material:material-icons-extended")
+
+    // Para solucionar el error del ListenableFuture
+    implementation("com.google.guava:guava:31.0.1-android")
+
+    // Opcional: Si usas las funciones de extensión de Guava para Kotlin
+    implementation("androidx.concurrent:concurrent-futures-ktx:1.1.0")
 }

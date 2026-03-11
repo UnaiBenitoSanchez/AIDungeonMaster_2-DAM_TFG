@@ -3,9 +3,13 @@ package com.example.aidungeonmaster.ui.game
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -17,22 +21,32 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.aidungeonmaster.viewmodel.GameViewModel
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.draw.clip
+import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material.icons.filled.Inventory
+import androidx.compose.foundation.Image
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.text.font.FontFamily
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GamePlayScreen(
     navController: androidx.navigation.NavHostController,
-    userId: String, // <--- NUEVO: Añadimos el ID del usuario
+    userId: String,
     characterName: String,
     theme: String,
     viewModel: GameViewModel = viewModel()
 ) {
     val listState = rememberLazyListState()
-
     val messages: List<Pair<String, String>> by viewModel.messages.collectAsState()
     val options: List<String> by viewModel.currentOptions.collectAsState()
     val isLoading: Boolean by viewModel.isLoading.collectAsState()
 
-    // Sincronizamos con los 3 parámetros que espera el ViewModel
+    var customAction by remember { mutableStateOf("") }
+
+    // Sincronizamos con el ViewModel
     LaunchedEffect(Unit) {
         viewModel.startStory(userId, characterName, theme)
     }
@@ -43,69 +57,129 @@ fun GamePlayScreen(
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFF121212))
-            .padding(16.dp)
-    ) {
-        // Cabecera
-        Card(
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
-            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
-        ) {
-            Text(
-                text = "Aventura: $theme - Héroe: $characterName",
-                modifier = Modifier.padding(12.dp),
-                style = MaterialTheme.typography.titleMedium
-            )
-        }
-
-        // Chat
-        LazyColumn(
-            state = listState,
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(messages) { message ->
-                GameMessageBubble(author = message.first, text = message.second)
-            }
-
-            if (isLoading) {
-                item {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp).padding(8.dp),
-                        color = MaterialTheme.colorScheme.primary,
-                        strokeWidth = 2.dp
+    MedievalBackground {
+        Scaffold(
+            topBar = {
+                // CORRECCIÓN: Usar TopAppBar y topAppBarColors
+                TopAppBar(
+                    title = { MedievalTitle("Aventura: $theme") },
+                    actions = {
+                        IconButton(onClick = {
+                            val gameId = "${userId}_${characterName}"
+                            navController.navigate("inventory/$gameId")
+                        }) {
+                            Icon(Icons.Default.Inventory, contentDescription = "Mochila", tint = Color(0xFFFFD700))
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = Color.Transparent,
+                        titleContentColor = Color.White
                     )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Text(
-            text = if (isLoading) "El DM está pensando..." else "¿Qué quieres hacer?",
-            color = Color.Gray,
-            style = MaterialTheme.typography.labelLarge
-        )
-
-        // Botones de opciones
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            val displayOptions = if (options.isEmpty() && !isLoading) listOf("Continuar") else options
-
-            displayOptions.forEach { accion ->
-                Button(
-                    onClick = { viewModel.sendPlayerAction(accion) },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(8.dp),
-                    enabled = !isLoading
+                )
+            },
+            bottomBar = {
+                Surface(
+                    tonalElevation = 8.dp,
+                    color = Color.Black.copy(alpha = 0.9f) // Un poco de transparencia para el estilo
                 ) {
-                    Text(text = accion, style = MaterialTheme.typography.bodyMedium)
+                    Column {
+                        if (options.isNotEmpty() && !isLoading) {
+                            LazyRow(
+                                modifier = Modifier.padding(8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                items(options) { opcion ->
+                                    AssistChip(
+                                        onClick = { viewModel.sendPlayerAction(opcion) },
+                                        label = { Text(opcion, color = Color.Cyan) },
+                                        colors = AssistChipDefaults.assistChipColors(
+                                            labelColor = Color.Cyan,
+                                            containerColor = Color(0xFF1E1E1E)
+                                        )
+                                    )
+                                }
+                            }
+                        }
+
+                        Row(
+                            modifier = Modifier
+                                .padding(8.dp)
+                                .fillMaxWidth()
+                                .navigationBarsPadding(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            IconButton(onClick = {
+                                // Generamos el ID exacto: userId_NombrePersonaje
+                                val gameId = "${userId}_${characterName}"
+                                navController.navigate("qr_scanner/$gameId") // Pasamos el ID a la ruta
+                            }) {
+                                Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan QR", tint = Color.Yellow)
+                            }
+
+                            TextField(
+                                value = customAction,
+                                onValueChange = { customAction = it },
+                                modifier = Modifier.weight(1f),
+                                placeholder = { Text("¿Qué quieres hacer?", color = Color.Gray) },
+                                maxLines = 2,
+                                colors = TextFieldDefaults.colors(
+                                    focusedContainerColor = Color(0xFF1E1E1E),
+                                    unfocusedContainerColor = Color(0xFF1E1E1E),
+                                    focusedTextColor = Color.White,
+                                    unfocusedTextColor = Color.White,
+                                    cursorColor = Color.Cyan
+                                )
+                            )
+
+                            IconButton(
+                                onClick = {
+                                    if (customAction.isNotBlank()) {
+                                        viewModel.sendCustomAction(customAction)
+                                        customAction = ""
+                                    }
+                                },
+                                enabled = !isLoading && customAction.isNotBlank()
+                            ) {
+                                Icon(
+                                    Icons.Default.Send,
+                                    contentDescription = "Enviar",
+                                    tint = if (customAction.isNotBlank()) Color.Cyan else Color.Gray
+                                )
+                            }
+                        }
+                    }
                 }
+            },
+            containerColor = Color.Transparent // Para ver el MedievalBackground
+        ) { padding ->
+            LazyColumn(
+                state = listState,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                item { Spacer(modifier = Modifier.height(8.dp)) }
+
+                items(messages) { message ->
+                    GameMessageBubble(author = message.first, text = message.second)
+                }
+
+                if (isLoading) {
+                    item {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().padding(16.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                color = Color(0xFFFFD700) // Color Oro
+                            )
+                        }
+                    }
+                }
+                item { Spacer(modifier = Modifier.height(16.dp)) }
             }
         }
     }
@@ -143,5 +217,19 @@ fun GameMessageBubble(author: String, text: String) {
                 color = Color.White
             )
         }
+    }
+}
+
+@Composable
+fun PlayerStatsHeader(hpCurrent: Int, hpMax: Int) {
+    Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text("HP", color = Color.Red, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.width(8.dp))
+        LinearProgressIndicator(
+            progress = hpCurrent.toFloat() / hpMax.toFloat(),
+            modifier = Modifier.fillMaxWidth().height(12.dp).clip(RoundedCornerShape(6.dp)),
+            color = Color.Green,
+            trackColor = Color.DarkGray
+        )
     }
 }

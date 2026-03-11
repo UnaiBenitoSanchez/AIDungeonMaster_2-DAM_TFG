@@ -14,10 +14,18 @@ import kotlinx.coroutines.tasks.await
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
-// Clase para mapear el JSON de la aventura
+// --- DEFINICIONES DE MODELO PARA EL PARSEO ---
+data class Item(
+    val name: String = "",
+    val description: String = "",
+    val type: String = ""
+)
+
 data class AdventureStep(
     val story: String = "",
-    val options: List<String> = emptyList()
+    val options: List<String> = emptyList(),
+    val damageTaken: Int = 0,
+    val itemFound: Item? = null
 )
 
 class GameViewModel : ViewModel() {
@@ -25,10 +33,9 @@ class GameViewModel : ViewModel() {
     private val repository = GameRepository()
     private var currentGameId: String = ""
     private var currentUserId: String = ""
-
     private val gson = Gson()
+    private val chatHistory = mutableListOf<ChatMessage>()
 
-    // 1. Configuración de Retrofit
     private val apiService = Retrofit.Builder()
         .baseUrl("https://api.groq.com/openai/")
         .addConverterFactory(GsonConverterFactory.create())
@@ -37,7 +44,6 @@ class GameViewModel : ViewModel() {
 
     private val apiKey = "Bearer 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"
 
-    // 2. Estados para la UI
     private val _messages = MutableStateFlow<List<Pair<String, String>>>(emptyList())
     val messages = _messages.asStateFlow()
 
@@ -47,9 +53,7 @@ class GameViewModel : ViewModel() {
     private val _isLoading = MutableStateFlow(false)
     val isLoading = _isLoading.asStateFlow()
 
-    // 3. Inicio de la historia
     fun startStory(userId: String, characterName: String, theme: String) {
-
         currentUserId = userId
         currentGameId = "${userId}_${characterName}_${theme}".replace(" ", "_")
 
@@ -57,134 +61,107 @@ class GameViewModel : ViewModel() {
             _isLoading.value = true
             try {
                 val savedData = repository.loadGame(currentGameId)
-
                 if (savedData != null) {
-                    // CASO A: Restaurar partida existente
                     val rawMessages = savedData["displayMessages"] as? List<Map<String, String>>
-                    _messages.value = rawMessages?.map {
-                        (it["first"] ?: "") to (it["second"] ?: "")
-                    } ?: emptyList()
-
+                    _messages.value = rawMessages?.map { (it["first"] ?: "") to (it["second"] ?: "") } ?: emptyList()
                     _currentOptions.value = (savedData["lastOptions"] as? List<*>)?.map { it.toString() } ?: emptyList()
 
-                    // Restaurar historial técnico
                     val savedHistory = savedData["chatHistory"] as? List<Map<String, String>>
                     chatHistory.clear()
                     savedHistory?.forEach {
                         chatHistory.add(ChatMessage(role = it["role"] ?: "user", content = it["content"] ?: ""))
                     }
-
                     _isLoading.value = false
                 } else {
-                    // CASO B: No hay datos, iniciamos historia nueva
-                    val prompt = """
-                    Eres un Dungeon Master experto. Inicia una aventura de $theme para el héroe $characterName.
-                    Describe la escena inicial y da 3 opciones de acción.
-                    Responde SIEMPRE en este formato JSON:
-                    { "story": "texto de la historia", "options": ["opcion1", "opcion2", "opcion3"] }
-                """.trimIndent()
-
-                    executeGroqCall(prompt)
-                    // isLoading se pondrá en false dentro de executeGroqCall o en el finally
+                    executeGroqCall(getInitialPrompt(characterName, theme))
                 }
             } catch (e: Exception) {
-                _messages.value = listOf("DM" to "Error al conectar con la base de datos: ${e.localizedMessage}")
+                _messages.value = listOf("DM" to "Error de conexión: ${e.localizedMessage}")
                 _isLoading.value = false
             }
         }
     }
 
-    // 4. Acción del jugador
+    // Maneja botones de opciones
     fun sendPlayerAction(action: String) {
         _messages.value = _messages.value + ("Tú" to action)
-
-        viewModelScope.launch {
-            _isLoading.value = true
-            try {
-                val prompt = "El jugador ha elegido: $action. Continúa la historia manteniendo el formato JSON anterior."
-                executeGroqCall(prompt)
-            } catch (e: Exception) {
-                _messages.value = _messages.value + ("DM" to "Error: ${e.localizedMessage}")
-            } finally {
-                _isLoading.value = false
-            }
-        }
+        generateNextStep(action)
     }
 
-    // 5. Lógica de red y parseo
-    private val chatHistory = mutableListOf<ChatMessage>()
+    // Maneja el texto libre (TextField)
+    fun sendCustomAction(action: String) {
+        if (action.isBlank()) return
+        _messages.value = _messages.value + ("Tú" to action)
+        generateNextStep(action)
+    }
+
+    // --- EL CORAZÓN DE LA LÓGICA ---
+    private fun generateNextStep(action: String) {
+        viewModelScope.launch {
+            executeGroqCall("El jugador intenta: $action")
+        }
+    }
 
     private suspend fun executeGroqCall(promptContent: String) {
         _isLoading.value = true
         try {
-            // Añadimos el mensaje del usuario al historial
             chatHistory.add(ChatMessage(role = "user", content = promptContent))
 
+            val systemPrompt = ChatMessage(role = "system", content = getEnhancedSystemPrompt())
             val request = GroqRequest(
-                messages = listOf(ChatMessage(role = "system", content = "Eres un DM que responde exclusivamente en JSON.")) + chatHistory
+                messages = listOf(systemPrompt) + chatHistory
             )
 
             val response = apiService.getCompletion(apiKey, request)
             val rawJson = response.choices.firstOrNull()?.message?.content ?: ""
 
-            // Limpieza y parseo
-            val cleanJson = rawJson.substringAfter("{").substringBeforeLast("}")
-            val adventure = gson.fromJson("{$cleanJson}", AdventureStep::class.java)
+            val adventure = gson.fromJson(rawJson, AdventureStep::class.java)
 
-            // IMPORTANTE: Guardamos solo la historia en el historial para la IA, no el JSON crudo
             chatHistory.add(ChatMessage(role = "assistant", content = adventure.story))
-
             _messages.value = _messages.value + ("DM" to adventure.story)
             _currentOptions.value = adventure.options
 
-            saveCurrentGame()
+            // Aquí es donde procesaríamos adventure.damageTaken o adventure.itemFound más adelante
 
+            saveCurrentGame()
         } catch (e: Exception) {
-            // Si falla el JSON, intentamos al menos mostrar lo que dijo la IA o un error amigable
-            _messages.value = _messages.value + ("DM" to "El DM se ha quedado sin palabras... (Error de formato)")
-            _currentOptions.value = listOf("Reintentar", "Cargar partida")
+            _messages.value = _messages.value + ("DM" to "El DM se ha confundido con las reglas...")
         } finally {
             _isLoading.value = false
         }
     }
 
+    private fun getEnhancedSystemPrompt(): String {
+        return """
+        Eres un Dungeon Master. Responde SIEMPRE en JSON exacto:
+        {
+          "story": "descripción",
+          "options": ["opción 1", "opción 2"],
+          "damageTaken": 0,
+          "itemFound": null
+        }
+        Si el jugador hace algo arriesgado, suma daño en damageTaken.
+        """.trimIndent()
+    }
+
+    private fun getInitialPrompt(name: String, theme: String): String {
+        return "Inicia una aventura de $theme para el héroe $name. Describe el inicio y da opciones."
+    }
+
     private fun saveCurrentGame() {
         viewModelScope.launch {
             try {
-                // Ya no necesitas safeId porque currentGameId ya viene limpio de startStory
-                val nameFromId = currentGameId.split("_").getOrNull(1) ?: "Heroe"
-
                 val gameData = mapOf(
                     "userId" to currentUserId,
-                    "characterName" to nameFromId,
                     "displayMessages" to _messages.value.map { mapOf("first" to it.first, "second" to it.second) },
                     "chatHistory" to chatHistory.map { mapOf("role" to it.role, "content" to it.content) },
                     "lastOptions" to _currentOptions.value,
                     "timestamp" to System.currentTimeMillis()
                 )
-
-                // Usamos un ID de documento sin espacios
-                val safeId = currentGameId.replace(" ", "_")
                 repository.saveGame(currentGameId, gameData)
-                println("DEBUG: Guardado solicitado para $currentGameId")
             } catch (e: Exception) {
-                println("DEBUG: Error al intentar guardar: ${e.message}")
+                println("Error al guardar: ${e.message}")
             }
-        }
-    }
-
-    // En GameRepository.kt
-    suspend fun saveGame(gameId: String, gameData: Map<String, Any>) {
-        try {
-            // Esto creará la colección "partidas" automáticamente si no existe
-            FirebaseFirestore.getInstance()
-                .collection("partidas")
-                .document(gameId)
-                .set(gameData)
-                .await()
-            println("DEBUG: Guardado con éxito en Firebase")
-        } catch (e: Exception) {
-            println("DEBUG: Error al guardar: ${e.message}")
         }
     }
 }
