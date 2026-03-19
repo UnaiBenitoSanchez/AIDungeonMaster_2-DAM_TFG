@@ -1,16 +1,15 @@
 package com.example.aidungeonmaster.ui.game
 
 import android.Manifest
-import android.util.Size
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -26,12 +25,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.aidungeonmaster.data.model.Item
 import com.example.aidungeonmaster.viewmodel.InventoryViewModel
-import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
@@ -45,194 +42,280 @@ fun QRScannerScreen(
     onBack: () -> Unit,
     inventoryViewModel: InventoryViewModel = viewModel()
 ) {
-    val context = LocalContext.current // Corregido
+    val context       = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
     var detectedItem by remember { mutableStateOf<Item?>(null) }
-    var isSaving by remember { mutableStateOf(false) }
-
-    val scope = rememberCoroutineScope()
+    var isSaving     by remember { mutableStateOf(false) }
+    val scope        = rememberCoroutineScope()
 
     var hasCameraPermission by remember {
         mutableStateOf(
-            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                context, Manifest.permission.CAMERA
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
         )
     }
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
-        hasCameraPermission = isGranted
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        hasCameraPermission = it
     }
 
-    LaunchedEffect(Unit) {
-        if (!hasCameraPermission) {
-            launcher.launch(Manifest.permission.CAMERA)
-        }
-    }
-
-    LaunchedEffect(gameId) {
-        inventoryViewModel.loadInventory(gameId)
-    }
+    LaunchedEffect(Unit) { if (!hasCameraPermission) launcher.launch(Manifest.permission.CAMERA) }
+    LaunchedEffect(gameId) { inventoryViewModel.loadInventory(gameId) }
 
     MedievalBackground {
         Scaffold(
             topBar = {
-                TopAppBar( // Usando TopAppBar estándar de M3
+                TopAppBar(
                     title = { MedievalTitle("ESCANEAR BOTÍN") },
                     navigationIcon = {
                         IconButton(onClick = onBack) {
                             Icon(Icons.Default.ArrowBack, contentDescription = "Volver", tint = Color.White)
                         }
                     },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color.Transparent
-                    )
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
                 )
             },
             containerColor = Color.Transparent
         ) { padding ->
             Column(modifier = Modifier.padding(padding).padding(16.dp)) {
-                if (!hasCameraPermission) {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("Se requiere permiso de cámara", color = Color.Red)
+                when {
+                    !hasCameraPermission -> {
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text("Se requiere permiso de cámara", color = Color.Red)
+                        }
                     }
-                } else if (detectedItem == null) {
-                    Box(modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .border(2.dp, Color(0xFFFFD700), RoundedCornerShape(12.dp))
-                    ) {
-                        AndroidView(
-                            factory = { ctx ->
-                                val previewView = PreviewView(ctx)
-                                val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
+                    detectedItem == null -> {
+                        // ── Instrucciones de formato ──────────────────────────
+                        Card(
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color(0x99000000)),
+                            border = CardDefaults.outlinedCardBorder()
+                        ) {
+                            Text(
+                                "Apunta a un QR con formato AIDO:tipo|nombre|efecto",
+                                modifier = Modifier.padding(10.dp),
+                                color = Color(0xFFFFD700),
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        }
 
-                                cameraProviderFuture.addListener({
-                                    val cameraProvider = cameraProviderFuture.get()
-                                    val preview = Preview.Builder().build().also {
-                                        it.setSurfaceProvider(previewView.surfaceProvider)
-                                    }
-
-                                    val imageAnalysis = ImageAnalysis.Builder()
-                                        .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                                        .build()
-
-                                    imageAnalysis.setAnalyzer(Executors.newSingleThreadExecutor()) { imageProxy ->
-                                        processImageProxy(imageProxy) { qrContent ->
-                                            if (detectedItem == null) {
-                                                val item = parseQrToItem(qrContent)
-                                                if (item != null) {
-                                                    detectedItem = item
+                        // ── Visor de cámara ───────────────────────────────────
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .border(2.dp, Color(0xFFFFD700), RoundedCornerShape(12.dp))
+                        ) {
+                            androidx.compose.ui.viewinterop.AndroidView(
+                                factory = { ctx ->
+                                    val previewView = PreviewView(ctx)
+                                    val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
+                                    cameraProviderFuture.addListener({
+                                        val cameraProvider = cameraProviderFuture.get()
+                                        val preview = Preview.Builder().build().also {
+                                            it.setSurfaceProvider(previewView.surfaceProvider)
+                                        }
+                                        val imageAnalysis = ImageAnalysis.Builder()
+                                            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                                            .build()
+                                        imageAnalysis.setAnalyzer(Executors.newSingleThreadExecutor()) { proxy ->
+                                            processImageProxy(proxy) { qrContent ->
+                                                if (detectedItem == null) {
+                                                    val item = parseQrToItem(qrContent)
+                                                    if (item != null) detectedItem = item
                                                 }
                                             }
                                         }
-                                    }
-
-                                    try {
-                                        cameraProvider.unbindAll()
-                                        cameraProvider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, imageAnalysis)
-                                    } catch (e: Exception) { e.printStackTrace() }
-                                }, ContextCompat.getMainExecutor(ctx))
-                                previewView
-                            },
-                            modifier = Modifier.fillMaxSize()
+                                        try {
+                                            cameraProvider.unbindAll()
+                                            cameraProvider.bindToLifecycle(
+                                                lifecycleOwner,
+                                                CameraSelector.DEFAULT_BACK_CAMERA,
+                                                preview, imageAnalysis
+                                            )
+                                        } catch (e: Exception) { e.printStackTrace() }
+                                    }, ContextCompat.getMainExecutor(ctx))
+                                    previewView
+                                },
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                    }
+                    else -> {
+                        BotinEncontradoDialog(
+                            item     = detectedItem!!,
+                            isSaving = isSaving,
+                            onCancel = { detectedItem = null },
+                            onConfirm = {
+                                scope.launch {
+                                    isSaving = true
+                                    inventoryViewModel.addItemToInventory(gameId, detectedItem!!)
+                                    kotlinx.coroutines.delay(1000)
+                                    isSaving = false
+                                    onBack()
+                                }
+                            }
                         )
                     }
-                } else {
-                    BotinEncontradoDialog(
-                        item = detectedItem!!,
-                        isSaving = isSaving,
-                        onCancel = { detectedItem = null },
-                        onConfirm = {
-                            // Usamos el scope que declaramos arriba
-                            scope.launch {
-                                isSaving = true
-                                inventoryViewModel.addItemToInventory(gameId, detectedItem!!)
-
-                                // Esperamos para asegurar la escritura y dar feedback
-                                kotlinx.coroutines.delay(1000)
-
-                                isSaving = false
-                                onBack()
-                            }
-                        }
-                    )
                 }
             }
         }
     }
 }
 
-// Lógica de ML Kit para procesar la imagen de la cámara
+// ── PROCESADO DE IMAGEN CON ML KIT ───────────────────────────────────────────
+
+@androidx.annotation.OptIn(ExperimentalGetImage::class)
 @OptIn(androidx.camera.core.ExperimentalGetImage::class)
 private fun processImageProxy(imageProxy: ImageProxy, onQrFound: (String) -> Unit) {
-    val mediaImage = imageProxy.image
-    if (mediaImage != null) {
-        val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
-        val scanner = BarcodeScanning.getClient()
-
-        scanner.process(image)
-            .addOnSuccessListener { barcodes ->
-                for (barcode in barcodes) {
-                    when (barcode.valueType) {
-                        Barcode.TYPE_TEXT -> {
-                            onQrFound(barcode.rawValue ?: "")
-                            return@addOnSuccessListener
-                        }
-                    }
+    val mediaImage = imageProxy.image ?: run { imageProxy.close(); return }
+    val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
+    BarcodeScanning.getClient().process(image)
+        .addOnSuccessListener { barcodes ->
+            for (b in barcodes) {
+                if (b.valueType == Barcode.TYPE_TEXT) {
+                    onQrFound(b.rawValue ?: "")
+                    return@addOnSuccessListener
                 }
             }
-            .addOnCompleteListener {
-                imageProxy.close()
-            }
-    } else {
-        imageProxy.close()
-    }
+        }
+        .addOnCompleteListener { imageProxy.close() }
 }
 
-// Lógica para convertir el texto crudo del QR en un Objeto
+// ── PARSER DE QR → ITEM ───────────────────────────────────────────────────────
+//
+//  FORMATOS SOPORTADOS (ver guía al final del archivo):
+//
+//  1. AIDO:tipo|nombre|descripcion|efecto
+//     Ej: AIDO:pocion|Poción de Curación|Restaura energía vital|cura:2d4+2
+//
+//  2. JSON  {"name":"X","type":"Y","description":"Z","effect":"W"}
+//
+//  3. Texto plano → consumible básico sin efecto
+
 private fun parseQrToItem(content: String): Item? {
     return try {
-        // Opción 1: El QR contiene un JSON rústico (Ej: {"name":"Pocion", "type":"pocion"})
-        // Usa Gson si lo prefieres, aquí lo parseamos manual por simplicidad
-        if (content.startsWith("{") && content.endsWith("}")) {
-            val name = content.substringAfter("\"name\":\"").substringBefore("\"")
-            val type = content.substringAfter("\"type\":\"").substringBefore("\"")
-            val effect = content.substringAfter("\"effect\":\"").substringBefore("\"")
-            if (name.isNotBlank()) Item(name = name, type = type, effect = effect) else null
-        } else if (content.startsWith("AIDO:")) {
-            // Opción 2: Formato propio (Ej: AIDO:pocion|Pocion de Curación|Cura 2d4)
-            val parts = content.removePrefix("AIDO:").split("|")
-            Item(type = parts[0], name = parts[1], effect = parts[2])
-        } else {
-            // Opción 3: Solo texto (lo convertimos en consumible básico)
-            Item(name = content, type = "consumible")
+        when {
+            // ── Formato AIDO: ─────────────────────────────────────────────
+            content.uppercase().startsWith("AIDO:") -> {
+                val body  = content.removePrefix("AIDO:").removePrefix("aido:")
+                val parts = body.split("|")
+                if (parts.size < 2) return null
+                val type  = normalizeItemType(parts.getOrElse(0) { "consumible" })
+                val name  = parts.getOrElse(1) { "Objeto misterioso" }
+                val desc  = parts.getOrElse(2) { "" }
+                val effect = parts.getOrElse(3) { defaultEffectForType(type) }
+                Item(
+                    id          = System.currentTimeMillis().toString(),
+                    name        = name,
+                    description = desc,
+                    type        = type,
+                    effect      = effect
+                )
+            }
+
+            // ── Formato JSON ──────────────────────────────────────────────
+            content.trimStart().startsWith("{") -> {
+                val name  = content.substringAfter("\"name\":\"").substringBefore("\"").trim()
+                val type  = normalizeItemType(content.substringAfter("\"type\":\"").substringBefore("\"").trim())
+                val desc  = content.substringAfter("\"description\":\"").substringBefore("\"").trim()
+                val eff   = content.substringAfter("\"effect\":\"").substringBefore("\"").trim()
+                if (name.isBlank()) null
+                else Item(
+                    id          = System.currentTimeMillis().toString(),
+                    name        = name,
+                    description = desc,
+                    type        = type,
+                    effect      = eff.ifBlank { defaultEffectForType(type) }
+                )
+            }
+
+            // ── Texto plano ───────────────────────────────────────────────
+            content.isNotBlank() -> Item(
+                id          = System.currentTimeMillis().toString(),
+                name        = content.take(60),
+                description = "Objeto encontrado en la aventura",
+                type        = "consumible",
+                effect      = ""
+            )
+
+            else -> null
         }
-    } catch (e: Exception) {
-        null
-    }
+    } catch (e: Exception) { null }
 }
 
+/** Normaliza sinónimos del campo tipo */
+private fun normalizeItemType(raw: String): String = when (raw.lowercase().trim()) {
+    "pocion", "poción", "potion", "bebida", "elixir"                  -> "pocion"
+    "arma", "weapon", "espada", "hacha", "daga", "arco", "lanza"      -> "arma"
+    "armadura", "armor", "escudo", "casco", "yelmo", "peto"           -> "armadura"
+    "pergamino", "scroll", "hechizo", "magia"                         -> "pergamino"
+    "veneno", "poison"                                                 -> "veneno"
+    "granada", "explosivo", "bomba"                                    -> "explosivo"
+    "reliquia", "artefacto", "artifact"                               -> "reliquia"
+    "comida", "ración", "food"                                        -> "consumible"
+    else                                                               -> "consumible"
+}
+
+/** Efecto por defecto según tipo cuando el QR no especifica uno */
+private fun defaultEffectForType(type: String): String = when (type) {
+    "pocion"     -> "cura:1d8+2"
+    "arma"       -> "daño:1d6"
+    "armadura"   -> "+2 CA"
+    "pergamino"  -> "daño:2d6"
+    "veneno"     -> "veneno:1d4"
+    "explosivo"  -> "daño:2d8"
+    else         -> ""
+}
+
+// ── DIÁLOGO DE BOTÍN ─────────────────────────────────────────────────────────
+
 @Composable
-fun BotinEncontradoDialog(item: Item, isSaving: Boolean, onCancel: () -> Unit, onConfirm: () -> Unit) {
+fun BotinEncontradoDialog(
+    item: Item, isSaving: Boolean,
+    onCancel: () -> Unit, onConfirm: () -> Unit
+) {
+    val typeEmoji = when (item.type) {
+        "pocion"    -> "🧪"
+        "arma"      -> "⚔️"
+        "armadura"  -> "🛡️"
+        "pergamino" -> "📜"
+        "veneno"    -> "☠️"
+        "explosivo" -> "💣"
+        "reliquia"  -> "✨"
+        else        -> "🎒"
+    }
+
     Card(
-        modifier = Modifier.fillMaxWidth().padding(16.dp).border(2.dp, Color(0xFFFFD700), RoundedCornerShape(12.dp)),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp)
+            .border(2.dp, Color(0xFFFFD700), RoundedCornerShape(12.dp)),
         colors = CardDefaults.cardColors(containerColor = Color(0xAA000000))
     ) {
-        Column(modifier = Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("¡BOTÍN ENCONTRADO!", color = Color(0xFFFFD700), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(16.dp))
-            InventoryItemRow(item) // Reutilizamos la vista de la mochila
+        Column(
+            modifier = Modifier.padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text("¡BOTÍN ENCONTRADO!", color = Color(0xFFFFD700),
+                style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text(typeEmoji, style = MaterialTheme.typography.displaySmall)
+            Spacer(Modifier.height(12.dp))
+            InventoryItemRow(item)
             Spacer(Modifier.height(24.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                 OutlinedButton(onClick = onCancel, enabled = !isSaving) {
                     Text("Desechar", color = Color.Red)
                 }
-                Button(onClick = onConfirm, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFD700)), enabled = !isSaving) {
-                    if (isSaving) {
-                        CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.Black)
-                    } else {
-                        Text("Guardar", color = Color.Black)
-                    }
+                Button(
+                    onClick  = onConfirm,
+                    enabled  = !isSaving,
+                    colors   = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFD700))
+                ) {
+                    if (isSaving) CircularProgressIndicator(Modifier.size(16.dp), color = Color.Black)
+                    else Text("Guardar en mochila", color = Color.Black)
                 }
             }
         }

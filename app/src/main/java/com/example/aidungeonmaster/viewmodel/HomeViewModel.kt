@@ -25,7 +25,8 @@ class HomeViewModel : ViewModel() {
         race: String,
         clazz: String,
         stats: Map<String, Int>,
-        physicalTraits: String
+        physicalTraits: String,
+        portraitUrl: String = ""
     ) {
         val userId = auth.currentUser?.uid ?: return
 
@@ -34,11 +35,12 @@ class HomeViewModel : ViewModel() {
                 Log.d("APP_FIRESTORE", "Guardando personaje...")
 
                 val charData = Character(
-                    name = name,
-                    race = race,
+                    name           = name,
+                    race           = race,
                     characterClass = clazz,
-                    stats = stats,
-                    physicalTraits = physicalTraits
+                    stats          = stats,
+                    physicalTraits = physicalTraits,
+                    portraitUrl    = portraitUrl
                 )
 
                 // Guardamos directamente en la colección del usuario

@@ -19,9 +19,9 @@ data class Character(
     val physicalTraits: String = "",
     val gameTheme: String? = null,
 
-    // --- NUEVOS CAMPOS (Añade estos) ---
+    // --- CAMPOS DE SISTEMA ---
     val hpMax: Int = 20,
     val hpCurrent: Int = 20,
-    // Una lista de objetos que el personaje posee
-    val inventory: List<Item> = emptyList()
+    val inventory: List<Item> = emptyList(),
+    val portraitUrl: String = ""   // URL generada por Pollinations.ai
 )

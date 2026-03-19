@@ -7,7 +7,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete // Icono de borrar
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
@@ -16,10 +16,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
+import coil.compose.SubcomposeAsyncImage
+import coil.request.ImageRequest
 import com.example.aidungeonmaster.data.model.Character
 import com.example.aidungeonmaster.navigation.Screen
 import com.example.aidungeonmaster.viewmodel.HomeViewModel
@@ -30,8 +34,6 @@ import com.google.firebase.auth.FirebaseAuth
 fun HomeScreen(navController: NavHostController, viewModel: HomeViewModel = viewModel()) {
     val characters by viewModel.characters.collectAsState()
     var showDialog by remember { mutableStateOf(false) }
-
-    // Estado para el diálogo de confirmación de borrado
     var characterToDelete by remember { mutableStateOf<Character?>(null) }
 
     val userId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
@@ -43,9 +45,7 @@ fun HomeScreen(navController: NavHostController, viewModel: HomeViewModel = view
                 actions = {
                     IconButton(onClick = {
                         viewModel.logout {
-                            navController.navigate(Screen.Login.route) {
-                                popUpTo(0) { inclusive = true }
-                            }
+                            navController.navigate(Screen.Login.route) { popUpTo(0) { inclusive = true } }
                         }
                     }) {
                         Icon(Icons.Default.ExitToApp, "Cerrar Sesión", tint = MaterialTheme.colorScheme.error)
@@ -60,7 +60,6 @@ fun HomeScreen(navController: NavHostController, viewModel: HomeViewModel = view
         }
     ) { padding ->
         Column(modifier = Modifier.padding(padding).padding(horizontal = 16.dp).fillMaxSize()) {
-
             if (characters.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text("No hay aventureros todavía.", color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -72,13 +71,9 @@ fun HomeScreen(navController: NavHostController, viewModel: HomeViewModel = view
                             character = character,
                             onClick = {
                                 if (character.gameTheme.isNullOrEmpty()) {
-                                    // CASO A: No tiene partida, va a elegir tema (GameSetup)
                                     navController.navigate(Screen.GameSetup.createRoute(userId, character.name))
                                 } else {
-                                    // CASO B: Ya tiene partida, va DIRECTO a jugar (GamePlay)
-                                    navController.navigate(
-                                        Screen.GamePlay.createRoute(userId, character.name, character.gameTheme)
-                                    )
+                                    navController.navigate(Screen.GamePlay.createRoute(userId, character.name, character.gameTheme))
                                 }
                             },
                             onDelete = { characterToDelete = character }
@@ -89,39 +84,30 @@ fun HomeScreen(navController: NavHostController, viewModel: HomeViewModel = view
         }
     }
 
-    // DIÁLOGO DE CREACIÓN
+    // ── DIÁLOGO CREACIÓN ─────────────────────────────────────────────────────
     if (showDialog) {
         CreateCharacterDialog(
             onDismiss = { showDialog = false },
-            onCreate = { name, race, clazz, stats, traits ->
-                viewModel.saveCharacter(name, race, clazz, stats, traits)
+            onCreate  = { name, race, clazz, stats, traits, portraitUrl ->
+                viewModel.saveCharacter(name, race, clazz, stats, traits, portraitUrl)
                 showDialog = false
             }
         )
     }
 
-    // DIÁLOGO DE CONFIRMACIÓN DE BORRADO
+    // ── DIÁLOGO CONFIRMACIÓN BORRADO ─────────────────────────────────────────
     characterToDelete?.let { character ->
         AlertDialog(
             onDismissRequest = { characterToDelete = null },
-            title = { Text("¿Eliminar personaje?") },
-            text = { Text("¿Estás seguro de que quieres borrar a ${character.name}? Esta acción no se puede deshacer.") },
+            title   = { Text("¿Eliminar personaje?") },
+            text    = { Text("¿Estás seguro de que quieres borrar a ${character.name}? Esta acción no se puede deshacer.") },
             confirmButton = {
                 TextButton(
-                    onClick = {
-                        viewModel.deleteCharacter(character.id)
-                        characterToDelete = null
-                    },
-                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                ) {
-                    Text("Eliminar")
-                }
+                    onClick = { viewModel.deleteCharacter(character.id); characterToDelete = null },
+                    colors  = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) { Text("Eliminar") }
             },
-            dismissButton = {
-                TextButton(onClick = { characterToDelete = null }) {
-                    Text("Cancelar")
-                }
-            }
+            dismissButton = { TextButton(onClick = { characterToDelete = null }) { Text("Cancelar") } }
         )
     }
 }
@@ -129,39 +115,63 @@ fun HomeScreen(navController: NavHostController, viewModel: HomeViewModel = view
 @Composable
 fun CharacterCard(character: Character, onClick: () -> Unit, onDelete: () -> Unit) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp)
-            .clickable { onClick() },
+        modifier  = Modifier.fillMaxWidth().padding(vertical = 8.dp).clickable { onClick() },
         elevation = CardDefaults.cardElevation(4.dp)
     ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+
+            // ── RETRATO O ICONO POR DEFECTO ──────────────────────────────────
             Box(
                 modifier = Modifier
-                    .size(50.dp)
-                    .clip(RoundedCornerShape(8.dp))
+                    .size(64.dp)
+                    .clip(RoundedCornerShape(10.dp))
                     .background(MaterialTheme.colorScheme.primaryContainer),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Default.Person, null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                if (character.portraitUrl.isNotBlank()) {
+                    SubcomposeAsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(character.portraitUrl).crossfade(true).build(),
+                        contentDescription = "Retrato de ${character.name}",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(10.dp)),
+                        loading = {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp).padding(4.dp),
+                                strokeWidth = 2.dp
+                            )
+                        },
+                        error = {
+                            Icon(Icons.Default.Person, null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                        }
+                    )
+                } else {
+                    Icon(Icons.Default.Person, null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                }
             }
 
-            Spacer(Modifier.width(16.dp))
+            Spacer(Modifier.width(14.dp))
 
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = character.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-
-                // Mostramos Raza, Clase y TEMA si existe
+                Text(character.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 val subtitle = if (!character.gameTheme.isNullOrEmpty()) {
                     "${character.race} • ${character.characterClass} | ${character.gameTheme}"
                 } else {
                     "${character.race} • ${character.characterClass} (Sin partida)"
                 }
-
-                Text(text = subtitle, style = MaterialTheme.typography.bodyMedium)
+                Text(subtitle, style = MaterialTheme.typography.bodyMedium)
+                // Mostrar HP si el personaje ya tiene partida
+                if (character.hpCurrent > 0 || character.hpMax > 0) {
+                    Text(
+                        "❤️ ${character.hpCurrent} / ${character.hpMax}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = when {
+                            character.hpCurrent <= character.hpMax * 0.25f -> Color.Red
+                            character.hpCurrent <= character.hpMax * 0.5f  -> Color(0xFFFF9800)
+                            else -> Color(0xFF4CAF50)
+                        }
+                    )
+                }
             }
 
             IconButton(onClick = onDelete) {

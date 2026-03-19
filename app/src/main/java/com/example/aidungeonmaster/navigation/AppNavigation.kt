@@ -5,6 +5,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import com.example.aidungeonmaster.ui.game.CombatScreen
 import com.example.aidungeonmaster.ui.game.GamePlayScreen
 import com.example.aidungeonmaster.ui.game.GameSetupScreen
 import com.example.aidungeonmaster.ui.game.InventoryScreen
@@ -13,6 +14,8 @@ import com.example.aidungeonmaster.ui.home.HomeScreen
 import com.example.aidungeonmaster.ui.login.LoginScreen
 import com.example.aidungeonmaster.ui.register.RegisterScreen
 import com.example.aidungeonmaster.viewmodel.AuthViewModel
+import com.example.aidungeonmaster.viewmodel.GameViewModel        // IMPORTANTE
+import com.example.aidungeonmaster.viewmodel.InventoryViewModel   // IMPORTANTE
 
 
 sealed class Screen(val route: String) {
@@ -20,7 +23,6 @@ sealed class Screen(val route: String) {
     object Register : Screen("register")
     object Home : Screen("home")
 
-    // NUEVAS RUTAS
     object Inventory : Screen("inventory/{userId}") {
         fun createRoute(userId: String) = "inventory/$userId"
     }
@@ -38,7 +40,11 @@ sealed class Screen(val route: String) {
 
 @Composable
 fun AppNavigation(navController: NavHostController) {
+    // INICIALIZACIÓN DE VIEWMODELS
     val authViewModel: AuthViewModel = viewModel()
+    val gameViewModel: GameViewModel = viewModel()           // <--- AÑADIDO
+    val inventoryViewModel: InventoryViewModel = viewModel() // <--- AÑADIDO
+
     val startRoute = if (authViewModel.isUserLoggedIn()) Screen.Home.route else Screen.Login.route
 
     NavHost(navController = navController, startDestination = startRoute) {
@@ -53,13 +59,12 @@ fun AppNavigation(navController: NavHostController) {
         }
 
         composable(Screen.GamePlay.route) { backStackEntry ->
-            val userId = backStackEntry.arguments?.getString("userId") ?: ""
+            val userId        = backStackEntry.arguments?.getString("userId")        ?: ""
             val characterName = backStackEntry.arguments?.getString("characterName") ?: ""
-            val theme = backStackEntry.arguments?.getString("theme") ?: ""
-            GamePlayScreen(navController, userId, characterName, theme)
+            val theme         = backStackEntry.arguments?.getString("theme")         ?: ""
+            GamePlayScreen(navController, userId, characterName, theme, gameViewModel, inventoryViewModel)
         }
 
-        // Dentro de tu NavHost en AppNavigation.kt
         composable("qr_scanner/{gameId}") { backStackEntry ->
             val gameId = backStackEntry.arguments?.getString("gameId") ?: ""
             QRScannerScreen(
@@ -73,6 +78,20 @@ fun AppNavigation(navController: NavHostController) {
             InventoryScreen(
                 gameId = idParaElInventario,
                 onBack = { navController.popBackStack() }
+            )
+        }
+
+        // RUTA DE COMBATE — recibe el gameId para actualizar HP
+        composable("combat/{gameId}") { backStackEntry ->
+            val gameId = backStackEntry.arguments?.getString("gameId") ?: ""
+            CombatScreen(
+                gameViewModel      = gameViewModel,
+                inventoryViewModel = inventoryViewModel,
+                gameId             = gameId,
+                onCombatEnd        = { victory ->
+                    gameViewModel.notifyCombatEnd(victory, gameViewModel.currentAdventureStep.value?.enemy?.name ?: "el enemigo")
+                    navController.popBackStack()
+                }
             )
         }
     }
