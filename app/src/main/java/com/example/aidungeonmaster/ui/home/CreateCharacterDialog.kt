@@ -196,7 +196,8 @@ fun CreateCharacterDialog(
                             portraitState = PortraitState.Loading
                             scope.launch {
                                 try {
-                                    val base64 = ImageUtils.generatePortraitBase64(race, clazz, physicalTraits)
+                                    // Añade 'subclazz' aquí:
+                                    val base64 = ImageUtils.generatePortraitBase64(race, clazz, subclazz, physicalTraits)
                                     val bitmap = ImageUtils.base64ToBitmap(base64)
                                     portraitState = PortraitState.Ready(bitmap, base64)
                                 } catch (e: Exception) {
@@ -218,7 +219,7 @@ fun CreateCharacterDialog(
                                 Text("Pintando el retrato...", color = Color.White, fontSize = 13.sp)
                             }
                         } else {
-                            val label = if (portraitState is PortraitState.Ready) "🔄 Regenerar Retrato" else "🖼️ Generar Retrato con IA"
+                            val label = if (portraitState is PortraitState.Ready) "🔄 Regenerar Retrato" else "🖼️ Generar Retrato"
                             Text(label, color = Color.White)
                         }
                     }
@@ -290,7 +291,7 @@ fun CreateCharacterDialog(
                                     color = Color(0xFF7B1FA2)
                                 )
                                 Column {
-                                    Text("Generando retrato con IA...", color = Color(0xFFCE93D8), fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                    Text("Generando retrato...", color = Color(0xFFCE93D8), fontSize = 13.sp, fontWeight = FontWeight.Bold)
                                     Text("Puede tardar entre 30 y 90 segundos. Por favor espera.", color = Color.Gray, fontSize = 11.sp)
                                 }
                             }

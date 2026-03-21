@@ -39,6 +39,18 @@ android {
             "\"${localProps.getProperty("GEMINI_API_KEY", "")}\""
         )
 
+        buildConfigField(
+            "String",
+            "CLOUDFLARE_ACCOUNT_ID",
+            "\"${localProps.getProperty("CLOUDFLARE_ACCOUNT_ID", "")}\""
+        )
+
+        buildConfigField(
+            "String",
+            "CLOUDFLARE_API_TOKEN",
+            "\"${localProps.getProperty("CLOUDFLARE_API_TOKEN", "")}\""
+        )
+
     }
 
     buildTypes {

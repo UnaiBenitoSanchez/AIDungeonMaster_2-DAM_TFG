@@ -138,13 +138,31 @@ fun HomeScreen(navController: NavHostController, viewModel: HomeViewModel = view
 
 @Composable
 fun CharacterCard(character: Character, onClick: () -> Unit, onDelete: () -> Unit) {
+
+    // Cambia la lógica del imageModel por esta más robusta:
+    val imageModel = remember(character.portraitUrl) {
+        val url = character.portraitUrl
+        if (url.isNullOrEmpty()) {
+            null
+        } else if (url.startsWith("iVBOR") || url.length > 100) {
+            // Si empieza por iVBOR o es muy largo, asumimos que es Base64 puro
+            try {
+                android.util.Base64.decode(url, android.util.Base64.DEFAULT)
+            } catch (e: Exception) {
+                null
+            }
+        } else {
+            url // Es una URL de internet normal
+        }
+    }
+
     Card(
         modifier  = Modifier.fillMaxWidth().padding(vertical = 8.dp).clickable { onClick() },
         elevation = CardDefaults.cardElevation(4.dp)
     ) {
         Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
 
-            // ── RETRATO O ICONO POR DEFECTO ──────────────────────────────────
+            // ── RETRATO ──
             Box(
                 modifier = Modifier
                     .size(64.dp)
@@ -155,10 +173,12 @@ fun CharacterCard(character: Character, onClick: () -> Unit, onDelete: () -> Uni
                 if (character.portraitUrl.isNotBlank()) {
                     SubcomposeAsyncImage(
                         model = ImageRequest.Builder(LocalContext.current)
-                            .data(character.portraitUrl).crossfade(true).build(),
+                            .data(imageModel) // <── Usamos el modelo procesado aquí
+                            .crossfade(true)
+                            .build(),
                         contentDescription = "Retrato de ${character.name}",
                         contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(10.dp)),
+                        modifier = Modifier.fillMaxSize(),
                         loading = {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(20.dp).padding(4.dp),
@@ -178,14 +198,16 @@ fun CharacterCard(character: Character, onClick: () -> Unit, onDelete: () -> Uni
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(character.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+
                 val subtitle = if (!character.gameTheme.isNullOrEmpty()) {
                     "${character.race} • ${character.characterClass} | ${character.gameTheme}"
                 } else {
                     "${character.race} • ${character.characterClass} (Sin partida)"
                 }
                 Text(subtitle, style = MaterialTheme.typography.bodyMedium)
+
                 // HP si tiene partida
-                if (character.hpCurrent > 0 || character.hpMax > 0) {
+                if (character.hpMax > 0) {
                     Text(
                         "❤️ ${character.hpCurrent} / ${character.hpMax}",
                         style = MaterialTheme.typography.bodySmall,
@@ -196,17 +218,8 @@ fun CharacterCard(character: Character, onClick: () -> Unit, onDelete: () -> Uni
                         }
                     )
                 }
-                // Última vez que jugó
-                if (character.lastPlayed > 0L) {
-                    val sdf = java.text.SimpleDateFormat("dd/MM/yyyy  HH:mm", java.util.Locale.getDefault())
-                    val fecha = sdf.format(java.util.Date(character.lastPlayed))
-                    Text(
-                        "🕐 Última partida: $fecha",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color.Gray
-                    )
-                }
-                // Última sesión
+
+                // Última sesión (He unido tus dos bloques de tiempo en uno solo más limpio)
                 if (character.lastPlayed > 0L) {
                     Text(
                         "🕐 ${formatLastPlayed(character.lastPlayed)}",
