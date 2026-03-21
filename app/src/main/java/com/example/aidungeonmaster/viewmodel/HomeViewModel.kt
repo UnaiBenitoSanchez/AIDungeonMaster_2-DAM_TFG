@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.aidungeonmaster.data.model.Character
+import com.example.aidungeonmaster.viewmodel.RankingViewModel
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -69,7 +70,16 @@ class HomeViewModel : ViewModel() {
                     )
                     .await()
 
-                Log.d("APP_SUCCESS", "Personaje y partida inicial guardados correctamente")
+                // 3. Escribir en ranking global (colección pública) — con campos aplanados
+                db.collection("ranking")
+                    .document(charId)
+                    .set(
+                        RankingViewModel.buildRankingData(name, race, clazz, stats, hpMax = 20),
+                        com.google.firebase.firestore.SetOptions.merge()
+                    )
+                    .await()
+
+                Log.d("APP_SUCCESS", "Personaje, partida y ranking guardados correctamente")
 
             } catch (e: Exception) {
                 Log.e("APP_ERROR", "Error al guardar: ${e.message}", e)
@@ -147,16 +157,26 @@ class HomeViewModel : ViewModel() {
         }
     }
 
-    fun deleteCharacter(characterId: String) {
+    fun deleteCharacter(characterId: String, characterName: String) {
         val userId = auth.currentUser?.uid ?: return
+        val charId = "${userId}_${characterName}"
         viewModelScope.launch {
             try {
+                // 1. Borrar de users/{uid}/characters
                 db.collection("users")
                     .document(userId)
                     .collection("characters")
                     .document(characterId)
                     .delete()
                     .await()
+
+                // 2. Borrar del ranking global
+                db.collection("ranking")
+                    .document(charId)
+                    .delete()
+                    .await()
+
+                Log.d("APP_SUCCESS", "Personaje y ranking eliminados: $charId")
             } catch (e: Exception) {
                 Log.e("APP_ERROR", "Error eliminando: ${e.message}")
             }

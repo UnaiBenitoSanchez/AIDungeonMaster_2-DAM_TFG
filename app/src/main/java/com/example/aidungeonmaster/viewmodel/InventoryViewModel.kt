@@ -79,8 +79,15 @@ class InventoryViewModel : ViewModel() {
                 db.collection("partidas").document(gameId)
                     .update("hpCurrent", newHp).await()
                 _character.value = _character.value?.copy(hpCurrent = newHp)
+
+                // Sincronizar hpCurrent en el ranking global (no hpMax, eso no cambia aquí)
+                db.collection("ranking").document(gameId)
+                    .update("hpCurrent", newHp.toLong())
+                    .await()
+
                 Log.d("INVENTORY_DEBUG", "HP actualizado: $newHp")
             } catch (e: Exception) {
+                // Si ranking doc no existe todavía, no es crítico
                 Log.e("INVENTORY_ERROR", "updateHp: ${e.message}")
             }
         }

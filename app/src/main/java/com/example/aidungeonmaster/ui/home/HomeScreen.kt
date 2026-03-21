@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
@@ -63,6 +64,9 @@ fun HomeScreen(navController: NavHostController, viewModel: HomeViewModel = view
             TopAppBar(
                 title = { Text("Tus Personajes", fontWeight = FontWeight.Bold) },
                 actions = {
+                    IconButton(onClick = { navController.navigate("ranking") }) {
+                        Icon(Icons.Default.EmojiEvents, contentDescription = "Ranking Mundial", tint = Color(0xFFFFD700))
+                    }
                     IconButton(onClick = {
                         viewModel.logout {
                             navController.navigate(Screen.Login.route) { popUpTo(0) { inclusive = true } }
@@ -123,7 +127,7 @@ fun HomeScreen(navController: NavHostController, viewModel: HomeViewModel = view
             text    = { Text("¿Estás seguro de que quieres borrar a ${character.name}? Esta acción no se puede deshacer.") },
             confirmButton = {
                 TextButton(
-                    onClick = { viewModel.deleteCharacter(character.id); characterToDelete = null },
+                    onClick = { viewModel.deleteCharacter(character.id, character.name); characterToDelete = null },
                     colors  = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
                 ) { Text("Eliminar") }
             },

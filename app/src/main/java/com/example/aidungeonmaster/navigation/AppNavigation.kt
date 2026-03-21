@@ -1,5 +1,7 @@
 package com.example.aidungeonmaster.navigation
 
+import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
@@ -11,6 +13,8 @@ import com.example.aidungeonmaster.ui.game.GameSetupScreen
 import com.example.aidungeonmaster.ui.game.InventoryScreen
 import com.example.aidungeonmaster.ui.game.QRScannerScreen
 import com.example.aidungeonmaster.ui.home.HomeScreen
+import com.example.aidungeonmaster.ui.home.RankingScreen
+import com.example.aidungeonmaster.viewmodel.RankingViewModel
 import com.example.aidungeonmaster.ui.login.LoginScreen
 import com.example.aidungeonmaster.ui.register.RegisterScreen
 import com.example.aidungeonmaster.viewmodel.AuthViewModel
@@ -32,12 +36,15 @@ sealed class Screen(val route: String) {
         fun createRoute(userId: String, characterName: String) = "game_setup/$userId/$characterName"
     }
 
+    object Ranking : Screen("ranking")
+
     object GamePlay : Screen("game_play/{userId}/{characterName}/{theme}") {
         fun createRoute(userId: String, characterName: String, theme: String) =
             "game_play/$userId/$characterName/$theme"
     }
 }
 
+@RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
 @Composable
 fun AppNavigation(navController: NavHostController) {
     // INICIALIZACIÓN DE VIEWMODELS
@@ -51,6 +58,13 @@ fun AppNavigation(navController: NavHostController) {
         composable(Screen.Login.route) { LoginScreen(navController) }
         composable(Screen.Register.route) { RegisterScreen(navController) }
         composable(Screen.Home.route) { HomeScreen(navController) }
+        composable(Screen.Ranking.route) {
+            val rankingViewModel: RankingViewModel = viewModel()
+            RankingScreen(
+                onBack = { navController.popBackStack() },
+                viewModel = rankingViewModel
+            )
+        }
 
         composable(Screen.GameSetup.route) { backStackEntry ->
             val userId = backStackEntry.arguments?.getString("userId") ?: ""
