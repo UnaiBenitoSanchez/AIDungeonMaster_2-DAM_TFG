@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.*
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
+import com.example.aidungeonmaster.utils.CombatMusicEngine
 import com.example.aidungeonmaster.utils.ImageUtils
 import com.example.aidungeonmaster.viewmodel.*
 import kotlinx.coroutines.delay
@@ -147,8 +148,19 @@ private fun CombatContent(
     val cooldowns by combatVm.cooldowns.collectAsState()
     var activeTab by remember { mutableStateOf(0) }
 
+    // ── MÚSICA DE COMBATE ─────────────────────────────────────────
+    val musicScope = rememberCoroutineScope()
+    DisposableEffect(Unit) {
+        CombatMusicEngine.start(musicScope)
+        onDispose {
+            CombatMusicEngine.stop()
+        }
+    }
+
     LaunchedEffect(phase) {
         if (phase == CombatPhase.VICTORY || phase == CombatPhase.DEFEAT) {
+            // Fade out suave al terminar el combate
+            CombatMusicEngine.fadeOutAndStop(musicScope)
             delay(2200)
             onCombatEnd(phase == CombatPhase.VICTORY)
         }

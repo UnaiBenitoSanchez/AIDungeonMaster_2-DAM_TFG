@@ -43,17 +43,36 @@ class HomeViewModel : ViewModel() {
                     portraitUrl    = portraitUrl
                 )
 
-                // Guardamos directamente en la colección del usuario
+                // 1. Guardar en users/{uid}/characters
                 db.collection("users")
                     .document(userId)
                     .collection("characters")
                     .add(charData)
                     .await()
 
-                Log.d("APP_SUCCESS", "Personaje guardado correctamente en Firebase")
+                // 2. Crear documento en partidas/{userId}_{name} con HP y mochila vacía
+                //    Así loadInventory siempre encuentra el documento desde el primer momento
+                val charId = "${userId}_${name}"
+                db.collection("partidas")
+                    .document(charId)
+                    .set(
+                        mapOf(
+                            "characterName"  to name,
+                            "characterClass" to clazz,
+                            "userId"         to userId,
+                            "hpMax"          to 20,
+                            "hpCurrent"      to 20,
+                            "inventory"      to emptyList<Any>(),
+                            "lastPlayed"     to 0L
+                        ),
+                        com.google.firebase.firestore.SetOptions.merge()
+                    )
+                    .await()
+
+                Log.d("APP_SUCCESS", "Personaje y partida inicial guardados correctamente")
 
             } catch (e: Exception) {
-                Log.e("APP_ERROR", "Error al guardar en base de datos: ${e.message}", e)
+                Log.e("APP_ERROR", "Error al guardar: ${e.message}", e)
             }
         }
     }
@@ -61,7 +80,6 @@ class HomeViewModel : ViewModel() {
     fun fetchCharacters() {
         val userId = auth.currentUser?.uid ?: return
 
-        // Listener en tiempo real: Si añades uno, la lista se actualiza sola
         db.collection("users")
             .document(userId)
             .collection("characters")
@@ -70,15 +88,63 @@ class HomeViewModel : ViewModel() {
                     Log.e("APP_ERROR", "Error escuchando cambios: ${error.message}")
                     return@addSnapshotListener
                 }
-
                 if (snapshot != null) {
-                    val list = snapshot.documents.mapNotNull { doc ->
+                    val baseList = snapshot.documents.mapNotNull { doc ->
                         doc.toObject(Character::class.java)?.copy(id = doc.id)
                     }
-                    _characters.value = list
-                    Log.d("APP_FIRESTORE", "Lista actualizada: ${list.size} personajes")
+                    // Enriquecer con HP real y lastPlayed desde partidas
+                    viewModelScope.launch {
+                        val enriched = baseList.map { char ->
+                            try {
+                                val charId = "${userId}_${char.name}"
+                                val partidaSnap = db.collection("partidas")
+                                    .document(charId).get().await()
+                                if (partidaSnap.exists()) {
+                                    char.copy(
+                                        hpMax      = partidaSnap.getLong("hpMax")?.toInt()     ?: char.hpMax,
+                                        hpCurrent  = partidaSnap.getLong("hpCurrent")?.toInt() ?: char.hpCurrent,
+                                        lastPlayed = partidaSnap.getLong("lastPlayed")         ?: 0L
+                                    )
+                                } else {
+                                    char
+                                }
+                            } catch (e: Exception) {
+                                char
+                            }
+                        }
+                        // El último jugado aparece arriba
+                        _characters.value = enriched.sortedByDescending { it.lastPlayed }
+                        Log.d("APP_FIRESTORE", "Lista actualizada: ${enriched.size} personajes")
+                    }
                 }
             }
+    }
+
+    /**
+     * Refresca solo el HP y lastPlayed desde partidas sin relanzar el snapshot listener.
+     * Se llama cada vez que HomeScreen vuelve a ser visible.
+     */
+    fun refreshHp() {
+        val userId = auth.currentUser?.uid ?: return
+        val current = _characters.value
+        if (current.isEmpty()) return
+
+        viewModelScope.launch {
+            val enriched = current.map { char ->
+                try {
+                    val charId = "${userId}_${char.name}"
+                    val snap   = db.collection("partidas").document(charId).get().await()
+                    if (snap.exists()) {
+                        char.copy(
+                            hpMax      = snap.getLong("hpMax")?.toInt()     ?: char.hpMax,
+                            hpCurrent  = snap.getLong("hpCurrent")?.toInt() ?: char.hpCurrent,
+                            lastPlayed = snap.getLong("lastPlayed")         ?: char.lastPlayed
+                        )
+                    } else char
+                } catch (e: Exception) { char }
+            }
+            _characters.value = enriched.sortedByDescending { it.lastPlayed }
+        }
     }
 
     fun deleteCharacter(characterId: String) {

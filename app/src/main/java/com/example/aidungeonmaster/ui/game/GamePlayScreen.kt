@@ -1,5 +1,7 @@
 package com.example.aidungeonmaster.ui.game
 
+import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -15,19 +17,19 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.aidungeonmaster.viewmodel.GameViewModel
-import com.example.aidungeonmaster.viewmodel.InventoryViewModel // Importante añadir esto
-import androidx.compose.ui.draw.clip
-import androidx.compose.foundation.Image
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.text.font.FontFamily
+import com.example.aidungeonmaster.viewmodel.InventoryViewModel
+import com.example.aidungeonmaster.utils.AdventureMusicEngine
 
+@RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GamePlayScreen(
@@ -36,96 +38,100 @@ fun GamePlayScreen(
     characterName: String,
     theme: String,
     viewModel: GameViewModel = viewModel(),
-    inventoryViewModel: InventoryViewModel = viewModel() // Inyectamos el ViewModel del inventario/vida
+    inventoryViewModel: InventoryViewModel = viewModel()
 ) {
     val listState = rememberLazyListState()
-    val messages: List<Pair<String, String>> by viewModel.messages.collectAsState()
-    val options: List<String> by viewModel.currentOptions.collectAsState()
-    val isLoading: Boolean by viewModel.isLoading.collectAsState()
+    val messages  by viewModel.messages.collectAsState()
+    val options   by viewModel.currentOptions.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
 
-    // Observamos el personaje para obtener su vida
     val characterState by inventoryViewModel.character.collectAsState()
     val hpCurrent = characterState?.hpCurrent ?: 20
-    val hpMax = characterState?.hpMax ?: 20
+    val hpMax     = characterState?.hpMax     ?: 20
 
     var customAction by remember { mutableStateOf("") }
-    // gameId incluye el tema → identifica la partida/historia concreta
+
     val gameId = "${userId}_${characterName}_${theme}".replace(" ", "_")
-    // charId sin tema → identifica al personaje (inventario/HP persisten entre aventuras)
     val charId = "${userId}_${characterName}"
 
-    // Observar el paso de aventura para detectar inicio de combate
     val currentStep by viewModel.currentAdventureStep.collectAsState()
     var showPixelTransition by remember { mutableStateOf(false) }
 
-    // Cargar inventario/vida del personaje (charId, sin tema)
+    // ── MÚSICA ───────────────────────────────────────────────────────────────
+    val musicScope = rememberCoroutineScope()
+    DisposableEffect(Unit) {
+        AdventureMusicEngine.start(musicScope)
+        onDispose { AdventureMusicEngine.fadeOutAndStop(musicScope) }
+    }
+
+    // ── CARGA INICIAL ─────────────────────────────────────────────────────────
     LaunchedEffect(charId) {
         inventoryViewModel.loadInventory(charId)
         viewModel.startStory(userId, characterName, theme)
     }
 
-    // Detectar si el DM ha iniciado un combate
+    // ── FEATURE 1: EFECTOS REALES DEL DM (daño + curación + ítems) ──────────
+    LaunchedEffect(Unit) {
+        viewModel.stepEffect.collect { step ->
+            val current = inventoryViewModel.character.value
+            // Aplicar daño fuera de combate
+            if (step.damageTaken > 0 && current != null) {
+                val newHp = (current.hpCurrent - step.damageTaken).coerceAtLeast(0)
+                inventoryViewModel.updateHp(charId, newHp)
+            }
+            // Aplicar curación (poción, descanso, magia narrativa...)
+            if (step.healingReceived > 0 && current != null) {
+                val newHp = (current.hpCurrent + step.healingReceived).coerceAtMost(current.hpMax)
+                inventoryViewModel.updateHp(charId, newHp)
+            }
+            // Añadir ítem al inventario
+            step.itemFound?.let { item ->
+                inventoryViewModel.addItemToInventory(charId, item)
+            }
+        }
+    }
+
+    // ── DETECTAR COMBATE ──────────────────────────────────────────────────────
     LaunchedEffect(currentStep?.combatStarted) {
         if (currentStep?.combatStarted == true && currentStep?.enemy != null) {
             showPixelTransition = true
         }
     }
 
+    // Scroll al último mensaje
     LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) {
-            listState.animateScrollToItem(messages.size - 1)
-        }
+        if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
     }
 
+    // ── FEATURE 2: MUERTE ─────────────────────────────────────────────────────
+    // Mostramos la pantalla de muerte cuando HP llega a 0 y el personaje existe
+    val isDead = characterState != null && hpCurrent <= 0
+
     MedievalBackground {
-        // Box para poder superponer el overlay de transición sobre el Scaffold
         Box(modifier = Modifier.fillMaxSize()) {
 
             Scaffold(
                 topBar = {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(Color.Black.copy(alpha = 0.7f)) // Un fondo elegante para la cabecera
-                    ) {
-                        // Fila para el Título y la Mochila
+                    Column(modifier = Modifier.fillMaxWidth().background(Color.Black.copy(alpha = 0.7f))) {
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 40.dp, start = 16.dp, end = 16.dp, bottom = 8.dp), // Padding superior para evitar la cámara/notch
-                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                                .padding(top = 40.dp, start = 16.dp, end = 16.dp, bottom = 8.dp),
+                            verticalAlignment   = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            // Título con espacio de sobra
                             Box(modifier = Modifier.weight(1f)) {
-                                MedievalTitle(
-                                    text = "Aventura: $theme",
-                                    modifier = Modifier.padding(vertical = 4.dp) // Espacio extra para que no se corte
-                                )
+                                MedievalTitle(text = "Aventura: $theme", modifier = Modifier.padding(vertical = 4.dp))
                             }
-
-                            // Botón de Inventario
-                            IconButton(onClick = {
-                                navController.navigate("inventory/$charId")
-                            }) {
-                                Icon(
-                                    Icons.Default.Inventory,
-                                    contentDescription = "Mochila",
-                                    tint = Color(0xFFFFD700),
-                                    modifier = Modifier.size(32.dp)
-                                )
+                            IconButton(onClick = { navController.navigate("inventory/$charId") }) {
+                                Icon(Icons.Default.Inventory, "Mochila",
+                                    tint = Color(0xFFFFD700), modifier = Modifier.size(32.dp))
                             }
                         }
-
-                        // Indicador de Vida justo debajo
                         PlayerStatsHeader(hpCurrent = hpCurrent, hpMax = hpMax)
                     }
                 },
                 bottomBar = {
-                    Surface(
-                        tonalElevation = 8.dp,
-                        color = Color.Black.copy(alpha = 0.9f) // Un poco de transparencia para el estilo
-                    ) {
+                    Surface(tonalElevation = 8.dp, color = Color.Black.copy(alpha = 0.9f)) {
                         Column {
                             if (options.isNotEmpty() && !isLoading) {
                                 LazyRow(
@@ -135,115 +141,156 @@ fun GamePlayScreen(
                                     items(options) { opcion ->
                                         AssistChip(
                                             onClick = { viewModel.sendPlayerAction(opcion) },
-                                            label = { Text(opcion, color = Color.Cyan) },
-                                            colors = AssistChipDefaults.assistChipColors(
-                                                labelColor = Color.Cyan,
-                                                containerColor = Color(0xFF1E1E1E)
-                                            )
+                                            label   = { Text(opcion, color = Color.Cyan) },
+                                            colors  = AssistChipDefaults.assistChipColors(
+                                                labelColor = Color.Cyan, containerColor = Color(0xFF1E1E1E))
                                         )
                                     }
                                 }
                             }
-
                             Row(
-                                modifier = Modifier
-                                    .padding(8.dp)
-                                    .fillMaxWidth()
-                                    .navigationBarsPadding(),
+                                modifier = Modifier.padding(8.dp).fillMaxWidth().navigationBarsPadding(),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                IconButton(onClick = {
-                                    navController.navigate("qr_scanner/$charId") // charId para QR → inventario
-                                }) {
-                                    Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan QR", tint = Color.Yellow)
+                                IconButton(onClick = { navController.navigate("qr_scanner/$charId") }) {
+                                    Icon(Icons.Default.QrCodeScanner, "Scan QR", tint = Color.Yellow)
                                 }
-
                                 TextField(
-                                    value = customAction,
-                                    onValueChange = { customAction = it },
+                                    value = customAction, onValueChange = { customAction = it },
                                     modifier = Modifier.weight(1f),
                                     placeholder = { Text("¿Qué quieres hacer?", color = Color.Gray) },
                                     maxLines = 2,
                                     colors = TextFieldDefaults.colors(
-                                        focusedContainerColor = Color(0xFF1E1E1E),
+                                        focusedContainerColor   = Color(0xFF1E1E1E),
                                         unfocusedContainerColor = Color(0xFF1E1E1E),
-                                        focusedTextColor = Color.White,
-                                        unfocusedTextColor = Color.White,
-                                        cursorColor = Color.Cyan
+                                        focusedTextColor        = Color.White,
+                                        unfocusedTextColor      = Color.White,
+                                        cursorColor             = Color.Cyan
                                     )
                                 )
-
                                 IconButton(
                                     onClick = {
                                         if (customAction.isNotBlank()) {
-                                            viewModel.sendCustomAction(customAction)
-                                            customAction = ""
+                                            viewModel.sendCustomAction(customAction); customAction = ""
                                         }
                                     },
                                     enabled = !isLoading && customAction.isNotBlank()
                                 ) {
-                                    Icon(
-                                        Icons.Default.Send,
-                                        contentDescription = "Enviar",
-                                        tint = if (customAction.isNotBlank()) Color.Cyan else Color.Gray
-                                    )
+                                    Icon(Icons.Default.Send, "Enviar",
+                                        tint = if (customAction.isNotBlank()) Color.Cyan else Color.Gray)
                                 }
                             }
                         }
                     }
                 },
-                containerColor = Color.Transparent // Para ver el MedievalBackground
+                containerColor = Color.Transparent
             ) { padding ->
                 LazyColumn(
                     state = listState,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding)
-                        .padding(horizontal = 16.dp),
+                    modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    item { Spacer(modifier = Modifier.height(8.dp)) }
-
-                    items(messages) { message ->
-                        GameMessageBubble(author = message.first, text = message.second)
-                    }
-
+                    item { Spacer(Modifier.height(8.dp)) }
+                    items(messages) { GameMessageBubble(author = it.first, text = it.second) }
                     if (isLoading) {
                         item {
-                            Box(
-                                modifier = Modifier.fillMaxWidth().padding(16.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(24.dp),
-                                    color = Color(0xFFFFD700) // Color Oro
-                                )
+                            Box(Modifier.fillMaxWidth().padding(16.dp), Alignment.Center) {
+                                CircularProgressIndicator(Modifier.size(24.dp), color = Color(0xFFFFD700))
                             }
                         }
                     }
-                    item { Spacer(modifier = Modifier.height(16.dp)) }
+                    item { Spacer(Modifier.height(16.dp)) }
                 }
             }
 
-            // ── OVERLAY: Transición de píxeles al entrar en combate ──
+            // ── TRANSICIÓN AL COMBATE ────────────────────────────────────────
             if (showPixelTransition) {
                 PixelTransitionOverlay {
                     showPixelTransition = false
+                    AdventureMusicEngine.stop()
                     navController.navigate("combat/$charId")
                 }
+            }
+
+            // ── PANTALLA DE MUERTE ───────────────────────────────────────────
+            if (isDead) {
+                DeathScreen(
+                    onRestart = {
+                        inventoryViewModel.resetCharacter(charId)
+                        viewModel.resetStory()
+                    },
+                    onGoHome = {
+                        AdventureMusicEngine.stop()
+                        navController.popBackStack("home", inclusive = false)
+                    }
+                )
             }
 
         } // fin Box
     } // fin MedievalBackground
 }
 
+// ── PANTALLA DE MUERTE ────────────────────────────────────────────────────────
+
+@Composable
+private fun DeathScreen(onRestart: () -> Unit, onGoHome: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.92f)),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(24.dp),
+            modifier = Modifier.padding(32.dp)
+        ) {
+            Text("💀", fontSize = 80.sp)
+            Text(
+                text = "Has caído en batalla",
+                color = Color.Red,
+                fontSize = 28.sp,
+                fontWeight = FontWeight.Black,
+                fontFamily = FontFamily.Serif,
+                textAlign = TextAlign.Center
+            )
+            Text(
+                text = "Tu aventura ha llegado a su fin...\nPero los héroes siempre pueden volver a levantarse.",
+                color = Color.LightGray,
+                fontSize = 15.sp,
+                textAlign = TextAlign.Center,
+                lineHeight = 22.sp
+            )
+            Spacer(Modifier.height(8.dp))
+
+            // Reiniciar: nueva historia, mismo personaje y tema, inventario y vida a 0
+            Button(
+                onClick = onRestart,
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7B0000)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("🔄  Nueva Historia", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            }
+
+            // Volver al listado de personajes
+            OutlinedButton(
+                onClick = onGoHome,
+                modifier = Modifier.fillMaxWidth(),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color.LightGray)
+            ) {
+                Text("🏠  Volver al Inicio", fontSize = 16.sp, color = Color.LightGray)
+            }
+        }
+    }
+}
+
+// ── BURBUJAS DE CHAT ──────────────────────────────────────────────────────────
+
 @Composable
 fun GameMessageBubble(author: String, text: String) {
     val isAI = author == "DM"
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         horizontalAlignment = if (isAI) Alignment.Start else Alignment.End
     ) {
         Text(
@@ -255,43 +302,38 @@ fun GameMessageBubble(author: String, text: String) {
         Surface(
             color = if (isAI) Color(0xFF1E1E1E) else Color(0xFF2C2C2C),
             shape = RoundedCornerShape(
-                topStart = 12.dp,
-                topEnd = 12.dp,
+                topStart = 12.dp, topEnd = 12.dp,
                 bottomStart = if (isAI) 0.dp else 12.dp,
-                bottomEnd = if (isAI) 12.dp else 0.dp
+                bottomEnd   = if (isAI) 12.dp else 0.dp
             ),
             tonalElevation = 2.dp
         ) {
-            Text(
-                text = text,
-                modifier = Modifier.padding(12.dp),
-                style = MaterialTheme.typography.bodyMedium,
-                color = Color.White
-            )
+            Text(text = text, modifier = Modifier.padding(12.dp),
+                style = MaterialTheme.typography.bodyMedium, color = Color.White)
         }
     }
 }
 
+// ── BARRA DE VIDA ─────────────────────────────────────────────────────────────
+
 @Composable
 fun PlayerStatsHeader(hpCurrent: Int, hpMax: Int) {
-    Surface(
-        color = Color.Black.copy(alpha = 0.4f), // Fondo semitransparente para legibilidad
-        modifier = Modifier.fillMaxWidth()
-    ) {
+    Surface(color = Color.Black.copy(alpha = 0.4f), modifier = Modifier.fillMaxWidth()) {
         Row(
-            modifier = Modifier
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("HP", color = Color.Red, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+            Text("HP", color = Color.Red, fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.width(12.dp))
             LinearProgressIndicator(
                 progress = { if (hpMax > 0) hpCurrent.toFloat() / hpMax.toFloat() else 0f },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(10.dp) // Un poco más fina queda más elegante
-                    .clip(RoundedCornerShape(5.dp)),
-                color = Color.Green,
+                modifier = Modifier.fillMaxWidth().height(10.dp).clip(RoundedCornerShape(5.dp)),
+                color      = when {
+                    hpCurrent <= hpMax * 0.25f -> Color.Red
+                    hpCurrent <= hpMax * 0.5f  -> Color(0xFFFF9800)
+                    else                        -> Color.Green
+                },
                 trackColor = Color.DarkGray
             )
         }

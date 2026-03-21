@@ -7,7 +7,6 @@ plugins {
     id("com.google.gms.google-services")
 }
 
-// Leer local.properties de forma segura
 val localProps = Properties().also { props ->
     val f = rootProject.file("local.properties")
     if (f.exists()) props.load(f.inputStream())
@@ -31,6 +30,13 @@ android {
             "String",
             "GROQ_API_KEY",
             "\"${localProps.getProperty("GROQ_API_KEY", "")}\""
+        )
+
+        // Gemini API Key para generación de imágenes con Imagen 3
+        buildConfigField(
+            "String",
+            "GEMINI_API_KEY",
+            "\"${localProps.getProperty("GEMINI_API_KEY", "")}\""
         )
 
     }

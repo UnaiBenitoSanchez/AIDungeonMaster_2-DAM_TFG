@@ -1,9 +1,8 @@
 package com.example.aidungeonmaster.ui.home
 
+import android.graphics.Bitmap
 import android.util.Log
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -16,25 +15,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.SubcomposeAsyncImage
-import coil.compose.AsyncImagePainter
-import coil.request.ImageRequest
 import com.example.aidungeonmaster.utils.ImageUtils
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import java.util.concurrent.TimeUnit
-import android.graphics.Bitmap
-import androidx.compose.foundation.Image
-import androidx.compose.ui.graphics.asImageBitmap
 
 // ── DADOS D&D — 4d6 DESCARTA EL MENOR ───────────────────────────────────────
 private fun rollDnDStat(): Pair<Int, List<Int>> {
@@ -42,48 +30,19 @@ private fun rollDnDStat(): Pair<Int, List<Int>> {
     val total = rolls.sum() - rolls.min()
     return total to rolls
 }
+
 private fun rollAllStats(statNames: List<String>): Map<String, Pair<Int, List<Int>>> =
     statNames.associateWith { rollDnDStat() }
 
-// ── PRE-FETCH: verifica que la URL devuelve una imagen ───────────────────────
-private val httpClient = OkHttpClient.Builder()
-    .connectTimeout(30, TimeUnit.SECONDS)
-    .readTimeout(90, TimeUnit.SECONDS)
-    .followRedirects(true)
-    .build()
-
-private suspend fun prefetchImageUrl(url: String): Result<String> = withContext(Dispatchers.IO) {
-    try {
-        val request = Request.Builder()
-            .url(url)
-            .header("User-Agent", "Mozilla/5.0")
-            .head()   // Solo cabeceras, no descarga todo
-            .build()
-        val response = httpClient.newCall(request).execute()
-        val contentType = response.header("Content-Type") ?: "unknown"
-        val code = response.code
-        Log.d("PORTRAIT", "HTTP $code | Content-Type: $contentType | URL: $url")
-        if (response.isSuccessful && contentType.startsWith("image")) {
-            Result.success(url)
-        } else {
-            Result.failure(Exception("HTTP $code | Content-Type: $contentType"))
-        }
-    } catch (e: Exception) {
-        Log.e("PORTRAIT", "Error pre-fetch: ${e.message}")
-        Result.failure(e)
-    }
-}
-
-// ── ESTADOS DE CARGA DEL RETRATO ─────────────────────────────────────────────
+// ── ESTADOS DEL RETRATO ──────────────────────────────────────────────────────
 private sealed class PortraitState {
-    object Idle : PortraitState()
+    object Idle    : PortraitState()
     object Loading : PortraitState()
     data class Ready(val bitmap: Bitmap, val base64: String) : PortraitState()
     data class Failed(val reason: String) : PortraitState()
 }
 
 // ── DIÁLOGO PRINCIPAL ────────────────────────────────────────────────────────
-
 @Composable
 fun CreateCharacterDialog(
     onDismiss: () -> Unit,
@@ -103,27 +62,28 @@ fun CreateCharacterDialog(
     var diceModeActive by remember { mutableStateOf(false) }
 
     var portraitState  by remember { mutableStateOf<PortraitState>(PortraitState.Idle) }
+    val scope          = rememberCoroutineScope()
 
     val canGenerate = race.isNotBlank() && clazz.isNotBlank() && physicalTraits.isNotBlank()
 
     val subclassesByClass = mapOf(
-        "Artífice"             to listOf("Alquimista","Armero","Artillero","Herrero de Batalla"),
-        "Bardo"                to listOf("Colegio de la Elocuencia","Colegio de las Espadas","Colegio del Conocimiento","Colegio del Valor"),
-        "Bárbaro"              to listOf("Senda de la Magia Salvaje","Senda del Berserker","Senda del Guardián Ancestral","Senda del Guerrero Totémico"),
-        "Brujo"                to listOf("El Archihada","El Celestial","El Genio","El Hexblade","El Primordial"),
+        "Artífice"               to listOf("Alquimista","Armero","Artillero","Herrero de Batalla"),
+        "Bardo"                  to listOf("Colegio de la Elocuencia","Colegio de las Espadas","Colegio del Conocimiento","Colegio del Valor"),
+        "Bárbaro"                to listOf("Senda de la Magia Salvaje","Senda del Berserker","Senda del Guardián Ancestral","Senda del Guerrero Totémico"),
+        "Brujo"                  to listOf("El Archihada","El Celestial","El Genio","El Hexblade","El Primordial"),
         "Caballero de la Muerte" to listOf("Caballero del Ocaso","Jinete Sombrío","Nigromante de Batalla","Señor de la Muerte"),
-        "Chamán"               to listOf("Chamán de la Tierra","Chamán de la Tormenta","Chamán de los Espíritus","Chamán del Fuego"),
-        "Clérigo"              to listOf("Dominio de la Guerra","Dominio de la Luz","Dominio de la Naturaleza","Dominio de la Tempestad","Dominio de la Vida","Dominio del Conocimiento","Dominio del Engaño"),
-        "Corsario"             to listOf("Capitán del Abismo","Cazaprimas","Corsario del Viento","Pistolero"),
-        "Druida"               to listOf("Círculo de la Luna","Círculo de la Tierra","Círculo de las Esporas","Círculo de los Sueños","Círculo del Pastor"),
-        "Exorcista"            to listOf("Cazador de Almas","Exorcista Oscuro","Purificador Sagrado","Sellador del Vacío"),
-        "Explorador"           to listOf("Acechador de las Sombras","Cazador","Cazador de Monstruos","Guardián del Enjambre","Maestro de Bestias"),
-        "Guerrero"             to listOf("Caballero Eco","Caballero Eldritch","Campeón","Estratega","Maestro de Batalla"),
-        "Hechicero"            to listOf("Alma Favorecida","Linaje Dracónico","Magia de Relojería","Magia Salvaje","Mente Aberrante"),
-        "Mago"                 to listOf("Escuela de Abjuración","Escuela de Adivinación","Escuela de Conjuración","Escuela de Encantamiento","Escuela de Evocación","Escuela de Ilusión","Escuela de Nigromancia","Escuela de Transmutación"),
-        "Monje"                to listOf("Camino de la Mano Abierta","Camino de la Sombra","Camino de los Cuatro Elementos","Camino del Maestro Borracho","Camino Kensei"),
-        "Paladín"              to listOf("Juramento de Conquista","Juramento de Devoción","Juramento de Redención","Juramento de Venganza","Juramento de los Antiguos"),
-        "Pícaro"               to listOf("Asesino","Embaucador Arcano","Espadachín","Explorador","Inquisitivo","Ladrón")
+        "Chamán"                 to listOf("Chamán de la Tierra","Chamán de la Tormenta","Chamán de los Espíritus","Chamán del Fuego"),
+        "Clérigo"                to listOf("Dominio de la Guerra","Dominio de la Luz","Dominio de la Naturaleza","Dominio de la Tempestad","Dominio de la Vida","Dominio del Conocimiento","Dominio del Engaño"),
+        "Corsario"               to listOf("Capitán del Abismo","Cazaprimas","Corsario del Viento","Pistolero"),
+        "Druida"                 to listOf("Círculo de la Luna","Círculo de la Tierra","Círculo de las Esporas","Círculo de los Sueños","Círculo del Pastor"),
+        "Exorcista"              to listOf("Cazador de Almas","Exorcista Oscuro","Purificador Sagrado","Sellador del Vacío"),
+        "Explorador"             to listOf("Acechador de las Sombras","Cazador","Cazador de Monstruos","Guardián del Enjambre","Maestro de Bestias"),
+        "Guerrero"               to listOf("Caballero Eco","Caballero Eldritch","Campeón","Estratega","Maestro de Batalla"),
+        "Hechicero"              to listOf("Alma Favorecida","Linaje Dracónico","Magia de Relojería","Magia Salvaje","Mente Aberrante"),
+        "Mago"                   to listOf("Escuela de Abjuración","Escuela de Adivinación","Escuela de Conjuración","Escuela de Encantamiento","Escuela de Evocación","Escuela de Ilusión","Escuela de Nigromancia","Escuela de Transmutación"),
+        "Monje"                  to listOf("Camino de la Mano Abierta","Camino de la Sombra","Camino de los Cuatro Elementos","Camino del Maestro Borracho","Camino Kensei"),
+        "Paladín"                to listOf("Juramento de Conquista","Juramento de Devoción","Juramento de Redención","Juramento de Venganza","Juramento de los Antiguos"),
+        "Pícaro"                 to listOf("Asesino","Embaucador Arcano","Espadachín","Explorador","Inquisitivo","Ladrón")
     )
 
     AlertDialog(
@@ -170,26 +130,42 @@ fun CreateCharacterDialog(
                 // ── RAZA / CLASE / SUBCLASE ──────────────────────────────────
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Box(Modifier.weight(1f)) {
-                        Dropdown(label = "Raza", options = listOf(
-                            "Aarakocras","Aasimar","Cambiantes","Centauro","Chico pollo","Chico Slime",
-                            "Deidad","Demonio","Dracónidos","Elemental","Elfo oscuro","Elfos","Enanos",
-                            "Espectro","Espíritu","Etergénito","Firbolgs","Forjados","Genasi","Gith",
-                            "Gnomos","Goblins","Golem","Goliats","Grungs","Híbridos Simic","Hobgoblins",
-                            "Hombre lobo","Hombres lagarto","Humanos","Huecos","Ilusión","Kalashtar",
-                            "Kenkus","Kobolds","Locathah","Loxodon","Medianos","Minotauros","Mutadores",
-                            "Orcos","Orcos de Eberron","Osgos","Polimorfo","Quimera","Rápido","Semielfos",
-                            "Semiorcos","Sátiro","Tabaxis","Tiflin","Tortogas","Trasgo","Tritones",
-                            "Vedalken","Verdan","Vampiro","Yuan-Ti Purasangres","Zombie"
-                        ), selected = race, onSelect = { race = it; portraitState = PortraitState.Idle }, enabled = !isGenerating)
+                        Dropdown(
+                            label = "Raza",
+                            options = listOf(
+                                "Aarakocras","Aasimar","Cambiantes","Centauro","Chico pollo","Chico Slime",
+                                "Deidad","Demonio","Dracónidos","Elemental","Elfo oscuro","Elfos","Enanos",
+                                "Espectro","Espíritu","Etergénito","Firbolgs","Forjados","Genasi","Gith",
+                                "Gnomos","Goblins","Golem","Goliats","Grungs","Híbridos Simic","Hobgoblins",
+                                "Hombre lobo","Hombres lagarto","Humanos","Huecos","Ilusión","Kalashtar",
+                                "Kenkus","Kobolds","Locathah","Loxodon","Medianos","Minotauros","Mutadores",
+                                "Orcos","Orcos de Eberron","Osgos","Polimorfo","Quimera","Rápido","Semielfos",
+                                "Semiorcos","Sátiro","Tabaxis","Tiflin","Tortogas","Trasgo","Tritones",
+                                "Vedalken","Verdan","Vampiro","Yuan-Ti Purasangres","Zombie"
+                            ),
+                            selected = race,
+                            onSelect = { race = it; portraitState = PortraitState.Idle },
+                            enabled = !isGenerating
+                        )
                     }
                     Box(Modifier.weight(1f)) {
-                        Dropdown(label = "Clase", options = subclassesByClass.keys.toList(),
-                            selected = clazz, onSelect = { clazz = it; subclazz = ""; portraitState = PortraitState.Idle }, enabled = !isGenerating)
+                        Dropdown(
+                            label = "Clase",
+                            options = subclassesByClass.keys.toList(),
+                            selected = clazz,
+                            onSelect = { clazz = it; subclazz = ""; portraitState = PortraitState.Idle },
+                            enabled = !isGenerating
+                        )
                     }
                 }
                 Spacer(Modifier.height(8.dp))
-                Dropdown(label = "Subclase", options = subclassesByClass[clazz] ?: listOf("Selecciona una clase primero"),
-                    selected = subclazz, onSelect = { subclazz = it }, enabled = !isGenerating && clazz.isNotEmpty())
+                Dropdown(
+                    label = "Subclase",
+                    options = subclassesByClass[clazz] ?: listOf("Selecciona una clase primero"),
+                    selected = subclazz,
+                    onSelect = { subclazz = it },
+                    enabled = !isGenerating && clazz.isNotEmpty()
+                )
 
                 Spacer(Modifier.height(16.dp))
                 HorizontalDivider()
@@ -197,118 +173,90 @@ fun CreateCharacterDialog(
 
                 // ── APARIENCIA + RETRATO IA ──────────────────────────────────
                 Text("Apariencia Física 🎨", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Text("Describe cómo se ve tu personaje. La IA generará su retrato.",
-                    style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                Text(
+                    "Describe cómo se ve tu personaje. La IA generará su retrato.",
+                    style = MaterialTheme.typography.bodySmall, color = Color.Gray
+                )
                 Spacer(Modifier.height(8.dp))
                 OutlinedTextField(
-                    value = physicalTraits, onValueChange = { physicalTraits = it; portraitState = PortraitState.Idle },
+                    value = physicalTraits,
+                    onValueChange = { physicalTraits = it; portraitState = PortraitState.Idle },
                     placeholder = { Text("Ej: Joven con cicatriz en el ojo, pelo largo plateado, armadura dorada...") },
                     modifier = Modifier.fillMaxWidth().height(100.dp),
-                    maxLines = 4, enabled = !isGenerating
+                    maxLines = 4,
+                    enabled = !isGenerating
                 )
                 Spacer(Modifier.height(10.dp))
 
-                // Botón generar retrato
+                // ── BOTÓN GENERAR RETRATO ────────────────────────────────────
                 if (canGenerate) {
-                    val scope = rememberCoroutineScope()
-
+                    val isLoading = portraitState is PortraitState.Loading
                     Button(
                         onClick = {
                             portraitState = PortraitState.Loading
-
                             scope.launch {
                                 try {
-                                    val base64 = ImageUtils.generatePortraitBase64(
-                                        race,
-                                        clazz,
-                                        physicalTraits
-                                    )
-
+                                    val base64 = ImageUtils.generatePortraitBase64(race, clazz, physicalTraits)
                                     val bitmap = ImageUtils.base64ToBitmap(base64)
-
                                     portraitState = PortraitState.Ready(bitmap, base64)
-
                                 } catch (e: Exception) {
+                                    Log.e("PORTRAIT", "Error generando retrato: ${e.message}")
                                     portraitState = PortraitState.Failed(e.message ?: "Error desconocido")
                                 }
                             }
                         },
                         modifier = Modifier.fillMaxWidth(),
-                        enabled = portraitState !is PortraitState.Loading,
+                        enabled = !isLoading,
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4A148C))
                     ) {
-                        if (portraitState is PortraitState.Loading) {
+                        if (isLoading) {
                             Row(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(16.dp),
-                                    strokeWidth = 2.dp,
-                                    color = Color.White
-                                )
-                                Text("Pintando el retrato...", color = Color.White)
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color.White)
+                                Text("Pintando el retrato...", color = Color.White, fontSize = 13.sp)
                             }
                         } else {
-                            Text("🖼️ Generar Retrato con IA", color = Color.White)
+                            val label = if (portraitState is PortraitState.Ready) "🔄 Regenerar Retrato" else "🖼️ Generar Retrato con IA"
+                            Text(label, color = Color.White)
                         }
                     }
                 }
 
-                // Panel de resultado del retrato
+                Spacer(Modifier.height(8.dp))
+
+                // ── PANEL DE RESULTADO DEL RETRATO ──────────────────────────
                 when (val state = portraitState) {
+
                     is PortraitState.Ready -> {
-                        Spacer(Modifier.height(8.dp))
                         Box(
-                            Modifier.fillMaxWidth().height(220.dp)
+                            Modifier
+                                .fillMaxWidth()
+                                .height(220.dp)
                                 .clip(RoundedCornerShape(12.dp))
                                 .border(2.dp, Color(0xFF7B1FA2), RoundedCornerShape(12.dp))
                                 .background(Color(0xFF1A0030)),
                             contentAlignment = Alignment.Center
                         ) {
-                                when (val state = portraitState) {
-
-                                    is PortraitState.Ready -> {
-                                        Spacer(Modifier.height(8.dp))
-
-                                        Box(
-                                            Modifier.fillMaxWidth()
-                                                .height(220.dp)
-                                                .clip(RoundedCornerShape(12.dp))
-                                                .border(2.dp, Color(0xFF7B1FA2), RoundedCornerShape(12.dp))
-                                                .background(Color(0xFF1A0030)),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Image(
-                                                bitmap = state.bitmap.asImageBitmap(),
-                                                contentDescription = "Retrato del personaje",
-                                                contentScale = ContentScale.Crop,
-                                                modifier = Modifier.fillMaxSize()
-                                            )
-                                        }
-                                    }
-
-                                    is PortraitState.Failed -> {
-                                        Spacer(Modifier.height(8.dp))
-                                        Text("Error: ${state.reason}", color = Color.Red)
-                                    }
-
-                                    is PortraitState.Loading -> {
-                                        Spacer(Modifier.height(8.dp))
-                                        CircularProgressIndicator()
-                                    }
-
-                                    else -> Unit
-                                }
-
+                            Image(
+                                bitmap = state.bitmap.asImageBitmap(),
+                                contentDescription = "Retrato del personaje",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
                         }
                         Spacer(Modifier.height(4.dp))
-                        Text("Pulsa el botón para regenerar un retrato diferente",
-                            style = MaterialTheme.typography.labelSmall, color = Color.Gray, textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth())
+                        Text(
+                            "Pulsa el botón para regenerar un retrato diferente",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.Gray,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
                     }
+
                     is PortraitState.Failed -> {
-                        Spacer(Modifier.height(8.dp))
                         Card(
                             colors = CardDefaults.cardColors(containerColor = Color(0xFF3E0000)),
                             modifier = Modifier.fillMaxWidth()
@@ -318,10 +266,37 @@ fun CreateCharacterDialog(
                                 Spacer(Modifier.height(4.dp))
                                 Text(state.reason, color = Color(0xFFFF8A80), fontSize = 11.sp)
                                 Spacer(Modifier.height(8.dp))
-                                Text("Puedes crear el personaje igualmente sin retrato, o volver a intentarlo.", color = Color.Gray, fontSize = 11.sp)
+                                Text(
+                                    "Puedes crear el personaje igualmente sin retrato, o volver a intentarlo.",
+                                    color = Color.Gray, fontSize = 11.sp
+                                )
                             }
                         }
                     }
+
+                    is PortraitState.Loading -> {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF1A0030)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                Modifier.padding(12.dp),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    strokeWidth = 2.dp,
+                                    color = Color(0xFF7B1FA2)
+                                )
+                                Column {
+                                    Text("Generando retrato con IA...", color = Color(0xFFCE93D8), fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                    Text("Puede tardar entre 30 y 90 segundos. Por favor espera.", color = Color.Gray, fontSize = 11.sp)
+                                }
+                            }
+                        }
+                    }
+
                     else -> Unit
                 }
 
@@ -335,8 +310,7 @@ fun CreateCharacterDialog(
                 Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF1B1B2F)), modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(10.dp)) {
                         Text("Sistema D&D — 4d6 descarta el menor", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color(0xFFFFD700))
-                        Text("Tira 4 dados de 6, descarta el resultado más bajo y suma los 3 restantes.",
-                            fontSize = 11.sp, color = Color.LightGray)
+                        Text("Tira 4 dados de 6, descarta el resultado más bajo y suma los 3 restantes.", fontSize = 11.sp, color = Color.LightGray)
                     }
                 }
                 Spacer(Modifier.height(8.dp))
@@ -390,8 +364,10 @@ fun CreateCharacterDialog(
                     val total   = diceResults.values.sumOf { it.first }
                     val average = if (diceResults.isNotEmpty()) total / diceResults.size else 0
                     val quality = when {
-                        average >= 13 -> "🌟 Excelente"; average >= 11 -> "✅ Buena"
-                        average >= 9  -> "⚠️ Normal";   else           -> "💀 Mala suerte"
+                        average >= 13 -> "🌟 Excelente"
+                        average >= 11 -> "✅ Buena"
+                        average >= 9  -> "⚠️ Normal"
+                        else           -> "💀 Mala suerte"
                     }
                     Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF0D2615)), modifier = Modifier.fillMaxWidth()) {
                         Row(Modifier.padding(10.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -403,12 +379,11 @@ fun CreateCharacterDialog(
                 }
 
                 Spacer(Modifier.height(8.dp))
-                Text("Asigna los bonos raciales: +2 y +1 a los atributos que prefieras.",
-                    style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                Text(
+                    "Asigna los bonos raciales: +2 y +1 a los atributos que prefieras.",
+                    style = MaterialTheme.typography.bodySmall, color = Color.Gray
+                )
             }
         }
     )
 }
-
-@Composable
-private fun rememberCoroutineScope() = androidx.compose.runtime.rememberCoroutineScope()

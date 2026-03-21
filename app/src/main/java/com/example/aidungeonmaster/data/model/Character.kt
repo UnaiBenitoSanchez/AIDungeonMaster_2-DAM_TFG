@@ -23,5 +23,6 @@ data class Character(
     val hpMax: Int = 20,
     val hpCurrent: Int = 20,
     val inventory: List<Item> = emptyList(),
-    val portraitUrl: String = ""   // URL generada por Pollinations.ai
+    val portraitUrl: String = "",
+    val lastPlayed: Long = 0L   // timestamp Unix ms — para ordenar por última partida
 )

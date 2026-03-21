@@ -24,6 +24,9 @@ class InventoryViewModel : ViewModel() {
     fun loadInventory(gameId: String) {
         viewModelScope.launch {
             _isLoading.value = true
+            // Resetear SIEMPRE antes de cargar para que nunca persista
+            // el estado de un personaje anterior (singleton compartido)
+            _character.value = null
             try {
                 val snapshot = db.collection("partidas").document(gameId).get().await()
                 if (snapshot.exists()) {
@@ -51,6 +54,15 @@ class InventoryViewModel : ViewModel() {
                         hpMax          = hpMax,
                         hpCurrent      = hpCurrent
                     )
+                } else {
+                    // Personaje nuevo sin documento de partida aún → valores por defecto
+                    _character.value = Character(
+                        id        = gameId,
+                        hpMax     = 20,
+                        hpCurrent = 20,
+                        inventory = emptyList()
+                    )
+                    Log.d("INVENTORY_DEBUG", "loadInventory: doc $gameId no existe, inicializando con defaults")
                 }
             } catch (e: Exception) {
                 Log.e("INVENTORY_ERROR", "loadInventory: ${e.message}")
@@ -127,6 +139,33 @@ class InventoryViewModel : ViewModel() {
             else -> {
                 removeItemFromInventory(gameId, item)
                 "✨ Usaste ${item.name}"
+            }
+        }
+    }
+
+    // ── REINICIA PERSONAJE AL MORIR (vida a 20, inventario vacío) ────────────
+    fun resetCharacter(charId: String) {
+        viewModelScope.launch {
+            try {
+                // Obtener el hpMax original del personaje
+                val snap = db.collection("partidas").document(charId).get().await()
+                val originalHpMax = snap.getLong("hpMax")?.toInt() ?: 20
+
+                db.collection("partidas").document(charId)
+                    .update(mapOf(
+                        "hpCurrent" to originalHpMax,
+                        "hpMax"     to originalHpMax,
+                        "inventory" to emptyList<Any>()
+                    )).await()
+
+                _character.value = _character.value?.copy(
+                    hpCurrent = originalHpMax,
+                    hpMax     = originalHpMax,
+                    inventory = emptyList()
+                )
+                Log.d("INVENTORY_DEBUG", "Personaje reiniciado: HP=$originalHpMax, inventario vacío")
+            } catch (e: Exception) {
+                Log.e("INVENTORY_ERROR", "resetCharacter: ${e.message}")
             }
         }
     }

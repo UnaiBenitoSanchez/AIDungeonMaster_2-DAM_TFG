@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -119,13 +120,12 @@ fun InventoryScreen(
                             }
                         } else {
                             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                items(
-                                    items = character!!.inventory,
-                                    key   = { it.id.ifBlank { it.name + it.type } }
-                                ) { item ->
+                                itemsIndexed(
+                                    items = character!!.inventory
+                                ) { index, item ->
                                     InventoryItemRow(
-                                        item    = item,
-                                        onUse   = { usedItem ->
+                                        item  = item,
+                                        onUse = { usedItem ->
                                             val msg = viewModel.useItem(gameId, usedItem, character!!.hpCurrent, character!!.hpMax)
                                             feedbackMsg = msg
                                         }

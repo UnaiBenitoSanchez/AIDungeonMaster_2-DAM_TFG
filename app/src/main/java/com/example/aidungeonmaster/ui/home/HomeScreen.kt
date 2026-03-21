@@ -28,6 +28,14 @@ import com.example.aidungeonmaster.data.model.Character
 import com.example.aidungeonmaster.navigation.Screen
 import com.example.aidungeonmaster.viewmodel.HomeViewModel
 import com.google.firebase.auth.FirebaseAuth
+import androidx.compose.runtime.DisposableEffect
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.concurrent.TimeUnit
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -37,6 +45,18 @@ fun HomeScreen(navController: NavHostController, viewModel: HomeViewModel = view
     var characterToDelete by remember { mutableStateOf<Character?>(null) }
 
     val userId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
+
+    // Refrescar el HP desde partidas cada vez que HomeScreen vuelve a ser visible
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.refreshHp()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     Scaffold(
         topBar = {
@@ -160,7 +180,7 @@ fun CharacterCard(character: Character, onClick: () -> Unit, onDelete: () -> Uni
                     "${character.race} • ${character.characterClass} (Sin partida)"
                 }
                 Text(subtitle, style = MaterialTheme.typography.bodyMedium)
-                // Mostrar HP si el personaje ya tiene partida
+                // HP si tiene partida
                 if (character.hpCurrent > 0 || character.hpMax > 0) {
                     Text(
                         "❤️ ${character.hpCurrent} / ${character.hpMax}",
@@ -172,11 +192,46 @@ fun CharacterCard(character: Character, onClick: () -> Unit, onDelete: () -> Uni
                         }
                     )
                 }
+                // Última vez que jugó
+                if (character.lastPlayed > 0L) {
+                    val sdf = java.text.SimpleDateFormat("dd/MM/yyyy  HH:mm", java.util.Locale.getDefault())
+                    val fecha = sdf.format(java.util.Date(character.lastPlayed))
+                    Text(
+                        "🕐 Última partida: $fecha",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.Gray
+                    )
+                }
+                // Última sesión
+                if (character.lastPlayed > 0L) {
+                    Text(
+                        "🕐 ${formatLastPlayed(character.lastPlayed)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.Gray
+                    )
+                }
             }
 
             IconButton(onClick = onDelete) {
                 Icon(Icons.Default.Delete, "Borrar", tint = MaterialTheme.colorScheme.outline)
             }
         }
+    }
+}
+
+// ── FORMATO DE FECHA ──────────────────────────────────────────────────────────
+private fun formatLastPlayed(timestamp: Long): String {
+    val now     = System.currentTimeMillis()
+    val diff    = now - timestamp
+    val days    = TimeUnit.MILLISECONDS.toDays(diff)
+    val hours   = TimeUnit.MILLISECONDS.toHours(diff)
+    val minutes = TimeUnit.MILLISECONDS.toMinutes(diff)
+    return when {
+        minutes < 1  -> "Hace un momento"
+        minutes < 60 -> "Hace $minutes min"
+        hours   < 24 -> "Hace $hours h"
+        days    == 1L -> "Ayer"
+        days    < 7  -> "Hace $days días"
+        else -> SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(timestamp))
     }
 }
