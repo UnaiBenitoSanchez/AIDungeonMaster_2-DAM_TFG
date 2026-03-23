@@ -102,8 +102,14 @@ fun AppNavigation(navController: NavHostController) {
                 gameViewModel      = gameViewModel,
                 inventoryViewModel = inventoryViewModel,
                 gameId             = gameId,
-                onCombatEnd        = { victory ->
-                    gameViewModel.notifyCombatEnd(victory, gameViewModel.currentAdventureStep.value?.enemy?.name ?: "el enemigo")
+                onCombatEnd        = { victory, xpGained ->
+                    if (victory && xpGained > 0) {
+                        gameViewModel.addPendingXp(xpGained)
+                    }
+                    gameViewModel.notifyCombatEnd(
+                        victory,
+                        gameViewModel.currentAdventureStep.value?.enemy?.name ?: "el enemigo"
+                    )
                     navController.popBackStack()
                 }
             )

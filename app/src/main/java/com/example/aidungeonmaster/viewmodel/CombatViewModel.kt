@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicLong
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 
 // ============================================================
 //  ENUMS Y DATA CLASSES
@@ -93,6 +95,10 @@ class CombatViewModel(
 
     private val _cooldowns    = MutableStateFlow<Map<String, Int>>(emptyMap())
     val cooldowns             = _cooldowns.asStateFlow()
+
+    /** XP que se emite una sola vez al terminar el combate con victoria. */
+    private val _xpReward = MutableSharedFlow<Int>(replay = 0, extraBufferCapacity = 1)
+    val xpReward = _xpReward.asSharedFlow()
 
     // --- Buffs temporales ---
     private var defenseBonus   = 0
@@ -207,10 +213,17 @@ class CombatViewModel(
 
                     if (newEnemyHp <= 0) {
                         log("💀 ¡${enemy.name} ha sido derrotado!", LogType.SYSTEM)
+
+                        // Calcular XP ganado: la mitad del HP máximo del enemigo
+                        val xpGained = (enemy.hpMax / 2).coerceAtLeast(5)
+                        log("⭐ +$xpGained XP ganado", LogType.SYSTEM)
+                        _xpReward.emit(xpGained)
+
                         delay(600)
                         _phase.value = CombatPhase.VICTORY
                         return@launch
                     }
+
                     endPlayerTurn()
                 }
                 else -> {
@@ -257,6 +270,11 @@ class CombatViewModel(
 
                     if (newEnemyHp <= 0) {
                         log("💀 ¡${enemy.name} ha sido derrotado!", LogType.SYSTEM)
+
+                        val xpGained = (enemy.hpMax / 2).coerceAtLeast(5)
+                        log("⭐ +$xpGained XP ganado", LogType.SYSTEM)
+                        _xpReward.emit(xpGained)
+
                         delay(600)
                         _phase.value = CombatPhase.VICTORY
                         if (ability.cooldownTurns > 0) addCooldown(ability)

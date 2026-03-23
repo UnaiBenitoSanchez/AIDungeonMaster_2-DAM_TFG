@@ -57,6 +57,8 @@ fun GamePlayScreen(
     val currentStep by viewModel.currentAdventureStep.collectAsState()
     var showPixelTransition by remember { mutableStateOf(false) }
 
+    var levelUpDialogLevel by remember { mutableStateOf<Int?>(null) }
+
     // ── MÚSICA ───────────────────────────────────────────────────────────────
     val musicScope = rememberCoroutineScope()
     DisposableEffect(Unit) {
@@ -91,6 +93,20 @@ fun GamePlayScreen(
         }
     }
 
+    LaunchedEffect(Unit) {
+        viewModel.pendingXp.collect { xp ->
+            if (xp > 0) {
+                inventoryViewModel.addXp(charId, xp)
+                viewModel.consumePendingXp()
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        inventoryViewModel.levelUpEvent.collect { newLevel ->
+            levelUpDialogLevel = newLevel
+        }
+    }
     // ── DETECTAR COMBATE ──────────────────────────────────────────────────────
     LaunchedEffect(currentStep?.combatStarted) {
         if (currentStep?.combatStarted == true && currentStep?.enemy != null) {
@@ -227,6 +243,14 @@ fun GamePlayScreen(
             }
 
         } // fin Box
+
+        levelUpDialogLevel?.let { lvl ->
+            LevelUpDialog(
+                newLevel       = lvl,
+                characterClass = characterState?.characterClass ?: "",
+                onDismiss      = { levelUpDialogLevel = null }
+            )
+        }
     } // fin MedievalBackground
 }
 

@@ -64,11 +64,13 @@ class HomeViewModel : ViewModel() {
                             "hpMax"          to 20,
                             "hpCurrent"      to 20,
                             "inventory"      to emptyList<Any>(),
-                            "lastPlayed"     to 0L
+                            "lastPlayed"     to 0L,
+
+                            "xp"             to 0,
+                            "level"          to 1
                         ),
                         com.google.firebase.firestore.SetOptions.merge()
-                    )
-                    .await()
+                    ).await()
 
                 // 3. Escribir en ranking global (colección pública) — con campos aplanados
                 db.collection("ranking")
@@ -113,7 +115,10 @@ class HomeViewModel : ViewModel() {
                                     char.copy(
                                         hpMax      = partidaSnap.getLong("hpMax")?.toInt()     ?: char.hpMax,
                                         hpCurrent  = partidaSnap.getLong("hpCurrent")?.toInt() ?: char.hpCurrent,
-                                        lastPlayed = partidaSnap.getLong("lastPlayed")         ?: 0L
+                                        lastPlayed = partidaSnap.getLong("lastPlayed")         ?: 0L,
+
+                                        xp         = partidaSnap.getLong("xp")?.toInt()        ?: char.xp,
+                                        level      = partidaSnap.getLong("level")?.toInt()     ?: char.level
                                     )
                                 } else {
                                     char
@@ -148,7 +153,10 @@ class HomeViewModel : ViewModel() {
                         char.copy(
                             hpMax      = snap.getLong("hpMax")?.toInt()     ?: char.hpMax,
                             hpCurrent  = snap.getLong("hpCurrent")?.toInt() ?: char.hpCurrent,
-                            lastPlayed = snap.getLong("lastPlayed")         ?: char.lastPlayed
+                            lastPlayed = snap.getLong("lastPlayed")         ?: char.lastPlayed,
+
+                            xp         = snap.getLong("xp")?.toInt()        ?: char.xp,
+                            level      = snap.getLong("level")?.toInt()     ?: char.level
                         )
                     } else char
                 } catch (e: Exception) { char }

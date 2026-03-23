@@ -58,7 +58,7 @@ fun CombatScreen(
     gameViewModel: GameViewModel,
     inventoryViewModel: InventoryViewModel,
     gameId: String,
-    onCombatEnd: (victory: Boolean) -> Unit
+    onCombatEnd: (victory: Boolean, xpGained: Int) -> Unit
 ) {
     val step      by gameViewModel.currentAdventureStep.collectAsState()
     val character by inventoryViewModel.character.collectAsState()
@@ -108,7 +108,7 @@ private fun CombatScreenReady(
     character: com.example.aidungeonmaster.data.model.Character,
     gameId: String,
     inventoryViewModel: InventoryViewModel,
-    onCombatEnd: (victory: Boolean) -> Unit
+    onCombatEnd: (victory: Boolean, xpGained: Int) -> Unit
 ) {
     // ✅ viewModel() llamado incondicionalmente — nunca después de un return
     val combatVm: CombatViewModel = viewModel(
@@ -138,7 +138,7 @@ private fun CombatContent(
     combatVm: CombatViewModel,
     enemyHpMax: Int,
     playerHpMax: Int,
-    onCombatEnd: (Boolean) -> Unit
+    onCombatEnd: (victory: Boolean, xpGained: Int) -> Unit
 ) {
     val phase     by combatVm.phase.collectAsState()
     val enemyHp   by combatVm.enemyHp.collectAsState()
@@ -159,10 +159,12 @@ private fun CombatContent(
 
     LaunchedEffect(phase) {
         if (phase == CombatPhase.VICTORY || phase == CombatPhase.DEFEAT) {
-            // Fade out suave al terminar el combate
             CombatMusicEngine.fadeOutAndStop(musicScope)
             delay(2200)
-            onCombatEnd(phase == CombatPhase.VICTORY)
+            val xpGained = if (phase == CombatPhase.VICTORY)
+                (combatVm.enemy.hpMax / 2).coerceAtLeast(5)
+            else 0
+            onCombatEnd(phase == CombatPhase.VICTORY, xpGained)
         }
     }
 

@@ -37,6 +37,9 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.unit.sp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -217,6 +220,52 @@ fun CharacterCard(character: Character, onClick: () -> Unit, onDelete: () -> Uni
                             else -> Color(0xFF4CAF50)
                         }
                     )
+                }
+
+                // Nivel + barra de XP
+                if (character.level > 0) {
+                    Spacer(Modifier.height(4.dp))
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        // Badge de nivel
+                        Surface(
+                            color = Color(0xFF3A2A00),
+                            shape = RoundedCornerShape(4.dp),
+                            border = BorderStroke(1.dp, Color(0xFFFFD700))
+                        ) {
+                            Text(
+                                text = "Nv.${character.level}",
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color(0xFFFFD700),
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        // Barra de progreso de XP
+                        val xpProgress = if (character.level * 100 > 0)
+                            character.xp.toFloat() / (character.level * 100) else 0f
+
+                        LinearProgressIndicator(
+                            progress = { xpProgress.coerceIn(0f, 1f) },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(5.dp)
+                                .clip(RoundedCornerShape(3.dp)),
+                            color      = Color(0xFFFFD700),
+                            trackColor = Color(0xFF2A2A2A)
+                        )
+
+                        Text(
+                            text = "${character.xp}/${character.level * 100} XP",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.Gray,
+                            fontSize = 10.sp
+                        )
+                    }
                 }
 
                 // Última sesión (He unido tus dos bloques de tiempo en uno solo más limpio)

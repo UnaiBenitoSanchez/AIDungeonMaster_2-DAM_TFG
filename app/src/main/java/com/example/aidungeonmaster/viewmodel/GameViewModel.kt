@@ -390,4 +390,10 @@ Reglas:
             }
         }
     }
+
+    private val _pendingXp = MutableStateFlow(0)
+    val pendingXp = _pendingXp.asStateFlow()
+    fun addPendingXp(xp: Int) { _pendingXp.value += xp }
+    fun consumePendingXp() { _pendingXp.value = 0 }
+
 }

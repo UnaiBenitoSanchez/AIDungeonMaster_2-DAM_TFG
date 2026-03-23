@@ -9,7 +9,7 @@ data class Item(
     val effect: String = ""          // Ej: "Daño 1d8", "Cura 2d4"
 )
 
-// 2. Actualizamos el Personaje para que tenga Mochila y Vida real
+// 2. Personaje con sistema de niveles
 data class Character(
     val id: String = "",
     val name: String = "",
@@ -24,5 +24,25 @@ data class Character(
     val hpCurrent: Int = 20,
     val inventory: List<Item> = emptyList(),
     val portraitUrl: String = "",
-    val lastPlayed: Long = 0L   // timestamp Unix ms — para ordenar por última partida
-)
+    val lastPlayed: Long = 0L,
+
+    // --- PROGRESIÓN ---
+    val xp: Int = 0,
+    val level: Int = 1
+) {
+    /** XP necesario para pasar al siguiente nivel */
+    val xpToNextLevel: Int get() = level * 100
+
+    /** Porcentaje de progreso hacia el siguiente nivel (0.0 – 1.0) */
+    val xpProgress: Float get() =
+        if (xpToNextLevel > 0) (xp.toFloat() / xpToNextLevel).coerceIn(0f, 1f) else 0f
+
+    /** Bonus de competencia según nivel (igual que D&D) */
+    val profBonus: Int get() = when {
+        level >= 17 -> 6
+        level >= 13 -> 5
+        level >= 9  -> 4
+        level >= 5  -> 3
+        else        -> 2
+    }
+}
