@@ -18,8 +18,9 @@ import com.example.aidungeonmaster.viewmodel.RankingViewModel
 import com.example.aidungeonmaster.ui.login.LoginScreen
 import com.example.aidungeonmaster.ui.register.RegisterScreen
 import com.example.aidungeonmaster.viewmodel.AuthViewModel
-import com.example.aidungeonmaster.viewmodel.GameViewModel        // IMPORTANTE
-import com.example.aidungeonmaster.viewmodel.InventoryViewModel   // IMPORTANTE
+import com.example.aidungeonmaster.viewmodel.GameViewModel
+import com.example.aidungeonmaster.viewmodel.InventoryViewModel
+import com.example.aidungeonmaster.viewmodel.WorldMapViewModel   // ← NUEVO
 
 
 sealed class Screen(val route: String) {
@@ -47,27 +48,27 @@ sealed class Screen(val route: String) {
 @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
 @Composable
 fun AppNavigation(navController: NavHostController) {
-    // INICIALIZACIÓN DE VIEWMODELS
-    val authViewModel: AuthViewModel = viewModel()
-    val gameViewModel: GameViewModel = viewModel()           // <--- AÑADIDO
-    val inventoryViewModel: InventoryViewModel = viewModel() // <--- AÑADIDO
+    val authViewModel: AuthViewModel           = viewModel()
+    val gameViewModel: GameViewModel           = viewModel()
+    val inventoryViewModel: InventoryViewModel = viewModel()
+    val worldMapViewModel: WorldMapViewModel   = viewModel()   // ← NUEVO
 
     val startRoute = if (authViewModel.isUserLoggedIn()) Screen.Home.route else Screen.Login.route
 
     NavHost(navController = navController, startDestination = startRoute) {
-        composable(Screen.Login.route) { LoginScreen(navController) }
+        composable(Screen.Login.route)    { LoginScreen(navController) }
         composable(Screen.Register.route) { RegisterScreen(navController) }
-        composable(Screen.Home.route) { HomeScreen(navController) }
+        composable(Screen.Home.route)     { HomeScreen(navController) }
         composable(Screen.Ranking.route) {
             val rankingViewModel: RankingViewModel = viewModel()
             RankingScreen(
-                onBack = { navController.popBackStack() },
+                onBack    = { navController.popBackStack() },
                 viewModel = rankingViewModel
             )
         }
 
         composable(Screen.GameSetup.route) { backStackEntry ->
-            val userId = backStackEntry.arguments?.getString("userId") ?: ""
+            val userId        = backStackEntry.arguments?.getString("userId")        ?: ""
             val characterName = backStackEntry.arguments?.getString("characterName") ?: ""
             GameSetupScreen(navController, userId, characterName)
         }
@@ -76,7 +77,15 @@ fun AppNavigation(navController: NavHostController) {
             val userId        = backStackEntry.arguments?.getString("userId")        ?: ""
             val characterName = backStackEntry.arguments?.getString("characterName") ?: ""
             val theme         = backStackEntry.arguments?.getString("theme")         ?: ""
-            GamePlayScreen(navController, userId, characterName, theme, gameViewModel, inventoryViewModel)
+            GamePlayScreen(
+                navController      = navController,
+                userId             = userId,
+                characterName      = characterName,
+                theme              = theme,
+                viewModel          = gameViewModel,
+                inventoryViewModel = inventoryViewModel,
+                mapViewModel       = worldMapViewModel   // ← NUEVO
+            )
         }
 
         composable("qr_scanner/{gameId}") { backStackEntry ->
@@ -95,7 +104,6 @@ fun AppNavigation(navController: NavHostController) {
             )
         }
 
-        // RUTA DE COMBATE — recibe el gameId para actualizar HP
         composable("combat/{gameId}") { backStackEntry ->
             val gameId = backStackEntry.arguments?.getString("gameId") ?: ""
             CombatScreen(

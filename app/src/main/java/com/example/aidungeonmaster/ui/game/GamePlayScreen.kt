@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.aidungeonmaster.viewmodel.GameViewModel
 import com.example.aidungeonmaster.viewmodel.InventoryViewModel
+import com.example.aidungeonmaster.viewmodel.WorldMapViewModel    // ← NUEVO
 import com.example.aidungeonmaster.utils.AdventureMusicEngine
 
 @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
@@ -38,7 +39,8 @@ fun GamePlayScreen(
     characterName: String,
     theme: String,
     viewModel: GameViewModel = viewModel(),
-    inventoryViewModel: InventoryViewModel = viewModel()
+    inventoryViewModel: InventoryViewModel = viewModel(),
+    mapViewModel: WorldMapViewModel = viewModel()               // ← NUEVO
 ) {
     val listState = rememberLazyListState()
     val messages  by viewModel.messages.collectAsState()
@@ -69,24 +71,23 @@ fun GamePlayScreen(
     // ── CARGA INICIAL ─────────────────────────────────────────────────────────
     LaunchedEffect(charId) {
         inventoryViewModel.loadInventory(charId)
+        viewModel.worldMapViewModel = mapViewModel      // ← NUEVO: conectar mapa
+        mapViewModel.loadMap(gameId)                    // ← NUEVO: cargar mapa guardado
         viewModel.startStory(userId, characterName, theme)
     }
 
-    // ── FEATURE 1: EFECTOS REALES DEL DM (daño + curación + ítems) ──────────
+    // ── EFECTOS REALES DEL DM (daño + curación + ítems) ─────────────────────
     LaunchedEffect(Unit) {
         viewModel.stepEffect.collect { step ->
             val current = inventoryViewModel.character.value
-            // Aplicar daño fuera de combate
             if (step.damageTaken > 0 && current != null) {
                 val newHp = (current.hpCurrent - step.damageTaken).coerceAtLeast(0)
                 inventoryViewModel.updateHp(charId, newHp)
             }
-            // Aplicar curación (poción, descanso, magia narrativa...)
             if (step.healingReceived > 0 && current != null) {
                 val newHp = (current.hpCurrent + step.healingReceived).coerceAtMost(current.hpMax)
                 inventoryViewModel.updateHp(charId, newHp)
             }
-            // Añadir ítem al inventario
             step.itemFound?.let { item ->
                 inventoryViewModel.addItemToInventory(charId, item)
             }
@@ -107,6 +108,7 @@ fun GamePlayScreen(
             levelUpDialogLevel = newLevel
         }
     }
+
     // ── DETECTAR COMBATE ──────────────────────────────────────────────────────
     LaunchedEffect(currentStep?.combatStarted) {
         if (currentStep?.combatStarted == true && currentStep?.enemy != null) {
@@ -119,8 +121,6 @@ fun GamePlayScreen(
         if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
     }
 
-    // ── FEATURE 2: MUERTE ─────────────────────────────────────────────────────
-    // Mostramos la pantalla de muerte cuando HP llega a 0 y el personaje existe
     val isDead = characterState != null && hpCurrent <= 0
 
     MedievalBackground {
@@ -219,6 +219,15 @@ fun GamePlayScreen(
                 }
             }
 
+            // ── BOTÓN FLOTANTE DEL MAPA ──────────────────────────────────────
+            // Posicionado sobre la barra inferior, a la izquierda.
+            WorldMapFab(
+                mapViewModel = mapViewModel,
+                modifier     = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(start = 16.dp, bottom = 110.dp)
+            )
+
             // ── TRANSICIÓN AL COMBATE ────────────────────────────────────────
             if (showPixelTransition) {
                 PixelTransitionOverlay {
@@ -287,7 +296,6 @@ private fun DeathScreen(onRestart: () -> Unit, onGoHome: () -> Unit) {
             )
             Spacer(Modifier.height(8.dp))
 
-            // Reiniciar: nueva historia, mismo personaje y tema, inventario y vida a 0
             Button(
                 onClick = onRestart,
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7B0000)),
@@ -296,7 +304,6 @@ private fun DeathScreen(onRestart: () -> Unit, onGoHome: () -> Unit) {
                 Text("🔄  Nueva Historia", fontSize = 16.sp, fontWeight = FontWeight.Bold)
             }
 
-            // Volver al listado de personajes
             OutlinedButton(
                 onClick = onGoHome,
                 modifier = Modifier.fillMaxWidth(),

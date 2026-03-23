@@ -37,10 +37,14 @@ data class AdventureStep(
     val story: String = "",
     val options: List<String> = emptyList(),
     val damageTaken: Int = 0,
-    val healingReceived: Int = 0,   // curación fuera de combate (pociones, descanso, magia...)
+    val healingReceived: Int = 0,
     val itemFound: Item? = null,
     val combatStarted: Boolean = false,
-    val enemy: Enemy? = null
+    val enemy: Enemy? = null,
+    // ── NUEVO: JSON de la ubicación actual del jugador ──────────────────────
+    // El DM lo rellena cuando el jugador llega a un lugar nuevo.
+    // Formato: {"name":"...","type":"ciudad|bosque|...","description":"..."}
+    val locationJson: String? = null
 )
 
 // ── VIEWMODEL ────────────────────────────────────────────────────────────────
@@ -49,13 +53,19 @@ class GameViewModel : ViewModel() {
 
     private val repository = GameRepository()
     private var currentGameId: String = ""
-    private var currentCharId: String = ""   // userId_characterName SIN tema
+    private var currentCharId: String = ""
     private var currentUserId: String = ""
     private var currentCharacterName: String = ""
     private var currentTheme: String = ""
     private val gson = Gson()
     private val chatHistory = mutableListOf<ChatMessage>()
     private val db = FirebaseFirestore.getInstance()
+
+    /**
+     * Referencia al WorldMapViewModel para notificarle ubicaciones nuevas.
+     * Se inyecta desde GamePlayScreen/AppNavigation.
+     */
+    var worldMapViewModel: WorldMapViewModel? = null
 
     private val MAX_HISTORY = 14
 
@@ -79,11 +89,6 @@ class GameViewModel : ViewModel() {
     private val _currentAdventureStep = MutableStateFlow<AdventureStep?>(null)
     val currentAdventureStep = _currentAdventureStep.asStateFlow()
 
-    /**
-     * Emite SOLO los pasos nuevos que llegan del DM (no los cargados de guardado).
-     * GamePlayScreen lo recibe para aplicar daño e ítems al inventario real.
-     * replay=0 → cada evento se consume una sola vez.
-     */
     private val _stepEffect = MutableSharedFlow<AdventureStep>(replay = 0, extraBufferCapacity = 1)
     val stepEffect = _stepEffect.asSharedFlow()
 
@@ -125,10 +130,6 @@ class GameViewModel : ViewModel() {
         }
     }
 
-    /**
-     * Borra la historia actual y arranca una nueva para el mismo personaje y tema.
-     * Llamado desde la pantalla de muerte.
-     */
     @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
     fun resetStory() {
         viewModelScope.launch {
@@ -138,12 +139,10 @@ class GameViewModel : ViewModel() {
             } catch (e: Exception) {
                 Log.w("GM_RESET", "Error borrando historia: ${e.message}")
             }
-            // Limpiar estado UI
             _messages.value       = emptyList()
             _currentOptions.value = emptyList()
             _currentAdventureStep.value = null
             chatHistory.clear()
-            // Nueva historia
             startStory(currentUserId, currentCharacterName, currentTheme)
         }
     }
@@ -291,17 +290,17 @@ class GameViewModel : ViewModel() {
 
     // ── APLICAR STEP AL ESTADO ───────────────────────────────────────────────
 
-    /**
-     * isNew=true → emite al SharedFlow para que GamePlayScreen aplique
-     * daño e ítems al inventario real. isNew=false → solo actualiza la UI
-     * (usado al cargar partida guardada, donde los efectos ya se aplicaron).
-     */
     private fun applyAdventureStep(step: AdventureStep, isNew: Boolean = false) {
         _messages.value = _messages.value + ("DM" to step.story)
         _currentOptions.value = step.options.filter { it.isNotBlank() }
         _currentAdventureStep.value = step
         if (isNew && (step.damageTaken > 0 || step.healingReceived > 0 || step.itemFound != null)) {
             viewModelScope.launch { _stepEffect.emit(step) }
+        }
+
+        // ── NUEVO: Notificar al mapa sobre la ubicación ───────────────────
+        if (isNew) {
+            worldMapViewModel?.processAdventureStep(step.story, step.locationJson)
         }
     }
 
@@ -324,15 +323,16 @@ class GameViewModel : ViewModel() {
 Eres un Dungeon Master de rol. Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional, sin bloques de código markdown, sin explicaciones. Solo el JSON.
 
 Estructura EXACTA (respeta los nombres de campo):
-{"story":"narración aquí","options":["opción 1","opción 2","opción 3"],"damageTaken":0,"healingReceived":0,"itemFound":null,"combatStarted":false,"enemy":null}
+{"story":"narración aquí","options":["opción 1","opción 2","opción 3"],"damageTaken":0,"healingReceived":0,"itemFound":null,"combatStarted":false,"enemy":null,"locationJson":null}
 
 Reglas:
 - "story": narrativa inmersiva en español, 2-4 frases.
 - "options": exactamente 2-4 opciones cortas para el jugador.
 - "combatStarted": true SOLO si hay combate activo. Entonces "enemy" debe tener {"name":"...","hpMax":N,"hpCurrent":N,"attackDamage":"XdY"}.
-- "damageTaken": daño recibido fuera de combate (0 si ninguno). Si el jugador muere (HP llega a 0), describe su caída épica.
-- "healingReceived": puntos de vida recuperados fuera de combate (poción usada, descanso, curación mágica...). 0 si ninguno.
+- "damageTaken": daño recibido fuera de combate (0 si ninguno).
+- "healingReceived": puntos de vida recuperados fuera de combate. 0 si ninguno.
 - "itemFound": null o {"id":"","name":"...","type":"arma/pocion/armadura","description":"...","effect":"..."}.
+- "locationJson": null O un JSON en STRING escapado cuando el jugador llega a un lugar NUEVO o diferente al anterior. Formato: "{\"name\":\"Nombre\",\"type\":\"ciudad|pueblo|mazmorra|bosque|montaña|cueva|taberna|templo|ruina|llanura|desierto|lago\",\"description\":\"Descripción breve del lugar\"}". Inclúyelo SOLO al cambiar de ubicación.
 - NO uses comillas simples. NO añadas campos extra. NO envuelvas en markdown.
 """.trimIndent()
 
@@ -360,7 +360,7 @@ Reglas:
     }
 
     private fun getInitialPrompt(name: String, theme: String): String =
-        "Inicia la aventura de $theme para el héroe llamado $name. Presenta el escenario de forma épica y ofrece 3 opciones iniciales."
+        "Inicia la aventura de $theme para el héroe llamado $name. Presenta el escenario de forma épica y ofrece 3 opciones iniciales. Si el inicio tiene un lugar concreto, inclúyelo en locationJson."
 
     // ── GUARDADO ──────────────────────────────────────────────────────────────
 
@@ -378,8 +378,6 @@ Reglas:
                 )
                 repository.saveGame(currentGameId, data)
 
-                // También actualizar lastPlayed en partidas/{charId} para que
-                // HomeViewModel pueda ordenar personajes por última sesión
                 if (currentCharId.isNotBlank()) {
                     db.collection("partidas").document(currentCharId)
                         .update("lastPlayed", now)
@@ -395,5 +393,4 @@ Reglas:
     val pendingXp = _pendingXp.asStateFlow()
     fun addPendingXp(xp: Int) { _pendingXp.value += xp }
     fun consumePendingXp() { _pendingXp.value = 0 }
-
 }
