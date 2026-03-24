@@ -17,9 +17,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.aidungeonmaster.R // Asegúrate de tener esta carpeta de recursos
-
-// Componente para el fondo de pergamino antiguo
+import com.example.aidungeonmaster.R
 @Composable
 fun MedievalBackground(content: @Composable () -> Unit) {
     Box(modifier = Modifier.fillMaxSize().background(Color(0xFF2B2B2B))) {
