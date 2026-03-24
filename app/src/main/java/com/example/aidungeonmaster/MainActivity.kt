@@ -1,8 +1,12 @@
 package com.example.aidungeonmaster
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -14,19 +18,34 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
+import androidx.core.content.ContextCompat
 import androidx.navigation.compose.rememberNavController
-import com.example.aidungeonmaster.ui.login.LoginScreen
-import com.example.aidungeonmaster.ui.register.RegisterScreen
+import com.example.aidungeonmaster.navigation.AppNavigation
 import com.example.aidungeonmaster.ui.theme.AIDungeonMasterTheme
 import androidx.core.view.WindowCompat
-import com.example.aidungeonmaster.navigation.AppNavigation
-import com.example.aidungeonmaster.ui.home.HomeScreen
 
 class MainActivity : ComponentActivity() {
+
+    // Launcher para solicitar el permiso POST_NOTIFICATIONS (Android 13+)
+    private val notificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        // No es necesario hacer nada extra; el usuario puede activarlo
+        // más tarde desde Ajustes si rechaza el permiso ahora.
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Solicitar permiso de notificaciones en Android 13+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(
+                    this, Manifest.permission.POST_NOTIFICATIONS
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
 
         WindowCompat.setDecorFitsSystemWindows(window, false)
         val windowInsetsController = WindowCompat.getInsetsController(window, window.decorView)

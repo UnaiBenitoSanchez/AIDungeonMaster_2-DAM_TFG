@@ -138,4 +138,7 @@ dependencies {
 
     // Opcional: Si usas las funciones de extensión de Guava para Kotlin
     implementation("androidx.concurrent:concurrent-futures-ktx:1.1.0")
+
+    // WorkManager (para RankingCheckWorker e InactivityWorker)
+    implementation("androidx.work:work-runtime-ktx:2.9.0")
 }

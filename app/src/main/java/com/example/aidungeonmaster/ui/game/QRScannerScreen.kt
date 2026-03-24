@@ -1,6 +1,7 @@
 package com.example.aidungeonmaster.ui.game
 
 import android.Manifest
+import android.media.MediaRouter2.getInstance
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
@@ -34,6 +35,8 @@ import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
 import kotlinx.coroutines.launch
 import java.util.concurrent.Executors
+
+import com.google.common.util.concurrent.ListenableFuture
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -111,6 +114,7 @@ fun QRScannerScreen(
                             androidx.compose.ui.viewinterop.AndroidView(
                                 factory = { ctx ->
                                     val previewView = PreviewView(ctx)
+
                                     val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
                                     cameraProviderFuture.addListener({
                                         val cameraProvider = cameraProviderFuture.get()
