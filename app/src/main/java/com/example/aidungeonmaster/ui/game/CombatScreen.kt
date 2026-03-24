@@ -59,7 +59,6 @@ fun CombatScreen(
     inventoryViewModel: InventoryViewModel,
     gameId: String,
     onCombatEnd: (victory: Boolean, xpGained: Int) -> Unit,
-    // ── NUEVO: AchievementViewModel para registrar logros de combate ──
     achievementViewModel: AchievementViewModel? = null
 ) {
     val step      by gameViewModel.currentAdventureStep.collectAsState()
