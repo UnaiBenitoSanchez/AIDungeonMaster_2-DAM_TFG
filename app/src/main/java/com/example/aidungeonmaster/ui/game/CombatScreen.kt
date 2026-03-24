@@ -58,7 +58,9 @@ fun CombatScreen(
     gameViewModel: GameViewModel,
     inventoryViewModel: InventoryViewModel,
     gameId: String,
-    onCombatEnd: (victory: Boolean, xpGained: Int) -> Unit
+    onCombatEnd: (victory: Boolean, xpGained: Int) -> Unit,
+    // ── NUEVO: AchievementViewModel para registrar logros de combate ──
+    achievementViewModel: AchievementViewModel? = null
 ) {
     val step      by gameViewModel.currentAdventureStep.collectAsState()
     val character by inventoryViewModel.character.collectAsState()
@@ -93,7 +95,8 @@ fun CombatScreen(
         character          = charReady,
         gameId             = gameId,
         inventoryViewModel = inventoryViewModel,
-        onCombatEnd        = onCombatEnd
+        onCombatEnd        = onCombatEnd,
+        achievementViewModel = achievementViewModel
     )
 }
 
@@ -108,16 +111,20 @@ private fun CombatScreenReady(
     character: com.example.aidungeonmaster.data.model.Character,
     gameId: String,
     inventoryViewModel: InventoryViewModel,
-    onCombatEnd: (victory: Boolean, xpGained: Int) -> Unit
+    onCombatEnd: (victory: Boolean, xpGained: Int) -> Unit,
+    // ── NUEVO ──
+    achievementViewModel: AchievementViewModel? = null
 ) {
     // ✅ viewModel() llamado incondicionalmente — nunca después de un return
     val combatVm: CombatViewModel = viewModel(
         // La key evita reusar un ViewModel antiguo si cambia el enemigo
         key     = "combat_${enemy.name}_${enemy.hpMax}",
         factory = CombatViewModelFactory(
-            enemy      = enemy,
-            character  = character,
-            onHpUpdate = { newHp -> inventoryViewModel.updateHp(gameId, newHp) }
+            enemy                = enemy,
+            character            = character,
+            onHpUpdate           = { newHp -> inventoryViewModel.updateHp(gameId, newHp) },
+            achievementViewModel = achievementViewModel,
+            charId               = gameId
         )
     )
 

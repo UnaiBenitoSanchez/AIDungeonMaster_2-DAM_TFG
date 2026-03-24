@@ -21,6 +21,9 @@ import com.example.aidungeonmaster.viewmodel.AuthViewModel
 import com.example.aidungeonmaster.viewmodel.GameViewModel
 import com.example.aidungeonmaster.viewmodel.InventoryViewModel
 import com.example.aidungeonmaster.viewmodel.WorldMapViewModel   // ← NUEVO
+// ── LOGROS Y MISIONES ────────────────────────────────────────────────────────
+import com.example.aidungeonmaster.ui.achievements.AchievementsScreen
+import com.example.aidungeonmaster.viewmodel.AchievementViewModel
 
 
 sealed class Screen(val route: String) {
@@ -39,6 +42,9 @@ sealed class Screen(val route: String) {
 
     object Ranking : Screen("ranking")
 
+    // ── NUEVO ──
+    object Achievements : Screen("achievements")
+
     object GamePlay : Screen("game_play/{userId}/{characterName}/{theme}") {
         fun createRoute(userId: String, characterName: String, theme: String) =
             "game_play/$userId/$characterName/$theme"
@@ -52,6 +58,7 @@ fun AppNavigation(navController: NavHostController) {
     val gameViewModel: GameViewModel           = viewModel()
     val inventoryViewModel: InventoryViewModel = viewModel()
     val worldMapViewModel: WorldMapViewModel   = viewModel()   // ← NUEVO
+    val achievementViewModel: AchievementViewModel = viewModel() // ── LOGROS
 
     val startRoute = if (authViewModel.isUserLoggedIn()) Screen.Home.route else Screen.Login.route
 
@@ -67,6 +74,14 @@ fun AppNavigation(navController: NavHostController) {
             )
         }
 
+        // ── LOGROS Y MISIONES ─────────────────────────────────────────────
+        composable(Screen.Achievements.route) {
+            AchievementsScreen(
+                viewModel = achievementViewModel,
+                onBack    = { navController.popBackStack() }
+            )
+        }
+
         composable(Screen.GameSetup.route) { backStackEntry ->
             val userId        = backStackEntry.arguments?.getString("userId")        ?: ""
             val characterName = backStackEntry.arguments?.getString("characterName") ?: ""
@@ -78,13 +93,14 @@ fun AppNavigation(navController: NavHostController) {
             val characterName = backStackEntry.arguments?.getString("characterName") ?: ""
             val theme         = backStackEntry.arguments?.getString("theme")         ?: ""
             GamePlayScreen(
-                navController      = navController,
-                userId             = userId,
-                characterName      = characterName,
-                theme              = theme,
-                viewModel          = gameViewModel,
-                inventoryViewModel = inventoryViewModel,
-                mapViewModel       = worldMapViewModel   // ← NUEVO
+                navController        = navController,
+                userId               = userId,
+                characterName        = characterName,
+                theme                = theme,
+                viewModel            = gameViewModel,
+                inventoryViewModel   = inventoryViewModel,
+                mapViewModel         = worldMapViewModel,   // ← NUEVO
+                achievementViewModel = achievementViewModel  // ── LOGROS
             )
         }
 
@@ -107,10 +123,11 @@ fun AppNavigation(navController: NavHostController) {
         composable("combat/{gameId}") { backStackEntry ->
             val gameId = backStackEntry.arguments?.getString("gameId") ?: ""
             CombatScreen(
-                gameViewModel      = gameViewModel,
-                inventoryViewModel = inventoryViewModel,
-                gameId             = gameId,
-                onCombatEnd        = { victory, xpGained ->
+                gameViewModel        = gameViewModel,
+                inventoryViewModel   = inventoryViewModel,
+                gameId               = gameId,
+                achievementViewModel = achievementViewModel, // ── LOGROS
+                onCombatEnd          = { victory, xpGained ->
                     if (victory && xpGained > 0) {
                         gameViewModel.addPendingXp(xpGained)
                     }

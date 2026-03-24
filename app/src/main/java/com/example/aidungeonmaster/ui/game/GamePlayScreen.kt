@@ -25,10 +25,16 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.aidungeonmaster.data.model.Achievement
+import com.example.aidungeonmaster.data.model.Quest
+import com.example.aidungeonmaster.ui.achievements.AchievementToast
+import com.example.aidungeonmaster.ui.achievements.QuestCompletedToast
 import com.example.aidungeonmaster.viewmodel.GameViewModel
 import com.example.aidungeonmaster.viewmodel.InventoryViewModel
 import com.example.aidungeonmaster.viewmodel.WorldMapViewModel    // ← NUEVO
 import com.example.aidungeonmaster.utils.AdventureMusicEngine
+import com.example.aidungeonmaster.viewmodel.AchievementViewModel
+import kotlinx.coroutines.launch
 
 @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
 @OptIn(ExperimentalMaterial3Api::class)
@@ -40,7 +46,8 @@ fun GamePlayScreen(
     theme: String,
     viewModel: GameViewModel = viewModel(),
     inventoryViewModel: InventoryViewModel = viewModel(),
-    mapViewModel: WorldMapViewModel = viewModel()               // ← NUEVO
+    mapViewModel: WorldMapViewModel = viewModel()  ,
+    achievementViewModel: AchievementViewModel = viewModel()
 ) {
     val listState = rememberLazyListState()
     val messages  by viewModel.messages.collectAsState()
@@ -71,9 +78,29 @@ fun GamePlayScreen(
     // ── CARGA INICIAL ─────────────────────────────────────────────────────────
     LaunchedEffect(charId) {
         inventoryViewModel.loadInventory(charId)
-        viewModel.worldMapViewModel = mapViewModel      // ← NUEVO: conectar mapa
-        mapViewModel.loadMap(gameId)                    // ← NUEVO: cargar mapa guardado
+        viewModel.worldMapViewModel = mapViewModel
+        mapViewModel.loadMap(gameId)
         viewModel.startStory(userId, characterName, theme)
+        achievementViewModel.loadForCharacter(charId)   // ← AÑADIR
+    }
+
+    var toastAchievement by remember { mutableStateOf<Achievement?>(null) }
+    var toastQuest       by remember { mutableStateOf<Quest?>(null) }
+
+    LaunchedEffect(Unit) {
+        launch { achievementViewModel.newAchievement.collect { toastAchievement = it } }
+        launch { achievementViewModel.completedQuest.collect  { toastQuest       = it } }
+    }
+
+    achievementViewModel.onMessageSent(charId)
+
+    LaunchedEffect(Unit) {
+        achievementViewModel.pendingAchievementXp.collect { xp ->
+            if (xp > 0) {
+                viewModel.addPendingXp(xp)
+                achievementViewModel.consumeAchievementXp()
+            }
+        }
     }
 
     // ── EFECTOS REALES DEL DM (daño + curación + ítems) ─────────────────────
@@ -249,6 +276,11 @@ fun GamePlayScreen(
                         navController.popBackStack("home", inclusive = false)
                     }
                 )
+            }
+
+            Column(modifier = Modifier.align(Alignment.TopCenter)) {
+                AchievementToast(achievement = toastAchievement) { toastAchievement = null }
+                QuestCompletedToast(quest = toastQuest) { toastQuest = null }
             }
 
         } // fin Box

@@ -17,18 +17,15 @@ import kotlinx.coroutines.flow.asSharedFlow
 //  ENUMS Y DATA CLASSES
 // ============================================================
 
-// Contador global — IDs únicos para entradas del log de combate.
-// NUNCA usar System.currentTimeMillis() como key en LazyColumn:
-// si dos mensajes llegan en el mismo ms el crash es inmediato.
 private val logIdCounter = AtomicLong(0L)
 
 enum class CombatPhase {
-    INTRO,          // Animación de entrada
-    PLAYER_TURN,    // El jugador elige acción
-    ROLLING,        // Animación de dado activa
-    ENEMY_TURN,     // El enemigo actúa
-    VICTORY,        // Jugador ganó
-    DEFEAT          // Jugador perdió / huyó
+    INTRO,
+    PLAYER_TURN,
+    ROLLING,
+    ENEMY_TURN,
+    VICTORY,
+    DEFEAT
 }
 
 enum class LogType {
@@ -45,14 +42,14 @@ data class CombatLogEntry(
 )
 
 data class DiceAnimState(
-    val diceLabel: String = "",       // "1d20", "2d6+3"
-    val actionLabel: String = "",     // "Ataque con Espada", "Bola de Fuego"
+    val diceLabel: String = "",
+    val actionLabel: String = "",
     val rolls: List<Int> = emptyList(),
     val total: Int = 0,
     val isVisible: Boolean = false,
     val isCrit: Boolean = false,
     val isFumble: Boolean = false,
-    val isHeal: Boolean = false
+    val isHeal: Boolean = false,
 )
 
 enum class AbilityType { DAMAGE, HEAL, BUFF_DEFENSE, BUFF_ATTACK, SPECIAL_FLEE }
@@ -61,7 +58,7 @@ data class ClassAbility(
     val id: String,
     val name: String,
     val description: String,
-    val diceExpression: String,       // "2d6+3", "heal:1d8+2", "flee", "adv:5"
+    val diceExpression: String,
     val type: AbilityType,
     val emoji: String,
     val cooldownTurns: Int = 0
@@ -74,10 +71,13 @@ data class ClassAbility(
 class CombatViewModel(
     val enemy: Enemy,
     val playerCharacter: Character,
-    private val onHpUpdate: (Int) -> Unit
+    private val onHpUpdate: (Int) -> Unit,
+    // ── NUEVO: AchievementViewModel para disparar logros desde el combate ──
+    val achievementViewModel: AchievementViewModel? = null,
+    // ── NUEVO: charId necesario para las funciones del AchievementViewModel ──
+    private val charId: String = ""
 ) : ViewModel() {
 
-    // --- Estados públicos ---
     private val _enemyHp      = MutableStateFlow(enemy.hpCurrent)
     val enemyHp               = _enemyHp.asStateFlow()
 
@@ -96,15 +96,12 @@ class CombatViewModel(
     private val _cooldowns    = MutableStateFlow<Map<String, Int>>(emptyMap())
     val cooldowns             = _cooldowns.asStateFlow()
 
-    /** XP que se emite una sola vez al terminar el combate con victoria. */
     private val _xpReward = MutableSharedFlow<Int>(replay = 0, extraBufferCapacity = 1)
     val xpReward = _xpReward.asSharedFlow()
 
-    // --- Buffs temporales ---
-    private var defenseBonus   = 0
-    private var hasAdvantage   = false
+    private var defenseBonus = 0
+    private var hasAdvantage = false
 
-    // --- Modificadores de stats ---
     private fun statMod(stat: String): Int {
         val v = playerCharacter.stats[stat] ?: 10
         return (v - 10) / 2
@@ -114,23 +111,18 @@ class CombatViewModel(
     private val dexMod   get() = statMod("Destreza")
     private val intMod   get() = statMod("Inteligencia")
     private val wisMod   get() = statMod("Sabiduría")
-    private val profBonus = 2   // niveles 1-4
+    private val profBonus = 2
 
-    // CA calculada del enemigo (12 base + bonus por HP máx)
     private val enemyAC: Int = (10 + (enemy.hpMax / 12).coerceIn(0, 5))
-    // CA del jugador
     private val playerAC: Int get() = (10 + dexMod + defenseBonus).coerceIn(8, 22)
 
-    // Habilidades basadas en clase
     val classAbilities: List<ClassAbility> = abilitiesForClass(playerCharacter.characterClass)
 
-    // Armas del inventario (items de tipo arma o con dados de daño en el efecto)
     val weapons: List<Item> = playerCharacter.inventory.filter { item ->
         item.type.contains("arma", ignoreCase = true) ||
                 item.effect.contains("d", ignoreCase = true) ||
                 item.description.uppercase().contains("\\dD\\d".toRegex())
     }.ifEmpty {
-        // Si no hay armas, dar un puñetazo básico
         listOf(Item(id = "fist", name = "Puñetazo", description = "Ataque desarmado", type = "arma", effect = "1d4"))
     }
 
@@ -157,7 +149,6 @@ class CombatViewModel(
         _phase.value = CombatPhase.ROLLING
 
         viewModelScope.launch {
-            // 1. Tirada de ataque d20
             val rollA1 = roll(20)
             val rollA2 = if (hasAdvantage) roll(20) else rollA1
             val attackRoll = if (hasAdvantage) maxOf(rollA1, rollA2) else rollA1
@@ -184,13 +175,17 @@ class CombatViewModel(
                     endPlayerTurn()
                 }
                 isCrit || totalAtk >= enemyAC -> {
-                    // 2. Tirada de daño
                     val diceExpr = weapon.effect.ifBlank { weapon.description }
                     val (cnt, sides, bonus) = parseDice(diceExpr)
                     val count       = if (isCrit) cnt * 2 else cnt
                     val damageRolls = List(count) { roll(sides) }
                     val rawDamage   = damageRolls.sum() + bonus + strMod
                     val damage      = rawDamage.coerceAtLeast(1)
+
+                    // ── LOGRO: Golpe Crítico ─────────────────────────────────
+                    if (isCrit) {
+                        achievementViewModel?.onCriticalHit()
+                    }
 
                     showDice(
                         diceLabel   = "${count}d${sides}${if (bonus > 0) "+$bonus" else ""}",
@@ -214,10 +209,17 @@ class CombatViewModel(
                     if (newEnemyHp <= 0) {
                         log("💀 ¡${enemy.name} ha sido derrotado!", LogType.SYSTEM)
 
-                        // Calcular XP ganado: la mitad del HP máximo del enemigo
                         val xpGained = (enemy.hpMax / 2).coerceAtLeast(5)
                         log("⭐ +$xpGained XP ganado", LogType.SYSTEM)
                         _xpReward.emit(xpGained)
+
+                        // ── LOGRO: Victoria en combate ───────────────────────
+                        achievementViewModel?.onCombatWon(charId)
+
+                        // ── LOGRO: Sobrevivir con 1 HP ───────────────────────
+                        if (_playerHp.value <= 1) {
+                            achievementViewModel?.onSurvivedLowHp()
+                        }
 
                         delay(600)
                         _phase.value = CombatPhase.VICTORY
@@ -247,11 +249,16 @@ class CombatViewModel(
         viewModelScope.launch {
             when (ability.type) {
                 AbilityType.DAMAGE -> {
-                    val isCrit = roll(20) == 20 // Chance de crítico en habilidades mágicas
+                    val isCrit = roll(20) == 20
                     val (cnt, sides, bonus) = parseDice(ability.diceExpression)
                     val count  = if (isCrit) cnt * 2 else cnt
                     val rolls  = List(count) { roll(sides) }
                     val damage = (rolls.sum() + bonus).coerceAtLeast(1)
+
+                    // ── LOGRO: Golpe Crítico con habilidad ───────────────────
+                    if (isCrit) {
+                        achievementViewModel?.onCriticalHit()
+                    }
 
                     showDice(
                         diceLabel   = "${count}d${sides}${if (bonus > 0) "+$bonus" else ""}",
@@ -274,6 +281,14 @@ class CombatViewModel(
                         val xpGained = (enemy.hpMax / 2).coerceAtLeast(5)
                         log("⭐ +$xpGained XP ganado", LogType.SYSTEM)
                         _xpReward.emit(xpGained)
+
+                        // ── LOGRO: Victoria en combate ───────────────────────
+                        achievementViewModel?.onCombatWon(charId)
+
+                        // ── LOGRO: Sobrevivir con 1 HP ───────────────────────
+                        if (_playerHp.value <= 1) {
+                            achievementViewModel?.onSurvivedLowHp()
+                        }
 
                         delay(600)
                         _phase.value = CombatPhase.VICTORY
@@ -330,7 +345,7 @@ class CombatViewModel(
                     if (total >= 12) {
                         log("💨 ¡Logras huir del combate! ($total ≥ 12)", LogType.SYSTEM)
                         delay(500)
-                        _phase.value = CombatPhase.DEFEAT   // huida = fin de combate
+                        _phase.value = CombatPhase.DEFEAT
                     } else {
                         log("🚫 Fallas la huida ($total < 12). ¡${enemy.name} te corta el paso!", LogType.PLAYER_MISS)
                         if (ability.cooldownTurns > 0) addCooldown(ability)
@@ -368,7 +383,7 @@ class CombatViewModel(
             val attackRoll = roll(20)
             val isCrit     = attackRoll == 20
             val isFumble   = attackRoll == 1
-            val totalAtk   = attackRoll + 3  // modificador simple de enemigo
+            val totalAtk   = attackRoll + 3
 
             showDice(
                 diceLabel   = "1d20",
@@ -423,7 +438,6 @@ class CombatViewModel(
                 }
             }
 
-            // Reducir cooldowns al final del turno
             defenseBonus = 0
             _cooldowns.value = _cooldowns.value
                 .mapValues { (_, v) -> v - 1 }
@@ -443,7 +457,6 @@ class CombatViewModel(
 
     private fun roll(sides: Int): Int = (1..sides).random()
 
-    /** Parsea "2d6+3", "1D8", "D4" → Triple(count, sides, bonus) */
     private fun parseDice(expr: String): Triple<Int, Int, Int> {
         val clean = expr.uppercase().trim()
         val rx    = """(\d*)D(\d+)(?:\+(\d+))?""".toRegex()
@@ -536,7 +549,6 @@ class CombatViewModel(
                 ClassAbility("patient_def",   "Defensa Paciente",     "+3 CA este turno",              "3",       AbilityType.BUFF_DEFENSE,"🧘", cooldownTurns = 2),
                 ClassAbility("step_wind",     "Paso del Viento",      "Esquivar y contraatacar",       "adv",     AbilityType.BUFF_ATTACK, "🌬️"),
             )
-            // ── Clases personalizadas ──────────────────────────────────────────
             "corsario" -> listOf(
                 ClassAbility("pistol_shot",   "Disparo de Pistola",   "Proyectil a quemarropa",        "2d6",     AbilityType.DAMAGE,      "🔫"),
                 ClassAbility("boarding_axe",  "Hacha de Abordaje",    "Golpe brutal de pirata",        "1d8+2",   AbilityType.DAMAGE,      "⚓"),
@@ -576,9 +588,12 @@ class CombatViewModel(
 class CombatViewModelFactory(
     private val enemy: Enemy,
     private val character: Character,
-    private val onHpUpdate: (Int) -> Unit
+    private val onHpUpdate: (Int) -> Unit,
+    // ── NUEVO: pasar el AchievementViewModel y charId al factory ──
+    private val achievementViewModel: AchievementViewModel? = null,
+    private val charId: String = ""
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T =
-        CombatViewModel(enemy, character, onHpUpdate) as T
+        CombatViewModel(enemy, character, onHpUpdate, achievementViewModel, charId) as T
 }

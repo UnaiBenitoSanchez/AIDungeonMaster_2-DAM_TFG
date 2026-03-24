@@ -40,6 +40,8 @@ import java.util.concurrent.TimeUnit
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.sp
+import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.Star
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -69,6 +71,13 @@ fun HomeScreen(navController: NavHostController, viewModel: HomeViewModel = view
                 actions = {
                     IconButton(onClick = { navController.navigate("ranking") }) {
                         Icon(Icons.Default.EmojiEvents, contentDescription = "Ranking Mundial", tint = Color(0xFFFFD700))
+                    }
+                    IconButton(onClick = { navController.navigate(Screen.Achievements.route) }) {
+                        Icon(
+                            Icons.Default.Star,
+                            contentDescription = "Logros",
+                            tint = Color(0xFFFFD700)
+                        )
                     }
                     IconButton(onClick = {
                         viewModel.logout {
