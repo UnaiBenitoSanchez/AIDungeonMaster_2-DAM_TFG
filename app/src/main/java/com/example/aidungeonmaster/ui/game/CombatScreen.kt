@@ -128,10 +128,12 @@ private fun CombatScreenReady(
     )
 
     CombatContent(
-        combatVm    = combatVm,
-        enemyHpMax  = enemy.hpMax,
-        playerHpMax = character.hpMax,
-        onCombatEnd = onCombatEnd
+        combatVm           = combatVm,
+        enemyHpMax         = enemy.hpMax,
+        playerHpMax        = character.hpMax,
+        inventoryViewModel = inventoryViewModel,
+        gameId             = gameId,
+        onCombatEnd        = onCombatEnd
     )
 }
 
@@ -144,6 +146,8 @@ private fun CombatContent(
     combatVm: CombatViewModel,
     enemyHpMax: Int,
     playerHpMax: Int,
+    inventoryViewModel: InventoryViewModel,
+    gameId: String,
     onCombatEnd: (victory: Boolean, xpGained: Int) -> Unit
 ) {
     val phase     by combatVm.phase.collectAsState()
@@ -171,6 +175,13 @@ private fun CombatContent(
                 (combatVm.enemy.hpMax / 2).coerceAtLeast(5)
             else 0
             onCombatEnd(phase == CombatPhase.VICTORY, xpGained)
+        }
+    }
+
+    // ── RECOMPENSA DE MONEDAS AL VENCER ──────────────────────────
+    LaunchedEffect(Unit) {
+        combatVm.coinsReward.collect { coins ->
+            if (coins > 0) inventoryViewModel.addCoins(gameId, coins)
         }
     }
 

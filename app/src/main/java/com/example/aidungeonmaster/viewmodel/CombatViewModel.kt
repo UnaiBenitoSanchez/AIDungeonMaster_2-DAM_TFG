@@ -99,6 +99,9 @@ class CombatViewModel(
     private val _xpReward = MutableSharedFlow<Int>(replay = 0, extraBufferCapacity = 1)
     val xpReward = _xpReward.asSharedFlow()
 
+    private val _coinsReward = MutableSharedFlow<Int>(replay = 0, extraBufferCapacity = 1)
+    val coinsReward = _coinsReward.asSharedFlow()
+
     private var defenseBonus = 0
     private var hasAdvantage = false
 
@@ -213,6 +216,11 @@ class CombatViewModel(
                         log("⭐ +$xpGained XP ganado", LogType.SYSTEM)
                         _xpReward.emit(xpGained)
 
+                        val coinsGained = if (enemy.goldCoins > 0) enemy.goldCoins
+                        else ((enemy.hpMax / 4) + (1..10).random()).coerceAtLeast(5)
+                        log("🪙 +$coinsGained monedas de oro", LogType.SYSTEM)
+                        _coinsReward.emit(coinsGained)
+
                         // ── LOGRO: Victoria en combate ───────────────────────
                         achievementViewModel?.onCombatWon(charId)
 
@@ -281,6 +289,11 @@ class CombatViewModel(
                         val xpGained = (enemy.hpMax / 2).coerceAtLeast(5)
                         log("⭐ +$xpGained XP ganado", LogType.SYSTEM)
                         _xpReward.emit(xpGained)
+
+                        val coinsGained = if (enemy.goldCoins > 0) enemy.goldCoins
+                        else ((enemy.hpMax / 4) + (1..10).random()).coerceAtLeast(5)
+                        log("🪙 +$coinsGained monedas de oro", LogType.SYSTEM)
+                        _coinsReward.emit(coinsGained)
 
                         // ── LOGRO: Victoria en combate ───────────────────────
                         achievementViewModel?.onCombatWon(charId)

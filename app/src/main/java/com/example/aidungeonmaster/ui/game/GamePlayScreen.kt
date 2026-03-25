@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.aidungeonmaster.data.model.Achievement
+import com.example.aidungeonmaster.data.model.Item
 import com.example.aidungeonmaster.data.model.Quest
 import com.example.aidungeonmaster.navigation.Screen
 import com.example.aidungeonmaster.ui.achievements.AchievementToast
@@ -104,6 +105,16 @@ fun GamePlayScreen(
         }
     }
 
+    // ── MONEDAS POR COMPLETAR MISIONES ───────────────────────────────────────
+    LaunchedEffect(Unit) {
+        achievementViewModel.pendingAchievementCoins.collect { coins ->
+            if (coins > 0) {
+                inventoryViewModel.addCoins(charId, coins)
+                achievementViewModel.consumeAchievementCoins()
+            }
+        }
+    }
+
     // ── EFECTOS REALES DEL DM (daño + curación + ítems) ─────────────────────
     LaunchedEffect(Unit) {
         viewModel.stepEffect.collect { step ->
@@ -118,6 +129,10 @@ fun GamePlayScreen(
             }
             step.itemFound?.let { item ->
                 inventoryViewModel.addItemToInventory(charId, item)
+            }
+            // ── MONEDAS ENCONTRADAS EN LA AVENTURA ────────────────
+            if (step.coinsFound > 0) {
+                inventoryViewModel.addCoins(charId, step.coinsFound)
             }
         }
     }

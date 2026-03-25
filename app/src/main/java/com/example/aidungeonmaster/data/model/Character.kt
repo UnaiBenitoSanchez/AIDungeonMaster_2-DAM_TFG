@@ -28,7 +28,10 @@ data class Character(
 
     // --- PROGRESIÓN ---
     val xp: Int = 0,
-    val level: Int = 1
+    val level: Int = 1,
+
+    // --- ECONOMÍA ---
+    val coins: Int = 0
 ) {
     /** XP necesario para pasar al siguiente nivel */
     val xpToNextLevel: Int get() = level * 100

@@ -30,7 +30,8 @@ data class Enemy(
     val name: String = "Enemigo",
     val hpMax: Int = 20,
     val hpCurrent: Int = 20,
-    val attackDamage: String = "1d6"
+    val attackDamage: String = "1d6",
+    val goldCoins: Int = 0   // Monedas que suelta al ser derrotado
 )
 
 data class AdventureStep(
@@ -41,6 +42,7 @@ data class AdventureStep(
     val itemFound: Item? = null,
     val combatStarted: Boolean = false,
     val enemy: Enemy? = null,
+    val coinsFound: Int = 0,   // Monedas encontradas en la aventura (sin combate)
     // ── NUEVO: JSON de la ubicación actual del jugador ──────────────────────
     // El DM lo rellena cuando el jugador llega a un lugar nuevo.
     // Formato: {"name":"...","type":"ciudad|bosque|...","description":"..."}
@@ -294,7 +296,7 @@ class GameViewModel : ViewModel() {
         _messages.value = _messages.value + ("DM" to step.story)
         _currentOptions.value = step.options.filter { it.isNotBlank() }
         _currentAdventureStep.value = step
-        if (isNew && (step.damageTaken > 0 || step.healingReceived > 0 || step.itemFound != null)) {
+        if (isNew && (step.damageTaken > 0 || step.healingReceived > 0 || step.itemFound != null || step.coinsFound > 0)) {
             viewModelScope.launch { _stepEffect.emit(step) }
         }
 
@@ -323,15 +325,16 @@ class GameViewModel : ViewModel() {
 Eres un Dungeon Master de rol. Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional, sin bloques de código markdown, sin explicaciones. Solo el JSON.
 
 Estructura EXACTA (respeta los nombres de campo):
-{"story":"narración aquí","options":["opción 1","opción 2","opción 3"],"damageTaken":0,"healingReceived":0,"itemFound":null,"combatStarted":false,"enemy":null,"locationJson":null}
+{"story":"narración aquí","options":["opción 1","opción 2","opción 3"],"damageTaken":0,"healingReceived":0,"itemFound":null,"combatStarted":false,"enemy":null,"coinsFound":0,"locationJson":null}
 
 Reglas:
 - "story": narrativa inmersiva en español, 2-4 frases.
 - "options": exactamente 2-4 opciones cortas para el jugador.
-- "combatStarted": true SOLO si hay combate activo. Entonces "enemy" debe tener {"name":"...","hpMax":N,"hpCurrent":N,"attackDamage":"XdY"}.
+- "combatStarted": true SOLO si hay combate activo. Entonces "enemy" debe tener {"name":"...","hpMax":N,"hpCurrent":N,"attackDamage":"XdY","goldCoins":N} donde goldCoins son las monedas que suelta el enemigo al morir (entre 5 y 50 según su nivel de dificultad).
 - "damageTaken": daño recibido fuera de combate (0 si ninguno).
 - "healingReceived": puntos de vida recuperados fuera de combate. 0 si ninguno.
 - "itemFound": null o {"id":"","name":"...","type":"arma/pocion/armadura","description":"...","effect":"..."}.
+- "coinsFound": monedas de oro encontradas en este paso fuera de combate (0 si ninguna). Úsalo cuando el jugador encuentra un tesoro, saquea un cofre, recibe una recompensa, etc. Valor entre 1 y 100.
 - "locationJson": null O un JSON en STRING escapado cuando el jugador llega a un lugar NUEVO o diferente al anterior. Formato: "{\"name\":\"Nombre\",\"type\":\"ciudad|pueblo|mazmorra|bosque|montaña|cueva|taberna|templo|ruina|llanura|desierto|lago\",\"description\":\"Descripción breve del lugar\"}". Inclúyelo SOLO al cambiar de ubicación.
 - NO uses comillas simples. NO añadas campos extra. NO envuelvas en markdown.
 """.trimIndent()

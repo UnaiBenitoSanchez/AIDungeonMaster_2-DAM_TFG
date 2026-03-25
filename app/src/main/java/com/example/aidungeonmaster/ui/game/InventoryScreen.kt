@@ -81,35 +81,55 @@ fun InventoryScreen(
                             colors   = CardDefaults.cardColors(containerColor = Color(0x44000000)),
                             border   = BorderStroke(1.dp, Color(0x55FFD700))
                         ) {
-                            Row(
-                                Modifier.padding(16.dp).fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                // Fila HP
+                                Row(
+                                    Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.Healing, null, tint = Color.Red, modifier = Modifier.size(24.dp))
+                                        Spacer(Modifier.width(8.dp))
+                                        Text(
+                                            "HP: ${character!!.hpCurrent} / ${character!!.hpMax}",
+                                            color = Color.White,
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                    // Barra de vida mini
+                                    val ratio = if (character!!.hpMax > 0)
+                                        character!!.hpCurrent.toFloat() / character!!.hpMax else 0f
+                                    val barColor = when {
+                                        ratio > 0.5f  -> Color(0xFF22CC55)
+                                        ratio > 0.25f -> Color(0xFFFFAA00)
+                                        else          -> Color(0xFFCC2222)
+                                    }
+                                    LinearProgressIndicator(
+                                        progress       = { ratio },
+                                        modifier       = Modifier.width(100.dp).height(8.dp),
+                                        color          = barColor,
+                                        trackColor     = Color(0xFF333333)
+                                    )
+                                }
+
+                                Spacer(Modifier.height(10.dp))
+
+                                // Fila Monedas
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.Healing, null, tint = Color.Red, modifier = Modifier.size(24.dp))
+                                    Text(
+                                        "🪙",
+                                        fontSize = 20.sp
+                                    )
                                     Spacer(Modifier.width(8.dp))
                                     Text(
-                                        "HP: ${character!!.hpCurrent} / ${character!!.hpMax}",
-                                        color = Color.White,
-                                        style = MaterialTheme.typography.bodyLarge,
+                                        text       = "${character!!.coins} monedas de oro",
+                                        color      = Color(0xFFFFD700),
+                                        style      = MaterialTheme.typography.bodyLarge,
                                         fontWeight = FontWeight.Bold
                                     )
                                 }
-                                // Barra de vida mini
-                                val ratio = if (character!!.hpMax > 0)
-                                    character!!.hpCurrent.toFloat() / character!!.hpMax else 0f
-                                val barColor = when {
-                                    ratio > 0.5f  -> Color(0xFF22CC55)
-                                    ratio > 0.25f -> Color(0xFFFFAA00)
-                                    else          -> Color(0xFFCC2222)
-                                }
-                                LinearProgressIndicator(
-                                    progress       = { ratio },
-                                    modifier       = Modifier.width(100.dp).height(8.dp),
-                                    color          = barColor,
-                                    trackColor     = Color(0xFF333333)
-                                )
                             }
                         }
 

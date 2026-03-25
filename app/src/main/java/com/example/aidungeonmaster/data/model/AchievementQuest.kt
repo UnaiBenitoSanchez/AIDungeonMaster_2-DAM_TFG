@@ -178,6 +178,7 @@ data class Quest(
     val description: String = "",
     val emoji: String = "📜",
     val xpReward: Int = 100,
+    val coinsReward: Int = 50,
     val objectives: List<QuestObjective> = emptyList(),
     val status: QuestStatus = QuestStatus.AVAILABLE,
     val acceptedAt: Long = 0L,
@@ -197,6 +198,7 @@ object QuestCatalog {
             description = "Comienza tu aventura enviando tus primeras acciones al Dungeon Master.",
             emoji = "👣",
             xpReward = 50,
+            coinsReward = 25,
             objectives = listOf(
                 QuestObjective(
                     type = QuestObjectiveType.MESSAGES,
@@ -211,6 +213,7 @@ object QuestCatalog {
             description = "Demuestra tu valor en combate ganando batallas.",
             emoji = "⚔️",
             xpReward = 150,
+            coinsReward = 80,
             objectives = listOf(
                 QuestObjective(
                     type = QuestObjectiveType.WINS,
@@ -225,6 +228,7 @@ object QuestCatalog {
             description = "Explora el mundo y descubre nuevos lugares.",
             emoji = "🗺️",
             xpReward = 120,
+            coinsReward = 60,
             objectives = listOf(
                 QuestObjective(
                     type = QuestObjectiveType.LOCATIONS,
@@ -239,6 +243,7 @@ object QuestCatalog {
             description = "Reúne objetos valiosos en tus aventuras.",
             emoji = "💎",
             xpReward = 100,
+            coinsReward = 100,
             objectives = listOf(
                 QuestObjective(
                     type = QuestObjectiveType.ITEMS,
@@ -253,6 +258,7 @@ object QuestCatalog {
             description = "Una misión épica para verdaderos aventureros.",
             emoji = "🦅",
             xpReward = 300,
+            coinsReward = 250,
             objectives = listOf(
                 QuestObjective(
                     type = QuestObjectiveType.WINS,

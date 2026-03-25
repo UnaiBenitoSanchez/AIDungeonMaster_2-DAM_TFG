@@ -54,6 +54,12 @@ class AchievementViewModel : ViewModel() {
 
     fun consumeAchievementXp() { _pendingAchievementXp.value = 0 }
 
+    // Monedas pendientes de conceder por misiones completadas
+    private val _pendingAchievementCoins = MutableStateFlow(0)
+    val pendingAchievementCoins = _pendingAchievementCoins.asStateFlow()
+
+    fun consumeAchievementCoins() { _pendingAchievementCoins.value = 0 }
+
     // ── Carga inicial ─────────────────────────────────────────────────────────
 
     fun loadForCharacter(charId: String) {
@@ -249,6 +255,7 @@ class AchievementViewModel : ViewModel() {
                     )
                     saveQuestToFirestore(uid, completed)
                     _pendingAchievementXp.value += completed.xpReward
+                    _pendingAchievementCoins.value += completed.coinsReward
                     _completedQuest.emit(completed)
                     // Desbloquear siguiente misión automáticamente
                     unlockNextQuest(uid, completed.id)
