@@ -42,6 +42,7 @@ import com.example.aidungeonmaster.viewmodel.WorldMapViewModel
 @Composable
 fun WorldMapFab(
     mapViewModel: WorldMapViewModel = viewModel(),
+    onOpenAR: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var showMap by remember { mutableStateOf(false) }
@@ -92,7 +93,11 @@ fun WorldMapFab(
     if (showMap) {
         WorldMapDialog(
             mapState  = mapState,
-            onDismiss = { showMap = false }
+            onDismiss = { showMap = false },
+            onOpenAR  = {
+                showMap = false
+                onOpenAR()
+            }
         )
     }
 }
@@ -102,7 +107,8 @@ fun WorldMapFab(
 @Composable
 fun WorldMapDialog(
     mapState: WorldMapState,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onOpenAR: () -> Unit = {}
 ) {
     var selectedLocation by remember { mutableStateOf<WorldLocation?>(null) }
 
@@ -127,6 +133,15 @@ fun WorldMapDialog(
                     fontFamily = FontFamily.Serif,
                     modifier   = Modifier.weight(1f)
                 )
+                // ── BOTÓN AR ───────────────────────────────────────
+                IconButton(
+                    onClick  = onOpenAR,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Text("AR", color = Color(0xFFFFD700), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+                Spacer(Modifier.width(4.dp))
+                // ─────────────────────────────────────────────────
                 IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) {
                     Icon(Icons.Default.Close, "Cerrar", tint = Color(0xFFFFD700))
                 }

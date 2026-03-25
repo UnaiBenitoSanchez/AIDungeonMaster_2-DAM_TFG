@@ -11,6 +11,9 @@
     <!-- Para re-programar los workers tras un reinicio del dispositivo -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
+    <!-- AR -->
+    <uses-feature android:name="android.hardware.camera.ar" android:required="false" />
+
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -32,6 +35,11 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Indica a Google Play que la app usa ARCore -->
+        <meta-data
+            android:name="com.google.ar.core"
+            android:value="optional" />
     </application>
 
 </manifest>

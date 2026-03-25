@@ -3,6 +3,8 @@ package com.example.aidungeonmaster.navigation
 import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -24,7 +26,8 @@ import com.example.aidungeonmaster.viewmodel.WorldMapViewModel   // ← NUEVO
 // ── LOGROS Y MISIONES ────────────────────────────────────────────────────────
 import com.example.aidungeonmaster.ui.achievements.AchievementsScreen
 import com.example.aidungeonmaster.viewmodel.AchievementViewModel
-
+// AR
+import com.example.aidungeonmaster.ui.game.ARMapScreen
 
 sealed class Screen(val route: String) {
     object Login : Screen("login")
@@ -42,12 +45,16 @@ sealed class Screen(val route: String) {
 
     object Ranking : Screen("ranking")
 
-    // ── NUEVO ──
     object Achievements : Screen("achievements")
 
     object GamePlay : Screen("game_play/{userId}/{characterName}/{theme}") {
         fun createRoute(userId: String, characterName: String, theme: String) =
             "game_play/$userId/$characterName/$theme"
+    }
+
+    // AR
+    object ARMap : Screen("ar_map/{gameId}") {
+        fun createRoute(gameId: String) = "ar_map/$gameId"
     }
 }
 
@@ -137,6 +144,16 @@ fun AppNavigation(navController: NavHostController) {
                     )
                     navController.popBackStack()
                 }
+            )
+        }
+
+        // AR
+        composable(Screen.ARMap.route) { backStackEntry ->
+            val gameId = backStackEntry.arguments?.getString("gameId") ?: ""
+            val mapState by worldMapViewModel.worldMapState.collectAsState()
+            ARMapScreen(
+                mapState = mapState,
+                onBack   = { navController.popBackStack() }
             )
         }
     }

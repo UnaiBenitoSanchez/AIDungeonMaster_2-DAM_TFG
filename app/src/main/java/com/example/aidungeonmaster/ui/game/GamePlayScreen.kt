@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.aidungeonmaster.data.model.Achievement
 import com.example.aidungeonmaster.data.model.Quest
+import com.example.aidungeonmaster.navigation.Screen
 import com.example.aidungeonmaster.ui.achievements.AchievementToast
 import com.example.aidungeonmaster.ui.achievements.QuestCompletedToast
 import com.example.aidungeonmaster.viewmodel.GameViewModel
@@ -252,7 +253,10 @@ fun GamePlayScreen(
                 mapViewModel = mapViewModel,
                 modifier     = Modifier
                     .align(Alignment.BottomStart)
-                    .padding(start = 16.dp, bottom = 110.dp)
+                    .padding(start = 16.dp, bottom = 110.dp),
+                onOpenAR     = {                                          // ← NUEVO
+                    navController.navigate(Screen.ARMap.createRoute(gameId))
+                }
             )
 
             // ── TRANSICIÓN AL COMBATE ────────────────────────────────────────
