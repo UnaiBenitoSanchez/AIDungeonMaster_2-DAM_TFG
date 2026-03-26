@@ -23,48 +23,48 @@ class AuthViewModel : ViewModel() {
 
     var errorMessage by mutableStateOf<String?>(null)
 
-    fun login(email: String, password: String, onSuccess: () -> Unit) {
-        isLoading = true
-        repository.login(
-            email,
-            password,
-            onSuccess = {
-                isLoading = false
-                onSuccess()
-            },
-            onError = {
-                isLoading = false
-                errorMessage = it
+    fun login(email: String, pass: String, onSuccess: () -> Unit) {
+        auth.signInWithEmailAndPassword(email, pass)
+            .addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    val user = auth.currentUser
+                    // Verificamos si ya validó el correo
+                    if (user?.isEmailVerified == true) {
+                        onSuccess() // ¡Adelante, entra a la aventura!
+                    } else {
+                        // No le dejamos entrar y cerramos la sesión temporal que hizo Firebase
+                        auth.signOut()
+                        errorMessage = "¡Alto ahí! Aún no has validado tu pergamino mágico (correo)."
+                    }
+                } else {
+                    errorMessage = "Credenciales incorrectas."
+                }
             }
-        )
     }
 
-    fun register(email: String, password: String, onSuccess: () -> Unit) {
+    fun register(email: String, pass: String, onSuccess: () -> Unit) {
+        // 1. Creamos el aventurero en Firebase
+        auth.createUserWithEmailAndPassword(email, pass)
+            .addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    // 2. Si se creó con éxito, obtenemos el usuario actual
+                    val user = auth.currentUser
 
-        if (email.isBlank() || password.isBlank()) {
-            errorMessage = "Email y contraseña obligatorios"
-            return
-        }
-
-        if (password.length < 6) {
-            errorMessage = "La contraseña debe tener al menos 6 caracteres"
-            return
-        }
-
-        isLoading = true
-
-        repository.register(
-            email,
-            password,
-            onSuccess = {
-                isLoading = false
-                onSuccess()
-            },
-            onError = {
-                isLoading = false
-                errorMessage = it
+                    // 3. Enviamos la lechuza (correo de verificación)
+                    user?.sendEmailVerification()
+                        ?.addOnCompleteListener { verificationTask ->
+                            if (verificationTask.isSuccessful) {
+                                // Correo enviado correctamente, llamamos al callback de éxito
+                                onSuccess()
+                            } else {
+                                errorMessage = "El pergamino de verificación se perdió en el camino."
+                            }
+                        }
+                } else {
+                    // Manejo de errores (correo ya en uso, mala conexión, etc.)
+                    errorMessage = task.exception?.localizedMessage ?: "Fallo al crear el personaje."
+                }
             }
-        )
     }
 
     fun clearError() {

@@ -73,7 +73,8 @@ private const val SPHERE_HEIGHT = 0.05f
 @Composable
 fun ARMapScreen(
     mapState: WorldMapState,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onOpen3DGallery: () -> Unit = {}
 ) {
     // ── SceneView / Filament ───────────────────────────────────────────────
     val engine         = rememberEngine()
@@ -191,11 +192,11 @@ fun ARMapScreen(
             pulseAlpha  = pulseAlpha,
             onBack      = onBack,
             onReset     = {
-                // Limpiar todos los nodos y permitir reposicionar el mapa
                 childNodes.clear()
                 selectedLocation = null
                 isMapPlaced = false
             },
+            onOpen3DGallery = onOpen3DGallery,
             modifier    = Modifier.align(Alignment.TopCenter)
         )
 
@@ -250,37 +251,126 @@ private fun buildARMap(
     val anchorNode = AnchorNode(engine = engine, anchor = anchor)
 
     locations.forEach { location ->
-        // Convertir coordenadas 2D del mapa [0..1] a posiciones 3D en metros
         val xOffset = (location.x - 0.5f) * MAP_SCALE
-        val zOffset = (location.y - 0.5f) * MAP_SCALE   // Y en mapa → Z en AR (profundidad)
+        val zOffset = (location.y - 0.5f) * MAP_SCALE
 
-        // Color según si es la ubicación actual
-        val rgba = if (location.isCurrentLocation)
-            Color(0xFFFFD700) // Oro (Gold) en formato ARGB
-        else
-            Color(0xFF87CEFA) // Azul cielo (Light Sky Blue) en formato ARGB
+        // ── Color y tamaño según el tipo de ubicación ───────────────────
+        val (baseColor, baseRadius, metallic, roughness) = getLocationStyle(location)
 
-        val mat  = materialLoader.createColorInstance(
-            color       = rgba,
-            metallic    = if (location.isCurrentLocation) 0.8f else 0.3f,
-            roughness   = if (location.isCurrentLocation) 0.2f else 0.5f,
+        val mat = materialLoader.createColorInstance(
+            color       = baseColor,
+            metallic    = metallic,
+            roughness   = roughness,
             reflectance = 0.5f
         )
 
-        val sphere = SphereNode(
+        // Forma principal
+        val mainSphere = SphereNode(
             engine           = engine,
-            radius           = SPHERE_RADIUS,
+            radius           = baseRadius,
             materialInstance = mat
         ).apply {
-            name     = location.id                           // usado para identificar en tap
+            name     = location.id
             position = Position(xOffset, SPHERE_HEIGHT, zOffset)
         }
 
-        anchorNode.addChildNode(sphere)
+        // ── Esfera pequeña flotante sobre la forma para indicar tipo ────
+        val accentColor = getLocationAccentColor(location)
+        val accentMat = materialLoader.createColorInstance(
+            color       = accentColor,
+            metallic    = 0.9f,
+            roughness   = 0.1f,
+            reflectance = 0.8f
+        )
+        val accentSphere = SphereNode(
+            engine           = engine,
+            radius           = baseRadius * 0.4f,
+            materialInstance = accentMat
+        ).apply {
+            name     = location.id
+            position = Position(xOffset, SPHERE_HEIGHT + baseRadius + 0.012f, zOffset)
+        }
+
+        // ── Indicador dorado pulsante si es la ubicación actual ─────────
+        if (location.isCurrentLocation) {
+            val pulseRing = SphereNode(
+                engine = engine,
+                radius = baseRadius * 1.6f,
+                materialInstance = materialLoader.createColorInstance(
+                    color       = Color(0xFFFFD700),
+                    metallic    = 0.9f,
+                    roughness   = 0.1f,
+                    reflectance = 0.9f
+                )
+            ).apply {
+                name     = location.id
+                position = Position(xOffset, SPHERE_HEIGHT * 0.3f, zOffset)
+            }
+            anchorNode.addChildNode(pulseRing)
+        }
+
+        anchorNode.addChildNode(mainSphere)
+        anchorNode.addChildNode(accentSphere)
     }
 
     childNodes += anchorNode
 }
+
+/** Devuelve (color, radio, metallic, roughness) según el tipo de ubicación */
+private fun getLocationStyle(location: WorldLocation): LocationStyle {
+    val isCurrent = location.isCurrentLocation
+    return when (location.type.lowercase().trim()) {
+        "bosque"            -> LocationStyle(Color(0xFF2E7D32), 0.028f, 0.0f, 0.85f)
+        "cueva"             -> LocationStyle(Color(0xFF37474F), 0.020f, 0.2f, 0.9f)
+        "mazmorra"          -> LocationStyle(Color(0xFF4A148C), 0.022f, 0.3f, 0.8f)
+        "ciudad"            -> LocationStyle(Color(0xFF1565C0), 0.032f, 0.4f, 0.5f)
+        "pueblo"            -> LocationStyle(Color(0xFF827717), 0.025f, 0.1f, 0.85f)
+        "montaña", "montana"-> LocationStyle(Color(0xFF546E7A), 0.030f, 0.1f, 0.9f)
+        "templo"            -> LocationStyle(Color(0xFFF9A825), 0.028f, 0.6f, 0.3f)
+        "torre"             -> LocationStyle(Color(0xFF283593), 0.022f, 0.5f, 0.4f)
+        "lago"              -> LocationStyle(Color(0xFF0277BD), 0.026f, 0.5f, 0.2f)
+        "mar"               -> LocationStyle(Color(0xFF01579B), 0.032f, 0.4f, 0.3f)
+        "desierto"          -> LocationStyle(Color(0xFFF57F17), 0.028f, 0.0f, 0.95f)
+        "taberna"           -> LocationStyle(Color(0xFF6D4C41), 0.024f, 0.1f, 0.9f)
+        "ruina"             -> LocationStyle(Color(0xFF4E342E), 0.025f, 0.05f, 0.95f)
+        "llanura"           -> LocationStyle(Color(0xFF388E3C), 0.026f, 0.0f, 0.9f)
+        else -> if (isCurrent)
+            LocationStyle(Color(0xFFFFD700), 0.030f, 0.8f, 0.2f)
+        else
+            LocationStyle(Color(0xFF87CEFA), 0.025f, 0.3f, 0.5f)
+    }
+}
+
+/** Color del acento (esfera pequeña flotante) que identifica el tipo visualmente */
+private fun getLocationAccentColor(location: WorldLocation): Color =
+    when (location.type.lowercase().trim()) {
+        "bosque"            -> Color(0xFF66BB6A)  // verde claro
+        "cueva"             -> Color(0xFF4FC3F7)  // azul cristal
+        "mazmorra"          -> Color(0xFFCE93D8)  // morado
+        "ciudad"            -> Color(0xFF90CAF9)  // azul claro
+        "pueblo"            -> Color(0xFFFFCC02)  // amarillo
+        "montaña", "montana"-> Color(0xFFECEFF1)  // blanco nieve
+        "templo"            -> Color(0xFFFFFFCC)  // dorado pálido
+        "torre"             -> Color(0xFF7986CB)  // índigo
+        "lago", "mar"       -> Color(0xFFB3E5FC)  // azul agua
+        "desierto"          -> Color(0xFFFFE082)  // arena
+        "taberna"           -> Color(0xFFFFAB40)  // naranja
+        "ruina"             -> Color(0xFFA1887F)  // marrón claro
+        else                -> Color(0xFFFFFFFF)
+    }
+
+// Data class auxiliar para agrupar los 4 valores de estilo
+data class LocationStyle(
+    val color: Color,
+    val radius: Float,
+    val metallic: Float,
+    val roughness: Float
+)
+
+operator fun LocationStyle.component1() = color
+operator fun LocationStyle.component2() = radius
+operator fun LocationStyle.component3() = metallic
+operator fun LocationStyle.component4() = roughness
 
 // ── COMPONENTES UI ────────────────────────────────────────────────────────────
 
@@ -292,6 +382,7 @@ private fun ARTopBar(
     pulseAlpha:           Float,
     onBack:               () -> Unit,
     onReset:              () -> Unit,
+    onOpen3DGallery:      () -> Unit = {},
     modifier:             Modifier = Modifier
 ) {
     Surface(
@@ -328,13 +419,18 @@ private fun ARTopBar(
                     !isMapPlaced ->
                         "🔍 Buscando superficie plana…"
                     else ->
-                        "✅ Mapa activo – toca una esfera"
+                        "✅ Mapa activo – toca un lugar"
                 }
                 Text(
                     text     = statusText,
                     color    = Color(0xFFCCBBAA).copy(alpha = if (!isMapPlaced) pulseAlpha else 1f),
                     fontSize = 11.sp
                 )
+            }
+
+            // Botón galería 3D
+            IconButton(onClick = onOpen3DGallery) {
+                Text("🏛️", fontSize = 20.sp)
             }
 
             // Botón reset (solo cuando el mapa ya está colocado)
@@ -403,8 +499,11 @@ private fun ARLegend(
                 color = Color(0xFF888877), fontSize = 10.sp
             )
             Spacer(Modifier.height(6.dp))
-            LegendRow(color = Color(0xFFFFD700), label = "Tu posición")
-            LegendRow(color = Color(0xFF88CCFF), label = "Visitado")
+            LegendRow(color = Color(0xFFFFD700), label = "Aquí ahora")
+            LegendRow(color = Color(0xFF66BB6A), label = "Bosque")
+            LegendRow(color = Color(0xFF1565C0), label = "Ciudad")
+            LegendRow(color = Color(0xFF4FC3F7), label = "Cueva")
+            LegendRow(color = Color(0xFFF9A825), label = "Templo")
         }
     }
 }

@@ -31,6 +31,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.aidungeonmaster.R
 import com.example.aidungeonmaster.viewmodel.AuthViewModel
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -42,6 +44,7 @@ fun RegisterScreen(
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
     var characterName by remember { mutableStateOf("") }
+    val context = LocalContext.current
 
     Box(
         modifier = Modifier
@@ -214,10 +217,17 @@ fun RegisterScreen(
                         onClick = {
                             if (password == confirmPassword) {
                                 viewModel.register(email, password) {
+                                    // El registro y el envío del correo fueron exitosos
+                                    Toast.makeText(
+                                        context,
+                                        "¡Revisa tu pergamino mágico! Te hemos enviado un correo de verificación.",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+
                                     navController.popBackStack()
                                 }
                             } else {
-                                viewModel.errorMessage = "Los sellos no coinciden"
+                                viewModel.errorMessage = "Los sellos mágicos (contraseñas) no coinciden"
                             }
                         },
                         modifier = Modifier

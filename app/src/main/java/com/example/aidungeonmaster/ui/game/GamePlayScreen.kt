@@ -81,7 +81,7 @@ fun GamePlayScreen(
     LaunchedEffect(charId) {
         inventoryViewModel.loadInventory(charId)
         viewModel.worldMapViewModel = mapViewModel
-        mapViewModel.loadMap(gameId)
+        mapViewModel.loadMap(charId)   // charId = "${userId}_${characterName}" (sin tema)
         viewModel.startStory(userId, characterName, theme)
         achievementViewModel.loadForCharacter(charId)   // ← AÑADIR
     }
@@ -270,7 +270,7 @@ fun GamePlayScreen(
                     .align(Alignment.BottomStart)
                     .padding(start = 16.dp, bottom = 110.dp),
                 onOpenAR     = {                                          // ← NUEVO
-                    navController.navigate(Screen.ARMap.createRoute(gameId))
+                    navController.navigate(Screen.ARMap.createRoute(charId))
                 }
             )
 

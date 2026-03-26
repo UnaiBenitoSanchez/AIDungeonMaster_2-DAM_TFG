@@ -3,6 +3,7 @@ package com.example.aidungeonmaster.navigation
 import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -28,6 +29,7 @@ import com.example.aidungeonmaster.ui.achievements.AchievementsScreen
 import com.example.aidungeonmaster.viewmodel.AchievementViewModel
 // AR
 import com.example.aidungeonmaster.ui.game.ARMapScreen
+import com.example.aidungeonmaster.ui.game.LocationsGalleryScreen
 
 sealed class Screen(val route: String) {
     object Login : Screen("login")
@@ -53,8 +55,14 @@ sealed class Screen(val route: String) {
     }
 
     // AR
-    object ARMap : Screen("ar_map/{gameId}") {
-        fun createRoute(gameId: String) = "ar_map/$gameId"
+    object ARMap : Screen("ar_map/{charId}") {
+        fun createRoute(charId: String) = "ar_map/$charId"
+    }
+
+    // Galería 3D de ubicaciones del personaje
+    object LocationsGallery : Screen("locations_gallery/{charId}/{characterName}") {
+        fun createRoute(charId: String, characterName: String) =
+            "locations_gallery/$charId/${characterName.replace(" ", "_")}"
     }
 }
 
@@ -147,13 +155,40 @@ fun AppNavigation(navController: NavHostController) {
             )
         }
 
-        // AR
+        // AR — usa charId (sin tema) para que el mapa sea per-personaje
         composable(Screen.ARMap.route) { backStackEntry ->
-            val gameId = backStackEntry.arguments?.getString("gameId") ?: ""
+            val charId = backStackEntry.arguments?.getString("charId") ?: ""
+            // Asegurar que el mapa está cargado para este personaje
+            LaunchedEffect(charId) {
+                if (charId.isNotBlank()) worldMapViewModel.loadMap(charId)
+            }
             val mapState by worldMapViewModel.worldMapState.collectAsState()
+            val characterName = charId.substringAfter("_")  // nombre aproximado para la galería
             ARMapScreen(
                 mapState = mapState,
-                onBack   = { navController.popBackStack() }
+                onBack   = { navController.popBackStack() },
+                onOpen3DGallery = {
+                    navController.navigate(
+                        Screen.LocationsGallery.createRoute(charId, characterName)
+                    )
+                }
+            )
+        }
+
+        // ── GALERÍA 3D DE UBICACIONES ─────────────────────────────────────────
+        composable(Screen.LocationsGallery.route) { backStackEntry ->
+            val charId        = backStackEntry.arguments?.getString("charId") ?: ""
+            val characterName = backStackEntry.arguments?.getString("characterName")
+                ?.replace("_", " ") ?: ""
+            // Cargar el mapa del personaje si aún no está cargado
+            LaunchedEffect(charId) {
+                if (charId.isNotBlank()) worldMapViewModel.loadMap(charId)
+            }
+            val mapState by worldMapViewModel.worldMapState.collectAsState()
+            LocationsGalleryScreen(
+                mapState      = mapState,
+                characterName = characterName,
+                onBack        = { navController.popBackStack() }
             )
         }
     }

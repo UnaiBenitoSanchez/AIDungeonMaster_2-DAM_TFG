@@ -28,7 +28,12 @@ class WorldMapViewModel : ViewModel() {
     private val _worldMapState = MutableStateFlow(WorldMapState())
     val worldMapState = _worldMapState.asStateFlow()
 
-    private var currentGameId: String = ""
+    /**
+     * Usamos el charId del personaje (formato: "{userId}_{characterName}") como clave
+     * para que TODAS las aventuras del mismo personaje compartan el mismo mapa del mundo.
+     * Antes usábamos el gameId (que incluía el tema), lo que generaba mapas separados por tema.
+     */
+    private var currentCharId: String = ""
 
     // ── TIPOS DE LUGAR Y SUS ICONOS ──────────────────────────────────────────
 
@@ -52,12 +57,16 @@ class WorldMapViewModel : ViewModel() {
 
     // ── CARGA / GUARDADO ─────────────────────────────────────────────────────
 
-    fun loadMap(gameId: String) {
-        currentGameId = gameId
+    /**
+     * Carga el mapa del personaje.
+     * @param charId  Identificador del personaje: "{userId}_{characterName}" (SIN el tema).
+     */
+    fun loadMap(charId: String) {
+        currentCharId = charId
         viewModelScope.launch {
             try {
                 val doc = db.collection("partidas")
-                    .document(gameId)
+                    .document(currentCharId)
                     .collection("worldMap")
                     .document("state")
                     .get()
@@ -83,7 +92,7 @@ class WorldMapViewModel : ViewModel() {
     }
 
     private fun saveMap() {
-        if (currentGameId.isBlank()) return
+        if (currentCharId.isBlank()) return
         viewModelScope.launch {
             try {
                 val state = _worldMapState.value
@@ -93,7 +102,7 @@ class WorldMapViewModel : ViewModel() {
                     "locations"         to state.locations.map { it.toMap() }
                 )
                 db.collection("partidas")
-                    .document(currentGameId)
+                    .document(currentCharId)
                     .collection("worldMap")
                     .document("state")
                     .set(data)
