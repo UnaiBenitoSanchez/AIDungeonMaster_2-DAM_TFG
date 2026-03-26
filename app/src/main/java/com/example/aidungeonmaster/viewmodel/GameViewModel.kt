@@ -335,7 +335,8 @@ Reglas:
 - "healingReceived": puntos de vida recuperados fuera de combate. 0 si ninguno.
 - "itemFound": null o {"id":"","name":"...","type":"arma/pocion/armadura","description":"...","effect":"..."}.
 - "coinsFound": monedas de oro encontradas en este paso fuera de combate (0 si ninguna). Úsalo cuando el jugador encuentra un tesoro, saquea un cofre, recibe una recompensa, etc. Valor entre 1 y 100.
-- "locationJson": null O un JSON en STRING escapado cuando el jugador llega a un lugar NUEVO o diferente al anterior. Formato: "{\"name\":\"Nombre\",\"type\":\"ciudad|pueblo|mazmorra|bosque|montaña|cueva|taberna|templo|ruina|llanura|desierto|lago\",\"description\":\"Descripción breve del lugar\"}". Inclúyelo SOLO al cambiar de ubicación.
+- "locationJson": null O un JSON en STRING escapado cuando el jugador llega a un lugar NUEVO o diferente al anterior. Formato: "{\"name\":\"Nombre\",\"type\":\"ciudad|pueblo|mazmorra|bosque|montaña|cueva|taberna|templo|ruina|llanura|desierto|lago|mar|océano\",\"description\":\"Descripción breve del lugar\"}". Inclúyelo SOLO al cambiar de ubicación.
+- Usa tipos canónicos. Si el lugar es océano, mar abierto o alta mar usa "océano". Si es un puerto, playa, costa o bahía usa "mar". Si es un río, arroyo, estanque o laguna usa "lago". Si es una gruta o caverna usa "cueva".
 - NO uses comillas simples. NO añadas campos extra. NO envuelvas en markdown.
 """.trimIndent()
 

@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import java.text.Normalizer
 
 /**
  * ViewModel que gestiona el mapa del mundo.
@@ -44,6 +45,7 @@ class WorldMapViewModel : ViewModel() {
         "bosque"    to "🌲",
         "montaña"   to "⛰️",
         "mar"       to "🌊",
+        "océano"    to "🌐",
         "desierto"  to "🏜️",
         "cueva"     to "🕳️",
         "taberna"   to "🍺",
@@ -54,6 +56,37 @@ class WorldMapViewModel : ViewModel() {
         "llanura"   to "🌾",
         "lugar"     to "📍"
     )
+
+    private fun normalizeLocationType(rawType: String?, context: String = ""): String {
+        val raw = listOfNotNull(rawType, context)
+            .joinToString(" ")
+            .lowercase()
+            .trim()
+
+        if (raw.isBlank()) return "lugar"
+
+        val normalized = Normalizer.normalize(raw, Normalizer.Form.NFD)
+            .replace(Regex("\\p{InCombiningDiacriticalMarks}+"), "")
+
+        return when {
+            listOf("ciudad", "metropoli", "capital").any { it in normalized } -> "ciudad"
+            listOf("pueblo", "aldea", "villa").any { it in normalized } -> "pueblo"
+            listOf("mazmorra", "cripta", "calabozo", "dungeon").any { it in normalized } -> "mazmorra"
+            listOf("bosque", "selva", "arboleda").any { it in normalized } -> "bosque"
+            listOf("montana", "pico", "cordillera").any { it in normalized } -> "montaña"
+            listOf("oceano", "alta mar", "mar abierto").any { it in normalized } -> "océano"
+            listOf("mar", "playa", "costa", "litoral", "bahia", "puerto", "muelle").any { it in normalized } -> "mar"
+            listOf("lago", "rio", "laguna", "arroyo", "estanque").any { it in normalized } -> "lago"
+            listOf("desierto", "duna", "arena", "arido").any { it in normalized } -> "desierto"
+            listOf("cueva", "gruta", "caverna", "cavidad").any { it in normalized } -> "cueva"
+            listOf("taberna", "posada", "meson", "cantina").any { it in normalized } -> "taberna"
+            listOf("templo", "santuario", "altar").any { it in normalized } -> "templo"
+            listOf("ruina", "ruinas").any { it in normalized } -> "ruina"
+            "torre" in normalized -> "torre"
+            listOf("llanura", "pradera", "campo").any { it in normalized } -> "llanura"
+            else -> "lugar"
+        }
+    }
 
     // ── CARGA / GUARDADO ─────────────────────────────────────────────────────
 
@@ -140,8 +173,8 @@ class WorldMapViewModel : ViewModel() {
         return try {
             val raw = gson.fromJson(json, Map::class.java)
             val name = raw["name"] as? String ?: return null
-            val type = (raw["type"] as? String)?.lowercase() ?: "lugar"
             val desc = raw["description"] as? String ?: ""
+            val type = normalizeLocationType(raw["type"] as? String, "$name $desc")
 
             WorldLocation(
                 id          = name.lowercase().replace(" ", "_"),
@@ -188,23 +221,7 @@ class WorldMapViewModel : ViewModel() {
     }
 
     private fun detectType(name: String, context: String): String {
-        val lower = (name + " " + context).lowercase()
-        return when {
-            "ciudad" in lower || "metrópoli" in lower   -> "ciudad"
-            "pueblo" in lower || "aldea" in lower        -> "pueblo"
-            "mazmorra" in lower || "cripta" in lower    -> "mazmorra"
-            "bosque" in lower || "arboleda" in lower    -> "bosque"
-            "montaña" in lower || "pico" in lower       -> "montaña"
-            "mar" in lower || "océano" in lower         -> "mar"
-            "lago" in lower || "río" in lower           -> "lago"
-            "desierto" in lower || "arena" in lower     -> "desierto"
-            "cueva" in lower || "gruta" in lower        -> "cueva"
-            "taberna" in lower || "posada" in lower     -> "taberna"
-            "templo" in lower || "santuario" in lower   -> "templo"
-            "ruina" in lower || "ruinas" in lower       -> "ruina"
-            "torre" in lower                            -> "torre"
-            else                                        -> "lugar"
-        }
+        return normalizeLocationType(name, context)
     }
 
     private fun extractSentenceContaining(text: String, keyword: String): String {
@@ -277,7 +294,10 @@ class WorldMapViewModel : ViewModel() {
         x                   = (this["x"] as? Number)?.toFloat() ?: 0.5f,
         y                   = (this["y"] as? Number)?.toFloat() ?: 0.5f,
         icon                = this["icon"] as? String ?: "📍",
-        type                = this["type"] as? String ?: "lugar",
+        type                = normalizeLocationType(
+            this["type"] as? String,
+            "${this["name"] as? String ?: ""} ${this["description"] as? String ?: ""}"
+        ),
         isCurrentLocation   = this["isCurrentLocation"] as? Boolean ?: false,
         discoveredAt        = (this["discoveredAt"] as? Number)?.toLong() ?: 0L
     )

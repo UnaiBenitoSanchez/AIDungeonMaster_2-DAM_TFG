@@ -3,6 +3,7 @@ package com.example.aidungeonmaster.ui.game
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -213,8 +214,8 @@ fun ARMapScreen(
         // ── LEYENDA DE COLORES ─────────────────────────────────────────────
         if (isMapPlaced) {
             ARLegend(
-                locationCount = mapState.locations.size,
-                modifier      = Modifier
+                locations = mapState.locations,
+                modifier  = Modifier
                     .align(Alignment.TopEnd)
                     .padding(top = 80.dp, end = 12.dp)
             )
@@ -318,22 +319,24 @@ private fun buildARMap(
 
 /** Devuelve (color, radio, metallic, roughness) según el tipo de ubicación */
 private fun getLocationStyle(location: WorldLocation): LocationStyle {
+    val type = normalizeLocationType(location.type)
     val isCurrent = location.isCurrentLocation
-    return when (location.type.lowercase().trim()) {
-        "bosque"            -> LocationStyle(Color(0xFF2E7D32), 0.028f, 0.0f, 0.85f)
-        "cueva"             -> LocationStyle(Color(0xFF37474F), 0.020f, 0.2f, 0.9f)
-        "mazmorra"          -> LocationStyle(Color(0xFF4A148C), 0.022f, 0.3f, 0.8f)
-        "ciudad"            -> LocationStyle(Color(0xFF1565C0), 0.032f, 0.4f, 0.5f)
-        "pueblo"            -> LocationStyle(Color(0xFF827717), 0.025f, 0.1f, 0.85f)
-        "montaña", "montana"-> LocationStyle(Color(0xFF546E7A), 0.030f, 0.1f, 0.9f)
-        "templo"            -> LocationStyle(Color(0xFFF9A825), 0.028f, 0.6f, 0.3f)
-        "torre"             -> LocationStyle(Color(0xFF283593), 0.022f, 0.5f, 0.4f)
-        "lago"              -> LocationStyle(Color(0xFF0277BD), 0.026f, 0.5f, 0.2f)
-        "mar"               -> LocationStyle(Color(0xFF01579B), 0.032f, 0.4f, 0.3f)
-        "desierto"          -> LocationStyle(Color(0xFFF57F17), 0.028f, 0.0f, 0.95f)
-        "taberna"           -> LocationStyle(Color(0xFF6D4C41), 0.024f, 0.1f, 0.9f)
-        "ruina"             -> LocationStyle(Color(0xFF4E342E), 0.025f, 0.05f, 0.95f)
-        "llanura"           -> LocationStyle(Color(0xFF388E3C), 0.026f, 0.0f, 0.9f)
+    return when (type) {
+        "bosque"             -> LocationStyle(Color(0xFF2E7D32), 0.028f, 0.0f, 0.85f)
+        "cueva"              -> LocationStyle(Color(0xFF37474F), 0.020f, 0.2f, 0.9f)
+        "mazmorra"           -> LocationStyle(Color(0xFF4A148C), 0.022f, 0.3f, 0.8f)
+        "ciudad"             -> LocationStyle(Color(0xFF1565C0), 0.032f, 0.4f, 0.5f)
+        "pueblo"             -> LocationStyle(Color(0xFF827717), 0.025f, 0.1f, 0.85f)
+        "montaña", "montana" -> LocationStyle(Color(0xFF546E7A), 0.030f, 0.1f, 0.9f)
+        "templo"             -> LocationStyle(Color(0xFFF9A825), 0.028f, 0.6f, 0.3f)
+        "torre"              -> LocationStyle(Color(0xFF283593), 0.022f, 0.5f, 0.4f)
+        "lago"               -> LocationStyle(Color(0xFF4FC3F7), 0.026f, 0.35f, 0.18f)
+        "mar"                -> LocationStyle(Color(0xFF0288D1), 0.030f, 0.45f, 0.22f)
+        "océano", "oceano"  -> LocationStyle(Color(0xFF0D47A1), 0.034f, 0.55f, 0.18f)
+        "desierto"           -> LocationStyle(Color(0xFFF57F17), 0.028f, 0.0f, 0.95f)
+        "taberna"            -> LocationStyle(Color(0xFF6D4C41), 0.024f, 0.1f, 0.9f)
+        "ruina"              -> LocationStyle(Color(0xFF4E342E), 0.025f, 0.05f, 0.95f)
+        "llanura"            -> LocationStyle(Color(0xFF388E3C), 0.026f, 0.0f, 0.9f)
         else -> if (isCurrent)
             LocationStyle(Color(0xFFFFD700), 0.030f, 0.8f, 0.2f)
         else
@@ -343,21 +346,36 @@ private fun getLocationStyle(location: WorldLocation): LocationStyle {
 
 /** Color del acento (esfera pequeña flotante) que identifica el tipo visualmente */
 private fun getLocationAccentColor(location: WorldLocation): Color =
-    when (location.type.lowercase().trim()) {
-        "bosque"            -> Color(0xFF66BB6A)  // verde claro
-        "cueva"             -> Color(0xFF4FC3F7)  // azul cristal
-        "mazmorra"          -> Color(0xFFCE93D8)  // morado
-        "ciudad"            -> Color(0xFF90CAF9)  // azul claro
-        "pueblo"            -> Color(0xFFFFCC02)  // amarillo
-        "montaña", "montana"-> Color(0xFFECEFF1)  // blanco nieve
-        "templo"            -> Color(0xFFFFFFCC)  // dorado pálido
-        "torre"             -> Color(0xFF7986CB)  // índigo
-        "lago", "mar"       -> Color(0xFFB3E5FC)  // azul agua
-        "desierto"          -> Color(0xFFFFE082)  // arena
-        "taberna"           -> Color(0xFFFFAB40)  // naranja
-        "ruina"             -> Color(0xFFA1887F)  // marrón claro
-        else                -> Color(0xFFFFFFFF)
+    when (normalizeLocationType(location.type)) {
+        "bosque"             -> Color(0xFF66BB6A)
+        "cueva"              -> Color(0xFF90CAF9)
+        "mazmorra"           -> Color(0xFFCE93D8)
+        "ciudad"             -> Color(0xFF90CAF9)
+        "pueblo"             -> Color(0xFFFFCC80)
+        "montaña", "montana" -> Color(0xFFECEFF1)
+        "templo"             -> Color(0xFFFFFFCC)
+        "torre"              -> Color(0xFF9FA8DA)
+        "lago"               -> Color(0xFFE1F5FE)
+        "mar"                -> Color(0xFFB3E5FC)
+        "océano", "oceano"  -> Color(0xFF82B1FF)
+        "desierto"           -> Color(0xFFFFE082)
+        "taberna"            -> Color(0xFFFFAB40)
+        "ruina"              -> Color(0xFFA1887F)
+        "llanura"            -> Color(0xFFA5D6A7)
+        else                  -> Color(0xFFFFFFFF)
     }
+
+private fun normalizeLocationType(rawType: String): String {
+    val normalized = java.text.Normalizer.normalize(rawType.lowercase().trim(), java.text.Normalizer.Form.NFD)
+        .replace(Regex("\\p{InCombiningDiacriticalMarks}+"), "")
+
+    return when {
+        listOf("oceano", "alta mar", "mar abierto").any { it in normalized } -> "océano"
+        listOf("puerto", "mar", "playa", "costa", "litoral", "bahia", "muelle").any { it in normalized } -> "mar"
+        listOf("lago", "rio", "laguna", "arroyo", "estanque").any { it in normalized } -> "lago"
+        else -> rawType.lowercase().trim()
+    }
+}
 
 // Data class auxiliar para agrupar los 4 valores de estilo
 data class LocationStyle(
@@ -485,8 +503,8 @@ private fun ARScanningHint(
 
 @Composable
 private fun ARLegend(
-    locationCount: Int,
-    modifier:      Modifier = Modifier
+    locations: List<WorldLocation>,
+    modifier:  Modifier = Modifier
 ) {
     Surface(
         color    = Color(0xCC1A0F00),
@@ -495,21 +513,31 @@ private fun ARLegend(
     ) {
         Column(modifier = Modifier.padding(10.dp)) {
             Text(
-                "$locationCount lugar${if (locationCount != 1) "es" else ""}",
+                "${locations.size} lugar${if (locations.size != 1) "es" else ""}",
                 color = Color(0xFF888877), fontSize = 10.sp
             )
             Spacer(Modifier.height(6.dp))
             LegendRow(color = Color(0xFFFFD700), label = "Aquí ahora")
-            LegendRow(color = Color(0xFF66BB6A), label = "Bosque")
-            LegendRow(color = Color(0xFF1565C0), label = "Ciudad")
-            LegendRow(color = Color(0xFF4FC3F7), label = "Cueva")
-            LegendRow(color = Color(0xFFF9A825), label = "Templo")
+            val legendTypes = locations
+                .map { normalizeLocationType(it.type) }
+                .filter { it.isNotBlank() }
+                .distinct()
+                .sorted()
+                .take(6)
+
+            legendTypes.forEach { type ->
+                LegendRow(
+                    color = getLocationStyle(WorldLocation(type = type)).color,
+                    accentColor = getLocationAccentColor(WorldLocation(type = type)),
+                    label = type.replaceFirstChar { it.uppercase() }
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun LegendRow(color: Color, label: String) {
+private fun LegendRow(color: Color, label: String, accentColor: Color? = null) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier          = Modifier.padding(vertical = 2.dp)
@@ -519,6 +547,10 @@ private fun LegendRow(color: Color, label: String) {
                 .size(10.dp)
                 .clip(CircleShape)
                 .background(color)
+                .then(
+                    if (accentColor != null) Modifier.border(1.dp, accentColor.copy(alpha = 0.95f), CircleShape)
+                    else Modifier
+                )
         )
         Spacer(Modifier.width(6.dp))
         Text(label, color = Color(0xFFCCBBAA), fontSize = 10.sp)

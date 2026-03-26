@@ -338,15 +338,27 @@ fun LocationMarker(
     isSelected: Boolean,
     modifier: Modifier = Modifier
 ) {
+    val normalizedType = java.text.Normalizer.normalize(location.type.lowercase().trim(), java.text.Normalizer.Form.NFD)
+        .replace(Regex("\\p{InCombiningDiacriticalMarks}+"), "")
+    val typeColor = when {
+        listOf("oceano", "alta mar", "mar abierto").any { it in normalizedType } -> Color(0xFF0D47A1)
+        listOf("mar", "playa", "costa", "litoral", "bahia", "puerto", "muelle").any { it in normalizedType } -> Color(0xFF0288D1)
+        listOf("lago", "rio", "laguna", "arroyo", "estanque").any { it in normalizedType } -> Color(0xFF4FC3F7)
+        listOf("bosque", "selva", "arboleda").any { it in normalizedType } -> Color(0xFF2E7D32)
+        listOf("cueva", "gruta", "caverna").any { it in normalizedType } -> Color(0xFF37474F)
+        listOf("montana", "pico", "cordillera").any { it in normalizedType } -> Color(0xFF546E7A)
+        listOf("ciudad", "metropoli", "capital").any { it in normalizedType } -> Color(0xFF1565C0)
+        else -> Color(0xFF8D6E63)
+    }
     val borderColor = when {
         location.isCurrentLocation -> Color(0xFFFFD700)
         isSelected                 -> Color(0xFFFF9900)
-        else                       -> Color(0xFF555555)
+        else                       -> typeColor.copy(alpha = 0.95f)
     }
     val bgColor = when {
         location.isCurrentLocation -> Color(0x99FFD700)
-        isSelected                 -> Color(0x99663300)
-        else                       -> Color(0x99111111)
+        isSelected                 -> typeColor.copy(alpha = 0.45f)
+        else                       -> typeColor.copy(alpha = 0.26f)
     }
 
     Box(
