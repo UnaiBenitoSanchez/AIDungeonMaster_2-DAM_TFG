@@ -233,6 +233,30 @@ class InventoryViewModel : ViewModel() {
         }
     }
 
+    // ── GASTA MONEDAS (TIENDA) ────────────────────────────────────────────────
+    /**
+     * Intenta gastar [amount] monedas. Devuelve true si había saldo suficiente.
+     * Actualiza Firestore y el estado local.
+     */
+    suspend fun spendCoins(gameId: String, amount: Int): Boolean {
+        return try {
+            val snap = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                .collection("partidas").document(gameId).get()
+                .await()
+            val current = snap.getLong("coins")?.toInt() ?: 0
+            if (current < amount) return false
+            val newTotal = current - amount
+            db.collection("partidas").document(gameId)
+                .update("coins", newTotal).await()
+            _character.value = _character.value?.copy(coins = newTotal)
+            Log.d("INVENTORY_DEBUG", "Monedas gastadas: -$amount → total $newTotal")
+            true
+        } catch (e: Exception) {
+            Log.e("INVENTORY_ERROR", "spendCoins: ${e.message}")
+            false
+        }
+    }
+
     // ── USA UN OBJETO DEL INVENTARIO ─────────────────────────────────────────
     fun useItem(gameId: String, item: Item, hpCurrent: Int, hpMax: Int): String {
         val effect = item.effect.lowercase().trim()

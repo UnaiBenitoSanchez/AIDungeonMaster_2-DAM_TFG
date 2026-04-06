@@ -130,6 +130,9 @@ dependencies {
     // ML Kit Barcode Scanning (Para detectar el QR)
     implementation("com.google.mlkit:barcode-scanning:17.2.0")
 
+    // ML Kit Text Recognition (Para detectar supermercados en el mundo real)
+    implementation("com.google.mlkit:text-recognition:16.0.0")
+
     // Iconos extendidos de Material (para el candado, mochila, etc.)
     implementation("androidx.compose.material:material-icons-extended")
 
