@@ -33,10 +33,12 @@ import com.example.aidungeonmaster.ui.achievements.AchievementToast
 import com.example.aidungeonmaster.ui.achievements.QuestCompletedToast
 import com.example.aidungeonmaster.viewmodel.GameViewModel
 import com.example.aidungeonmaster.viewmodel.InventoryViewModel
-import com.example.aidungeonmaster.viewmodel.WorldMapViewModel    // ← NUEVO
+import com.example.aidungeonmaster.viewmodel.WorldMapViewModel
 import com.example.aidungeonmaster.utils.AdventureMusicEngine
 import com.example.aidungeonmaster.viewmodel.AchievementViewModel
 import kotlinx.coroutines.launch
+import com.example.aidungeonmaster.utils.SupermarketProximityManager
+import androidx.compose.ui.platform.LocalContext
 
 @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
 @OptIn(ExperimentalMaterial3Api::class)
@@ -75,6 +77,18 @@ fun GamePlayScreen(
     DisposableEffect(Unit) {
         AdventureMusicEngine.start(musicScope)
         onDispose { AdventureMusicEngine.fadeOutAndStop(musicScope) }
+    }
+
+    // ── DETECCIÓN DE SUPERMERCADOS EN TIEMPO REAL ─────────────────────────
+    // Se activa mientras el jugador está en la pantalla de juego y se detiene
+    // automáticamente al salir (onDispose). El Worker del background sigue
+    // funcionando cuando la app está cerrada.
+    val context = LocalContext.current
+
+    DisposableEffect(Unit) {
+        val proximityManager = SupermarketProximityManager(context)
+        proximityManager.start()
+        onDispose { proximityManager.stop() }
     }
 
     // ── CARGA INICIAL ─────────────────────────────────────────────────────────
