@@ -233,6 +233,54 @@ class InventoryViewModel : ViewModel() {
         }
     }
 
+    // ── REPUTACIÓN EN TIENDAS ─────────────────────────────────────────────────
+
+    /**
+     * Carga la reputación del personaje en todas las cadenas de supermercados.
+     * Devuelve un mapa de shopKey → puntos (0 si nunca ha comprado ahí).
+     */
+    suspend fun loadShopReputation(gameId: String): Map<String, Int> {
+        return try {
+            val snap = db.collection("partidas").document(gameId).get().await()
+            @Suppress("UNCHECKED_CAST")
+            val raw = snap.get("shopReputation") as? Map<String, Long> ?: emptyMap()
+            raw.mapValues { it.value.toInt() }
+        } catch (e: Exception) {
+            Log.e("INVENTORY_ERROR", "loadShopReputation: ${e.message}")
+            emptyMap()
+        }
+    }
+
+    /**
+     * Añade [points] puntos de reputación en la tienda [shopKey] y persiste en Firestore.
+     * Devuelve el nuevo total de reputación para esa tienda.
+     */
+    suspend fun addShopReputation(gameId: String, shopKey: String, points: Int = 10): Int {
+        return try {
+            val snap = db.collection("partidas").document(gameId).get().await()
+            @Suppress("UNCHECKED_CAST")
+            val current = (snap.get("shopReputation") as? Map<String, Long>)
+                ?.get(shopKey)?.toInt() ?: 0
+            val newTotal = current + points
+            db.collection("partidas").document(gameId)
+                .update("shopReputation.$shopKey", newTotal).await()
+            Log.d("INVENTORY_DEBUG", "Reputación $shopKey: +$points → $newTotal")
+            newTotal
+        } catch (e: Exception) {
+            // Si el campo no existía, lo creamos con set+merge
+            try {
+                db.collection("partidas").document(gameId).set(
+                    mapOf("shopReputation" to mapOf(shopKey to points)),
+                    com.google.firebase.firestore.SetOptions.merge()
+                ).await()
+                points
+            } catch (e2: Exception) {
+                Log.e("INVENTORY_ERROR", "addShopReputation: ${e2.message}")
+                0
+            }
+        }
+    }
+
     // ── GASTA MONEDAS (TIENDA) ────────────────────────────────────────────────
     /**
      * Intenta gastar [amount] monedas. Devuelve true si había saldo suficiente.

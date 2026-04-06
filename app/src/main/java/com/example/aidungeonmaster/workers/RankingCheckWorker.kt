@@ -86,11 +86,12 @@ class RankingCheckWorker(
             if (wasInTop3 && !isNowInTop3) {
                 Log.i(TAG, "$charName PERDIÓ top 3 en ${category.label} (ahora #${index + 1})")
                 NotificationHelper.showRankingLostNotification(
-                    context        = applicationContext,
-                    characterName  = charName,
-                    categoryLabel  = category.label,
-                    newPosition    = index,
-                    notificationId = notifId(userId, category, charId)
+                    context          = applicationContext,
+                    characterName    = charName,
+                    categoryLabel    = category.label,
+                    previousPosition = previousPos,
+                    newPosition      = index,
+                    notificationId   = notifId(userId, category, charId)
                 )
             }
 
@@ -112,11 +113,12 @@ class RankingCheckWorker(
                     val charName = charId.removePrefix("${userId}_")
                     Log.i(TAG, "$charName ya no aparece en top 10 de ${category.label}")
                     NotificationHelper.showRankingLostNotification(
-                        context        = applicationContext,
-                        characterName  = charName,
-                        categoryLabel  = category.label,
-                        newPosition    = POSITION_OUT_OF_TOP,
-                        notificationId = notifId(userId, category, charId)
+                        context          = applicationContext,
+                        characterName    = charName,
+                        categoryLabel    = category.label,
+                        previousPosition = prevPos,
+                        newPosition      = POSITION_OUT_OF_TOP,
+                        notificationId   = notifId(userId, category, charId)
                     )
                 }
                 // Resetear para no volver a notificar

@@ -145,6 +145,9 @@ dependencies {
     // WorkManager (para RankingCheckWorker e InactivityWorker)
     implementation("androidx.work:work-runtime-ktx:2.9.0")
 
+    // Localización (para SupermarketProximityWorker)
+    implementation("com.google.android.gms:play-services-location:21.2.0")
+
     // --- REALIDAD AUMENTADA ---
     // ARCore: motor de AR de Google
     implementation("com.google.ar:core:1.43.0")

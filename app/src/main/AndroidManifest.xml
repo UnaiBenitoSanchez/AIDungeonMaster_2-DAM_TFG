@@ -11,6 +11,11 @@
     <!-- Para re-programar los workers tras un reinicio del dispositivo -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
+    <!-- Localización (para detección de supermercados cercanos) -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+
     <!-- AR -->
     <uses-feature android:name="android.hardware.camera.ar" android:required="false" />
 

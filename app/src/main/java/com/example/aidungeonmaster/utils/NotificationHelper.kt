@@ -14,13 +14,31 @@ import com.example.aidungeonmaster.R
  * Centraliza la creación de canales y el envío de notificaciones locales.
  *
  * Canales disponibles:
- *  - CHANNEL_RANKING    → Alta prioridad. Se activa cuando un personaje pierde el top 3.
- *  - CHANNEL_INACTIVITY → Prioridad normal. Recordatorio si llevas +12 h sin jugar.
+ *  - CHANNEL_RANKING    → Alta prioridad. Perdida de puesto en TOP 3.
+ *  - CHANNEL_INACTIVITY → Prioridad normal. Recordatorio de inactividad.
+ *  - CHANNEL_PROXIMITY  → Alta prioridad. Supermercado cerca (tienda de pociones).
  */
 object NotificationHelper {
 
     const val CHANNEL_RANKING    = "ranking_channel"
     const val CHANNEL_INACTIVITY = "inactivity_channel"
+    const val CHANNEL_PROXIMITY  = "proximity_channel"
+
+    // ── Emojis de posición ────────────────────────────────────────────────────
+
+    private fun positionEmoji(pos: Int) = when (pos) {
+        0    -> "🥇"
+        1    -> "🥈"
+        2    -> "🥉"
+        else -> "🏅"
+    }
+
+    private fun positionName(pos: Int) = when (pos) {
+        0    -> "primer puesto"
+        1    -> "segundo puesto"
+        2    -> "tercer puesto"
+        else -> "puesto #${pos + 1}"
+    }
 
     // ── Creación de canales (llamar una sola vez, en Application.onCreate) ────
 
@@ -49,6 +67,18 @@ object NotificationHelper {
                     description = "Recordatorio para retomar tus aventuras activas"
                 }
             )
+
+            manager.createNotificationChannel(
+                NotificationChannel(
+                    CHANNEL_PROXIMITY,
+                    "Tienda Cercana",
+                    NotificationManager.IMPORTANCE_HIGH
+                ).apply {
+                    description =
+                        "Aviso cuando hay un supermercado cerca donde comprar pociones y suministros"
+                    enableVibration(true)
+                }
+            )
         }
     }
 
@@ -57,6 +87,7 @@ object NotificationHelper {
     /**
      * @param characterName  Nombre del personaje afectado.
      * @param categoryLabel  Nombre de la categoría (p. ej. "Stats Totales").
+     * @param previousPosition  Posición que tenía ANTES (0 = 1er puesto, 1 = 2º, 2 = 3º).
      * @param newPosition    Nueva posición en el ranking (base 0). Usa 999 si sale del top 10.
      * @param notificationId ID único para poder cancelarla o actualizarla después.
      */
@@ -65,25 +96,40 @@ object NotificationHelper {
         characterName: String,
         categoryLabel: String,
         newPosition: Int,
+        previousPosition: Int = -1,   // -1 = desconocido
         notificationId: Int = 1000
     ) {
-        val posText = if (newPosition >= 10) "fuera del top 10" else "#${newPosition + 1}"
+        val oldPosText = if (previousPosition in 0..2)
+            positionName(previousPosition)
+        else
+            "el Top 3"
+
+        val oldEmoji = if (previousPosition in 0..2)
+            positionEmoji(previousPosition)
+        else
+            "🏆"
+
+        val newPosText = when {
+            newPosition >= 100 -> "fuera del top 10"
+            else               -> "el puesto #${newPosition + 1}"
+        }
+
+        val title   = "$oldEmoji ¡$characterName ha caído del Top 3!"
+        val summary = "$characterName ha perdido $oldPosText en $categoryLabel. " +
+                "Ahora ocupa $newPosText."
+        val bigText = "Tu héroe $characterName ocupaba $oldEmoji $oldPosText en " +
+                "la categoría «$categoryLabel» del ranking mundial.\n\n" +
+                "Otro aventurero le ha desbancado. Ahora está en $newPosText.\n\n" +
+                "¡Vuelve a la batalla y recupera tu gloria!"
+
         val intent  = launchIntent(context)
         val pending = pendingIntent(context, requestCode = 100 + notificationId, intent)
 
         val notification = NotificationCompat.Builder(context, CHANNEL_RANKING)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle("⚔️ ¡Alerta de Ranking!")
-            .setContentText(
-                "$characterName ha perdido el podio en $categoryLabel. Ahora es $posText."
-            )
-            .setStyle(
-                NotificationCompat.BigTextStyle().bigText(
-                    "Tu héroe $characterName ha sido desbancado del podio de $categoryLabel. " +
-                            "Ahora ocupa la posición $posText. " +
-                            "¡Vuelve a la batalla para recuperar tu gloria!"
-                )
-            )
+            .setContentTitle(title)
+            .setContentText(summary)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(bigText))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setContentIntent(pending)
             .setAutoCancel(true)
@@ -95,11 +141,6 @@ object NotificationHelper {
 
     // ── Notificación: inactividad prolongada ──────────────────────────────────
 
-    /**
-     * @param characterName  El personaje más reciente del usuario.
-     * @param hoursInactive  Horas sin jugar (para construir el texto).
-     * @param notificationId ID único para evitar duplicados por usuario.
-     */
     fun showInactivityNotification(
         context: Context,
         characterName: String,
@@ -128,6 +169,51 @@ object NotificationHelper {
                 )
             )
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setContentIntent(pending)
+            .setAutoCancel(true)
+            .build()
+
+        context.getSystemService(NotificationManager::class.java)
+            .notify(notificationId, notification)
+    }
+
+    // ── Notificación: supermercado cercano ────────────────────────────────────
+
+    /**
+     * @param supermarketName  Nombre del supermercado detectado cercano.
+     * @param distanceMeters   Distancia aproximada en metros.
+     * @param specialty        Especialidad de esa cadena (pociones, armas, etc.).
+     * @param notificationId   ID para no duplicar notificaciones.
+     */
+    fun showProximityNotification(
+        context: Context,
+        supermarketName: String,
+        distanceMeters: Int,
+        specialty: String,
+        notificationId: Int = 3000
+    ) {
+        val distText = when {
+            distanceMeters < 100 -> "a menos de 100 m"
+            distanceMeters < 250 -> "a unos ${(distanceMeters / 50) * 50} m"
+            else                 -> "a unos ${(distanceMeters / 100) * 100} m"
+        }
+
+        val title   = "🏪 ¡Mercader cercano detectado!"
+        val summary = "$supermarketName está $distText. Especialidad: $specialty"
+        val bigText = "Un comerciante de $supermarketName ha instalado su puesto $distText.\n\n" +
+                "Especialidad de hoy: $specialty\n\n" +
+                "Abre el escáner en la app y apunta al cartel del super para " +
+                "acceder a la tienda de aventureros. ¡Las pociones no duran para siempre!"
+
+        val intent  = launchIntent(context)
+        val pending = pendingIntent(context, requestCode = 300 + notificationId, intent)
+
+        val notification = NotificationCompat.Builder(context, CHANNEL_PROXIMITY)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentTitle(title)
+            .setContentText(summary)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(bigText))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setContentIntent(pending)
             .setAutoCancel(true)
             .build()
