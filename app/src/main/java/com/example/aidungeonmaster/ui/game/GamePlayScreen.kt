@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoStories
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Inventory
@@ -194,6 +195,10 @@ fun GamePlayScreen(
                         ) {
                             Box(modifier = Modifier.weight(1f)) {
                                 MedievalTitle(text = "Aventura: $theme", modifier = Modifier.padding(vertical = 4.dp))
+                            }
+                            IconButton(onClick = { navController.navigate("bestiary/$charId") }) {
+                                Icon(Icons.Default.AutoStories, "Bestiario",
+                                    tint = Color(0xFFFFD700), modifier = Modifier.size(32.dp))
                             }
                             IconButton(onClick = { navController.navigate("inventory/$charId") }) {
                                 Icon(Icons.Default.Inventory, "Mochila",

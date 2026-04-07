@@ -29,6 +29,7 @@ import com.example.aidungeonmaster.ui.achievements.AchievementsScreen
 import com.example.aidungeonmaster.viewmodel.AchievementViewModel
 // AR
 import com.example.aidungeonmaster.ui.game.ARMapScreen
+import com.example.aidungeonmaster.ui.game.BestiaryScreen
 import com.example.aidungeonmaster.ui.game.LocationsGalleryScreen
 
 sealed class Screen(val route: String) {
@@ -189,6 +190,16 @@ fun AppNavigation(navController: NavHostController) {
                 mapState      = mapState,
                 characterName = characterName,
                 onBack        = { navController.popBackStack() }
+            )
+        }
+
+        // ── BESTIARIO ─────────────────────────────────────────
+        composable("bestiary/{charId}") { backStackEntry ->
+            val charId = backStackEntry.arguments?.getString("charId").orEmpty()
+
+            BestiaryScreen(
+                gameId = charId,
+                onBack = { navController.popBackStack() }
             )
         }
     }

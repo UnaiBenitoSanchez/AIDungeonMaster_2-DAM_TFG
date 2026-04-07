@@ -12,6 +12,9 @@ import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
+import kotlinx.coroutines.tasks.await
 
 // ============================================================
 //  ENUMS Y DATA CLASSES
@@ -102,6 +105,16 @@ class CombatViewModel(
     private val _coinsReward = MutableSharedFlow<Int>(replay = 0, extraBufferCapacity = 1)
     val coinsReward = _coinsReward.asSharedFlow()
 
+    private val db = FirebaseFirestore.getInstance()
+
+    private val bestiaryMonsterId: String
+        get() = enemy.name
+            .trim()
+            .lowercase()
+            .replace("[^a-z0-9áéíóúñ ]".toRegex(), "")
+            .replace("\\s+".toRegex(), "_")
+            .ifBlank { "monstruo_desconocido" }
+
     private var defenseBonus = 0
     private var hasAdvantage = false
 
@@ -134,6 +147,11 @@ class CombatViewModel(
     // ============================================================
     init {
         viewModelScope.launch {
+            registerEncounterInBestiary()
+
+            log("📚 Guardando bestiario en partida: $charId", LogType.SYSTEM)
+            android.util.Log.d("BESTIARY_DEBUG", "registerEncounterInBestiary charId=$charId enemy=${enemy.name}")
+
             delay(400)
             log("⚔️ ¡${enemy.name} aparece ante ti!", LogType.SYSTEM)
             log("📊 CA enemiga: $enemyAC | HP: ${enemy.hpMax}", LogType.SYSTEM)
@@ -221,6 +239,11 @@ class CombatViewModel(
                         log("🪙 +$coinsGained monedas de oro", LogType.SYSTEM)
                         _coinsReward.emit(coinsGained)
 
+                        registerDefeatInBestiary(
+                            damageNotes = listOf(weapon.name),
+                            knownLoot = if (coinsGained > 0) listOf("$coinsGained monedas de oro") else emptyList()
+                        )
+
                         // ── LOGRO: Victoria en combate ───────────────────────
                         achievementViewModel?.onCombatWon(charId)
 
@@ -294,6 +317,11 @@ class CombatViewModel(
                         else ((enemy.hpMax / 4) + (1..10).random()).coerceAtLeast(5)
                         log("🪙 +$coinsGained monedas de oro", LogType.SYSTEM)
                         _coinsReward.emit(coinsGained)
+
+                        registerDefeatInBestiary(
+                            abilitiesSeen = listOf(ability.name),
+                            knownLoot = if (coinsGained > 0) listOf("$coinsGained monedas de oro") else emptyList()
+                        )
 
                         // ── LOGRO: Victoria en combate ───────────────────────
                         achievementViewModel?.onCombatWon(charId)
@@ -461,6 +489,141 @@ class CombatViewModel(
                 log("🎲 Tu turno — elige tu acción", LogType.SYSTEM)
                 _phase.value = CombatPhase.PLAYER_TURN
             }
+        }
+    }
+
+    // ============================================================
+    //  BESTIARIO
+    // ============================================================
+
+    private suspend fun registerEncounterInBestiary() {
+        try {
+            if (charId.isBlank()) return
+
+            val docRef = db.collection("partidas")
+                .document(charId)
+                .collection("bestiary")
+                .document(bestiaryMonsterId)
+
+            val snapshot = docRef.get().await()
+            val now = System.currentTimeMillis()
+
+            val previousTimesEncountered =
+                snapshot.getLong("timesEncountered")?.toInt() ?: 0
+
+            val previousTimesDefeated =
+                snapshot.getLong("timesDefeated")?.toInt() ?: 0
+
+            val previousLocations =
+                (snapshot.get("locationsSeen") as? List<*>)?.mapNotNull { it as? String }
+                    ?: emptyList()
+
+            val previousTags =
+                (snapshot.get("tags") as? List<*>)?.mapNotNull { it as? String }
+                    ?: emptyList()
+
+            val previousDamageNotes =
+                ((snapshot.get("lastObservedStats") as? Map<*, *>)?.get("damageNotes") as? List<*>)
+                    ?.mapNotNull { it as? String }
+                    ?: emptyList()
+
+            val previousAbilitiesSeen =
+                ((snapshot.get("lastObservedStats") as? Map<*, *>)?.get("abilitiesSeen") as? List<*>)
+                    ?.mapNotNull { it as? String }
+                    ?: emptyList()
+
+            val firstSeenAt = snapshot.getLong("firstSeenAt") ?: now
+
+            val payload = mapOf(
+                "name" to enemy.name,
+                "description" to "Enemigo encontrado en combate.",
+                "imageUrl" to "",
+                "firstSeenAt" to firstSeenAt,
+                "lastSeenAt" to now,
+                "timesEncountered" to (previousTimesEncountered + 1),
+                "timesDefeated" to previousTimesDefeated,
+                "locationsSeen" to previousLocations.distinct(),
+                "tags" to (previousTags + listOf("combate")).distinct(),
+                "lastObservedStats" to mapOf(
+                    "hpMaxObserved" to enemy.hpMax,
+                    "armorClassObserved" to enemyAC,
+                    "damageNotes" to previousDamageNotes.distinct(),
+                    "abilitiesSeen" to previousAbilitiesSeen.distinct()
+                ),
+                "knownLoot" to ((snapshot.get("knownLoot") as? List<*>)?.mapNotNull { it as? String }
+                    ?: emptyList()),
+                "notes" to (snapshot.getString("notes") ?: "")
+            )
+
+            docRef.set(payload, SetOptions.merge()).await()
+        } catch (e: Exception) {
+            log("⚠️ No se pudo registrar ${enemy.name} en el bestiario.", LogType.SYSTEM)
+        }
+    }
+
+    private suspend fun registerDefeatInBestiary(
+        damageNotes: List<String> = emptyList(),
+        abilitiesSeen: List<String> = emptyList(),
+        knownLoot: List<String> = emptyList()
+    ) {
+        try {
+            if (charId.isBlank()) return
+
+            val docRef = db.collection("partidas")
+                .document(charId)
+                .collection("bestiary")
+                .document(bestiaryMonsterId)
+
+            val snapshot = docRef.get().await()
+            val now = System.currentTimeMillis()
+
+            val previousTimesEncountered =
+                snapshot.getLong("timesEncountered")?.toInt() ?: 1
+
+            val previousTimesDefeated =
+                snapshot.getLong("timesDefeated")?.toInt() ?: 0
+
+            val previousKnownLoot =
+                (snapshot.get("knownLoot") as? List<*>)?.mapNotNull { it as? String }
+                    ?: emptyList()
+
+            val previousDamageNotes =
+                ((snapshot.get("lastObservedStats") as? Map<*, *>)?.get("damageNotes") as? List<*>)
+                    ?.mapNotNull { it as? String }
+                    ?: emptyList()
+
+            val previousAbilitiesSeen =
+                ((snapshot.get("lastObservedStats") as? Map<*, *>)?.get("abilitiesSeen") as? List<*>)
+                    ?.mapNotNull { it as? String }
+                    ?: emptyList()
+
+            val firstSeenAt = snapshot.getLong("firstSeenAt") ?: now
+
+            val payload = mapOf(
+                "name" to enemy.name,
+                "description" to (snapshot.getString("description") ?: "Enemigo encontrado en combate."),
+                "imageUrl" to (snapshot.getString("imageUrl") ?: ""),
+                "firstSeenAt" to firstSeenAt,
+                "lastSeenAt" to now,
+                "timesEncountered" to previousTimesEncountered,
+                "timesDefeated" to (previousTimesDefeated + 1),
+                "locationsSeen" to ((snapshot.get("locationsSeen") as? List<*>)?.mapNotNull { it as? String }
+                    ?: emptyList()),
+                "tags" to ((snapshot.get("tags") as? List<*>)?.mapNotNull { it as? String }
+                    ?: listOf("combate")),
+                "lastObservedStats" to mapOf(
+                    "hpMaxObserved" to enemy.hpMax,
+                    "armorClassObserved" to enemyAC,
+                    "damageNotes" to (previousDamageNotes + damageNotes).distinct(),
+                    "abilitiesSeen" to (previousAbilitiesSeen + abilitiesSeen).distinct()
+                ),
+                "knownLoot" to (previousKnownLoot + knownLoot).distinct(),
+                "notes" to (snapshot.getString("notes") ?: "")
+            )
+
+            docRef.set(payload, SetOptions.merge()).await()
+        } catch (e: Exception) {
+            log("⚠️ No se pudo actualizar la derrota de ${enemy.name} en el bestiario.", LogType.SYSTEM)
         }
     }
 
