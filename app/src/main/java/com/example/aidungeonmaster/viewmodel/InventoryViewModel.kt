@@ -110,18 +110,9 @@ class InventoryViewModel : ViewModel() {
     }
 
     // ── AÑADE XP Y GESTIONA SUBIDA DE NIVEL ──────────────────────────────────
-    /**
-     * Suma [amount] XP al personaje. Si supera [xpToNextLevel], sube de nivel:
-     *  - hpMax aumenta 5 + modificador de Constitución (como D&D, dado de golpe simplificado)
-     *  - hpCurrent se restaura al nuevo hpMax
-     *  - xp se reinicia a los puntos sobrantes
-     * Emite un evento en [levelUpEvent] con el nuevo nivel para que la UI reaccione.
-     */
     fun addXp(gameId: String, amount: Int) {
         viewModelScope.launch {
             try {
-                // Leer valores actuales directamente de Firestore
-                // para evitar la race condition con loadInventory()
                 val snap = db.collection("partidas").document(gameId).get().await()
                 if (!snap.exists()) {
                     Log.w("INVENTORY_ERROR", "addXp: documento $gameId no existe")
@@ -132,7 +123,6 @@ class InventoryViewModel : ViewModel() {
                 var currentLevel = snap.getLong("level")?.toInt() ?: 1
                 var currentHpMax = snap.getLong("hpMax")?.toInt() ?: 20
 
-                // Calcular constitución para el HP al subir nivel
                 val char = _character.value
                 val conMod = ((char?.stats?.get("Constitución") ?: 10) - 10) / 2
 
@@ -148,7 +138,6 @@ class InventoryViewModel : ViewModel() {
                 val newHpCurrent = if (didLevelUp) currentHpMax
                 else snap.getLong("hpCurrent")?.toInt() ?: currentHpMax
 
-                // Guardar en partidas
                 db.collection("partidas").document(gameId).update(
                     mapOf(
                         "xp" to currentXp,
@@ -158,7 +147,6 @@ class InventoryViewModel : ViewModel() {
                     )
                 ).await()
 
-                // Actualizar el state local con los valores reales
                 _character.value = _character.value?.copy(
                     xp = currentXp,
                     level = currentLevel,
@@ -181,7 +169,6 @@ class InventoryViewModel : ViewModel() {
                 Log.e("INVENTORY_ERROR", "addXp: ${e.message}")
             }
 
-            // Sincronizar ranking (no crítico)
             try {
                 val currentLevel = _character.value?.level ?: 1
                 val currentHpMax = _character.value?.hpMax ?: 20
@@ -200,10 +187,6 @@ class InventoryViewModel : ViewModel() {
     }
 
     // ── AÑADE MONEDAS Y LAS PERSISTE EN FIRESTORE ────────────────────────────
-    /**
-     * Suma [amount] monedas al personaje. Actualiza Firestore y el estado local.
-     * Es seguro llamarlo desde cualquier fuente: combate, misiones, aventura.
-     */
     fun addCoins(gameId: String, amount: Int) {
         if (amount <= 0) return
         viewModelScope.launch {
@@ -216,7 +199,6 @@ class InventoryViewModel : ViewModel() {
                 _character.value = _character.value?.copy(coins = newTotal)
                 Log.d("INVENTORY_DEBUG", "Monedas +$amount → total $newTotal")
             } catch (e: Exception) {
-                // Si el campo no existe todavía, lo creamos
                 try {
                     val current = _character.value?.coins ?: 0
                     val newTotal = current + amount
@@ -234,11 +216,6 @@ class InventoryViewModel : ViewModel() {
     }
 
     // ── REPUTACIÓN EN TIENDAS ─────────────────────────────────────────────────
-
-    /**
-     * Carga la reputación del personaje en todas las cadenas de supermercados.
-     * Devuelve un mapa de shopKey → puntos (0 si nunca ha comprado ahí).
-     */
     suspend fun loadShopReputation(gameId: String): Map<String, Int> {
         return try {
             val snap = db.collection("partidas").document(gameId).get().await()
@@ -251,10 +228,6 @@ class InventoryViewModel : ViewModel() {
         }
     }
 
-    /**
-     * Añade [points] puntos de reputación en la tienda [shopKey] y persiste en Firestore.
-     * Devuelve el nuevo total de reputación para esa tienda.
-     */
     suspend fun addShopReputation(gameId: String, shopKey: String, points: Int = 10): Int {
         return try {
             val snap = db.collection("partidas").document(gameId).get().await()
@@ -267,7 +240,6 @@ class InventoryViewModel : ViewModel() {
             Log.d("INVENTORY_DEBUG", "Reputación $shopKey: +$points → $newTotal")
             newTotal
         } catch (e: Exception) {
-            // Si el campo no existía, lo creamos con set+merge
             try {
                 db.collection("partidas").document(gameId).set(
                     mapOf("shopReputation" to mapOf(shopKey to points)),
@@ -281,11 +253,127 @@ class InventoryViewModel : ViewModel() {
         }
     }
 
+    // ── BANCO DEL PERSONAJE ───────────────────────────────────────────────────
+    suspend fun getBankAccount(gameId: String): Map<String, Any>? {
+        return try {
+            val snap = db.collection("bank_accounts").document(gameId).get().await()
+            if (snap.exists()) snap.data else null
+        } catch (e: Exception) {
+            Log.e("INVENTORY_ERROR", "getBankAccount: ${e.message}")
+            null
+        }
+    }
+
+    suspend fun registerBankPin(gameId: String, pin: String): Boolean {
+        if (!pin.matches(Regex("""\d{4}"""))) return false
+        return try {
+            val docRef = db.collection("bank_accounts").document(gameId)
+            val existing = docRef.get().await()
+            if (existing.exists()) return false
+
+            docRef.set(
+                mapOf(
+                    "gameId" to gameId,
+                    "pin" to pin,
+                    "balance" to 0,
+                    "createdAt" to System.currentTimeMillis(),
+                    "updatedAt" to System.currentTimeMillis()
+                )
+            ).await()
+            true
+        } catch (e: Exception) {
+            Log.e("INVENTORY_ERROR", "registerBankPin: ${e.message}")
+            false
+        }
+    }
+
+    suspend fun verifyBankPin(gameId: String, pin: String): Boolean {
+        return try {
+            val snap = db.collection("bank_accounts").document(gameId).get().await()
+            snap.exists() && snap.getString("pin") == pin
+        } catch (e: Exception) {
+            Log.e("INVENTORY_ERROR", "verifyBankPin: ${e.message}")
+            false
+        }
+    }
+
+    suspend fun depositToBank(gameId: String, amount: Int): Boolean {
+        if (amount <= 0) return false
+        return try {
+            val gameRef = db.collection("partidas").document(gameId)
+            val bankRef = db.collection("bank_accounts").document(gameId)
+
+            val gameSnap = gameRef.get().await()
+            val bankSnap = bankRef.get().await()
+
+            if (!bankSnap.exists()) return false
+
+            val currentCoins = gameSnap.getLong("coins")?.toInt() ?: 0
+            if (currentCoins < amount) return false
+
+            val currentBankBalance = bankSnap.getLong("balance")?.toInt() ?: 0
+            val newCoins = currentCoins - amount
+            val newBankBalance = currentBankBalance + amount
+
+            gameRef.set(
+                mapOf("coins" to newCoins),
+                com.google.firebase.firestore.SetOptions.merge()
+            ).await()
+
+            bankRef.update(
+                mapOf(
+                    "balance" to newBankBalance,
+                    "updatedAt" to System.currentTimeMillis()
+                )
+            ).await()
+
+            _character.value = _character.value?.copy(coins = newCoins)
+            true
+        } catch (e: Exception) {
+            Log.e("INVENTORY_ERROR", "depositToBank: ${e.message}")
+            false
+        }
+    }
+
+    suspend fun withdrawFromBank(gameId: String, amount: Int): Boolean {
+        if (amount <= 0) return false
+        return try {
+            val gameRef = db.collection("partidas").document(gameId)
+            val bankRef = db.collection("bank_accounts").document(gameId)
+
+            val gameSnap = gameRef.get().await()
+            val bankSnap = bankRef.get().await()
+
+            if (!bankSnap.exists()) return false
+
+            val currentCoins = gameSnap.getLong("coins")?.toInt() ?: 0
+            val currentBankBalance = bankSnap.getLong("balance")?.toInt() ?: 0
+            if (currentBankBalance < amount) return false
+
+            val newCoins = currentCoins + amount
+            val newBankBalance = currentBankBalance - amount
+
+            gameRef.set(
+                mapOf("coins" to newCoins),
+                com.google.firebase.firestore.SetOptions.merge()
+            ).await()
+
+            bankRef.update(
+                mapOf(
+                    "balance" to newBankBalance,
+                    "updatedAt" to System.currentTimeMillis()
+                )
+            ).await()
+
+            _character.value = _character.value?.copy(coins = newCoins)
+            true
+        } catch (e: Exception) {
+            Log.e("INVENTORY_ERROR", "withdrawFromBank: ${e.message}")
+            false
+        }
+    }
+
     // ── GASTA MONEDAS (TIENDA) ────────────────────────────────────────────────
-    /**
-     * Intenta gastar [amount] monedas. Devuelve true si había saldo suficiente.
-     * Actualiza Firestore y el estado local.
-     */
     suspend fun spendCoins(gameId: String, amount: Int): Boolean {
         return try {
             val snap = com.google.firebase.firestore.FirebaseFirestore.getInstance()
@@ -362,8 +450,6 @@ class InventoryViewModel : ViewModel() {
                             "hpMax" to originalHpMax,
                             "inventory" to emptyList<Any>(),
                             "coins" to 0
-                            // Nota: xp y level NO se reinician al morir.
-                            // El personaje conserva su progresión aunque pierda la historia.
                         )
                     ).await()
 
@@ -413,12 +499,15 @@ class InventoryViewModel : ViewModel() {
                         mapOf(
                             "inventory" to listOf(
                                 mapOf(
-                                    "id" to newItem.id, "name" to newItem.name,
+                                    "id" to newItem.id,
+                                    "name" to newItem.name,
                                     "description" to newItem.description,
-                                    "type" to newItem.type, "effect" to newItem.effect
+                                    "type" to newItem.type,
+                                    "effect" to newItem.effect
                                 )
                             ),
-                            "hpMax" to 20, "hpCurrent" to 20
+                            "hpMax" to 20,
+                            "hpCurrent" to 20
                         ),
                         com.google.firebase.firestore.SetOptions.merge()
                     ).await()
@@ -441,9 +530,11 @@ class InventoryViewModel : ViewModel() {
                 }
                 val updatedMaps = updated.map {
                     mapOf(
-                        "id" to it.id, "name" to it.name,
+                        "id" to it.id,
+                        "name" to it.name,
                         "description" to it.description,
-                        "type" to it.type, "effect" to it.effect
+                        "type" to it.type,
+                        "effect" to it.effect
                     )
                 }
                 db.collection("partidas").document(gameId)
