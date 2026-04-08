@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     id("com.google.gms.google-services")
+    id("com.chaquo.python")
 }
 
 val localProps = Properties().also { props ->
@@ -51,6 +52,10 @@ android {
             "\"${localProps.getProperty("CLOUDFLARE_API_TOKEN", "")}\""
         )
 
+        ndk {
+            abiFilters += listOf("arm64-v8a", "x86_64")
+        }
+
     }
 
     buildTypes {
@@ -71,7 +76,18 @@ android {
     }
     buildFeatures {
         compose = true
-        buildConfig = true   // necesario para BuildConfig.GROQ_API_KEY
+        buildConfig = true
+    }
+}
+
+chaquopy {
+    defaultConfig {
+        version = "3.11"
+    }
+    sourceSets {
+        getByName("main") {
+            srcDir("src/main/python")
+        }
     }
 }
 

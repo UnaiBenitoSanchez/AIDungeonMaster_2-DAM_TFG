@@ -37,6 +37,7 @@ import com.example.aidungeonmaster.viewmodel.JournalViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.example.aidungeonmaster.python.PythonJournalBridge
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -71,6 +72,29 @@ fun JournalScreen(
                         entry.itemNames.any { it.lowercase().contains(q) }
             }
         }
+    }
+
+    val pythonInput = remember(entries) {
+        entries.take(8).map { entry ->
+            mapOf(
+                "title" to entry.title,
+                "summary" to entry.summary,
+                "type" to entry.type,
+                "enemyName" to entry.enemyName,
+                "locationName" to entry.locationName,
+                "tags" to entry.tags,
+                "itemNames" to entry.itemNames,
+                "timestamp" to entry.timestamp
+            )
+        }
+    }
+
+    val chapterTitle = remember(pythonInput) {
+        PythonJournalBridge.makeChapterTitle(pythonInput)
+    }
+
+    val adventureSummary = remember(pythonInput) {
+        PythonJournalBridge.summarizeEntries(pythonInput)
     }
 
     MedievalBackground {
@@ -123,6 +147,13 @@ fun JournalScreen(
                     else -> {
                         Column(modifier = Modifier.fillMaxSize()) {
                             JournalSummaryCard(totalEntries = entries.size)
+
+                            Spacer(Modifier.height(12.dp))
+
+                            PythonAdventureSummaryCard(
+                                chapterTitle = chapterTitle,
+                                summary = adventureSummary
+                            )
 
                             Spacer(Modifier.height(12.dp))
 
@@ -207,6 +238,36 @@ private fun JournalSummaryCard(totalEntries: Int) {
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun PythonAdventureSummaryCard(
+    chapterTitle: String,
+    summary: String
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = Color(0x55220000)),
+        border = BorderStroke(1.dp, Color(0x66FFD700))
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "🪶 $chapterTitle",
+                color = Color(0xFFFFD700),
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp
+            )
+
+            Spacer(Modifier.height(8.dp))
+
+            Text(
+                text = summary,
+                color = Color.White,
+                style = MaterialTheme.typography.bodyMedium,
+                lineHeight = 22.sp
+            )
         }
     }
 }

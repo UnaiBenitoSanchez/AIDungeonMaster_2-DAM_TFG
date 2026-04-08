@@ -8,9 +8,16 @@ import com.example.aidungeonmaster.workers.RankingCheckWorker
 import com.example.aidungeonmaster.workers.SupermarketProximityWorker
 import java.util.concurrent.TimeUnit
 
+import com.chaquo.python.Python
+import com.chaquo.python.android.AndroidPlatform
 class AIDungeonMasterApp : Application() {
 
     override fun onCreate() {
+
+        if (!Python.isStarted()) {
+            Python.start(AndroidPlatform(this))
+        }
+
         super.onCreate()
         NotificationHelper.createChannels(this)
 
