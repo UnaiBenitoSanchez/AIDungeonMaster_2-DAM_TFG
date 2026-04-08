@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.tasks.await
+import java.util.UUID
 
 // ============================================================
 //  ENUMS Y DATA CLASSES
@@ -80,6 +81,53 @@ class CombatViewModel(
     // ── NUEVO: charId necesario para las funciones del AchievementViewModel ──
     private val charId: String = ""
 ) : ViewModel() {
+
+    // ============================================================
+    //  DIARIO DE AVENTURA
+    // ============================================================
+
+    private suspend fun addJournalEntry(
+        title: String,
+        summary: String,
+        fullText: String = "",
+        type: String = "combat",
+        tags: List<String> = emptyList(),
+        enemyName: String = "",
+        hpChange: Int = 0,
+        coinsChange: Int = 0,
+        xpGained: Int = 0
+    ) {
+        try {
+            if (charId.isBlank()) return
+
+            val entryId = UUID.randomUUID().toString()
+
+            val payload = mapOf(
+                "title" to title,
+                "summary" to summary,
+                "fullText" to fullText,
+                "timestamp" to System.currentTimeMillis(),
+                "chapter" to "",
+                "type" to type,
+                "tags" to tags.distinct(),
+                "locationName" to "",
+                "enemyName" to enemyName,
+                "itemNames" to emptyList<String>(),
+                "hpChange" to hpChange,
+                "coinsChange" to coinsChange,
+                "xpGained" to xpGained
+            )
+
+            db.collection("partidas")
+                .document(charId)
+                .collection("journal")
+                .document(entryId)
+                .set(payload, SetOptions.merge())
+                .await()
+        } catch (_: Exception) {
+            // no rompemos el combate por un fallo del diario
+        }
+    }
 
     private val _enemyHp      = MutableStateFlow(enemy.hpCurrent)
     val enemyHp               = _enemyHp.asStateFlow()
@@ -244,6 +292,23 @@ class CombatViewModel(
                             knownLoot = if (coinsGained > 0) listOf("$coinsGained monedas de oro") else emptyList()
                         )
 
+                        addJournalEntry(
+                            title = "Victoria en combate",
+                            summary = "Has derrotado a ${enemy.name} con ${weapon.name}.",
+                            fullText = buildString {
+                                append("El combate terminó en victoria. ")
+                                append("${enemy.name} fue derrotado usando ${weapon.name}. ")
+                                append("Recompensa obtenida: $xpGained XP")
+                                if (coinsGained > 0) append(" y $coinsGained monedas")
+                                append(".")
+                            },
+                            type = "combat",
+                            tags = listOf("combate", "victoria", enemy.name.lowercase(), weapon.name.lowercase()),
+                            enemyName = enemy.name,
+                            coinsChange = coinsGained,
+                            xpGained = xpGained
+                        )
+
                         // ── LOGRO: Victoria en combate ───────────────────────
                         achievementViewModel?.onCombatWon(charId)
 
@@ -323,6 +388,23 @@ class CombatViewModel(
                             knownLoot = if (coinsGained > 0) listOf("$coinsGained monedas de oro") else emptyList()
                         )
 
+                        addJournalEntry(
+                            title = "Victoria en combate",
+                            summary = "Has derrotado a ${enemy.name} con la habilidad ${ability.name}.",
+                            fullText = buildString {
+                                append("El combate terminó en victoria. ")
+                                append("${enemy.name} cayó ante la habilidad ${ability.name}. ")
+                                append("Recompensa obtenida: $xpGained XP")
+                                if (coinsGained > 0) append(" y $coinsGained monedas")
+                                append(".")
+                            },
+                            type = "combat",
+                            tags = listOf("combate", "victoria", enemy.name.lowercase(), ability.name.lowercase()),
+                            enemyName = enemy.name,
+                            coinsChange = coinsGained,
+                            xpGained = xpGained
+                        )
+
                         // ── LOGRO: Victoria en combate ───────────────────────
                         achievementViewModel?.onCombatWon(charId)
 
@@ -357,6 +439,16 @@ class CombatViewModel(
                     _playerHp.value = newHp
                     onHpUpdate(newHp)
                     log("${ability.emoji} ${ability.name}: recuperas $heal HP (${newHp}/${playerCharacter.hpMax}).", LogType.HEAL)
+
+                    addJournalEntry(
+                        title = "Has usado una habilidad de curación",
+                        summary = "Usaste ${ability.name} y recuperaste $heal puntos de vida.",
+                        fullText = "${ability.name} permitió recuperar $heal puntos de vida durante el combate contra ${enemy.name}.",
+                        type = "combat",
+                        tags = listOf("combate", "curacion", ability.name.lowercase()),
+                        enemyName = enemy.name,
+                        hpChange = heal
+                    )
                 }
 
                 AbilityType.BUFF_DEFENSE -> {
@@ -469,6 +561,16 @@ class CombatViewModel(
 
                     if (newHp <= 0) {
                         log("💀 Has caído en combate...", LogType.SYSTEM)
+
+                        addJournalEntry(
+                            title = "Has sido derrotado",
+                            summary = "Has caído en combate contra ${enemy.name}.",
+                            fullText = "El combate terminó en derrota. ${enemy.name} venció al héroe.",
+                            type = "combat",
+                            tags = listOf("combate", "derrota", enemy.name.lowercase()),
+                            enemyName = enemy.name
+                        )
+
                         delay(600)
                         _phase.value = CombatPhase.DEFEAT
                         return@launch

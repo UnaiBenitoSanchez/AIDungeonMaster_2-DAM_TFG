@@ -40,6 +40,9 @@ import com.example.aidungeonmaster.viewmodel.AchievementViewModel
 import kotlinx.coroutines.launch
 import com.example.aidungeonmaster.utils.SupermarketProximityManager
 import androidx.compose.ui.platform.LocalContext
+import com.example.aidungeonmaster.viewmodel.JournalViewModel
+
+import androidx.compose.material.icons.filled.MenuBook
 
 @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
 @OptIn(ExperimentalMaterial3Api::class)
@@ -51,8 +54,9 @@ fun GamePlayScreen(
     theme: String,
     viewModel: GameViewModel = viewModel(),
     inventoryViewModel: InventoryViewModel = viewModel(),
-    mapViewModel: WorldMapViewModel = viewModel()  ,
-    achievementViewModel: AchievementViewModel = viewModel()
+    mapViewModel: WorldMapViewModel = viewModel(),
+    achievementViewModel: AchievementViewModel = viewModel(),
+    journalViewModel: JournalViewModel = viewModel()
 ) {
     val listState = rememberLazyListState()
     val messages  by viewModel.messages.collectAsState()
@@ -95,10 +99,20 @@ fun GamePlayScreen(
     // ── CARGA INICIAL ─────────────────────────────────────────────────────────
     LaunchedEffect(charId) {
         inventoryViewModel.loadInventory(charId)
+        journalViewModel.loadJournal(charId)
+
         viewModel.worldMapViewModel = mapViewModel
         mapViewModel.loadMap(charId)   // charId = "${userId}_${characterName}" (sin tema)
         viewModel.startStory(userId, characterName, theme)
-        achievementViewModel.loadForCharacter(charId)   // ← AÑADIR
+        achievementViewModel.loadForCharacter(charId)
+
+        journalViewModel.addOrMergeSimpleEntry(
+            charId = charId,
+            title = "Comienzo de la aventura",
+            summary = "$characterName ha iniciado una nueva aventura con temática \"$theme\".",
+            type = "story",
+            tags = listOf("inicio", "aventura", theme)
+        )
     }
 
     var toastAchievement by remember { mutableStateOf<Achievement?>(null) }
@@ -109,7 +123,11 @@ fun GamePlayScreen(
         launch { achievementViewModel.completedQuest.collect  { toastQuest       = it } }
     }
 
-    achievementViewModel.onMessageSent(charId)
+    LaunchedEffect(messages.size) {
+        if (messages.isNotEmpty()) {
+            achievementViewModel.onMessageSent(charId)
+        }
+    }
 
     LaunchedEffect(Unit) {
         achievementViewModel.pendingAchievementXp.collect { xp ->
@@ -134,20 +152,69 @@ fun GamePlayScreen(
     LaunchedEffect(Unit) {
         viewModel.stepEffect.collect { step ->
             val current = inventoryViewModel.character.value
+
             if (step.damageTaken > 0 && current != null) {
                 val newHp = (current.hpCurrent - step.damageTaken).coerceAtLeast(0)
                 inventoryViewModel.updateHp(charId, newHp)
+
+                journalViewModel.addEntry(
+                    charId = charId,
+                    title = "Has recibido daño",
+                    summary = "Has sufrido ${step.damageTaken} puntos de daño.",
+                    fullText = "Durante la aventura, $characterName recibió ${step.damageTaken} puntos de daño.",
+                    type = "system",
+                    tags = listOf("daño", "hp"),
+                    hpChange = -step.damageTaken
+                )
             }
+
             if (step.healingReceived > 0 && current != null) {
                 val newHp = (current.hpCurrent + step.healingReceived).coerceAtMost(current.hpMax)
                 inventoryViewModel.updateHp(charId, newHp)
+
+                journalViewModel.addEntry(
+                    charId = charId,
+                    title = "Has recuperado salud",
+                    summary = "Has recuperado ${step.healingReceived} puntos de vida.",
+                    fullText = "Durante la aventura, $characterName recuperó ${step.healingReceived} puntos de vida.",
+                    type = "system",
+                    tags = listOf("curacion", "hp"),
+                    hpChange = step.healingReceived
+                )
             }
+
             step.itemFound?.let { item ->
                 inventoryViewModel.addItemToInventory(charId, item)
+
+                journalViewModel.addEntry(
+                    charId = charId,
+                    title = "Has encontrado un objeto",
+                    summary = "Has obtenido ${item.name}.",
+                    fullText = buildString {
+                        append("$characterName encontró ${item.name}.")
+                        if (item.description.isNotBlank()) {
+                            append(" ")
+                            append(item.description)
+                        }
+                    },
+                    type = "loot",
+                    tags = listOf("objeto", "botin", item.type),
+                    itemNames = listOf(item.name)
+                )
             }
-            // ── MONEDAS ENCONTRADAS EN LA AVENTURA ────────────────
+
             if (step.coinsFound > 0) {
                 inventoryViewModel.addCoins(charId, step.coinsFound)
+
+                journalViewModel.addEntry(
+                    charId = charId,
+                    title = "Has encontrado monedas",
+                    summary = "Has conseguido ${step.coinsFound} monedas de oro.",
+                    fullText = "$characterName encontró ${step.coinsFound} monedas de oro durante la aventura.",
+                    type = "loot",
+                    tags = listOf("oro", "monedas", "botin"),
+                    coinsChange = step.coinsFound
+                )
             }
         }
     }
@@ -170,6 +237,18 @@ fun GamePlayScreen(
     // ── DETECTAR COMBATE ──────────────────────────────────────────────────────
     LaunchedEffect(currentStep?.combatStarted) {
         if (currentStep?.combatStarted == true && currentStep?.enemy != null) {
+            val enemy = currentStep?.enemy
+            if (enemy != null) {
+                journalViewModel.addEntry(
+                    charId = charId,
+                    title = "Comienza un combate",
+                    summary = "Te enfrentas a ${enemy.name}.",
+                    fullText = "$characterName entra en combate contra ${enemy.name}.",
+                    type = "combat",
+                    tags = listOf("combate", enemy.name.lowercase()),
+                    enemyName = enemy.name
+                )
+            }
             showPixelTransition = true
         }
     }
@@ -197,12 +276,30 @@ fun GamePlayScreen(
                                 MedievalTitle(text = "Aventura: $theme", modifier = Modifier.padding(vertical = 4.dp))
                             }
                             IconButton(onClick = { navController.navigate("bestiary/$charId") }) {
-                                Icon(Icons.Default.AutoStories, "Bestiario",
-                                    tint = Color(0xFFFFD700), modifier = Modifier.size(32.dp))
+                                Icon(
+                                    Icons.Default.AutoStories,
+                                    contentDescription = "Bestiario",
+                                    tint = Color(0xFFFFD700),
+                                    modifier = Modifier.size(30.dp)
+                                )
                             }
+
+                            IconButton(onClick = { navController.navigate(Screen.Journal.createRoute(charId)) }) {
+                                Icon(
+                                    Icons.Default.MenuBook,
+                                    contentDescription = "Diario",
+                                    tint = Color(0xFFFFD700),
+                                    modifier = Modifier.size(30.dp)
+                                )
+                            }
+
                             IconButton(onClick = { navController.navigate("inventory/$charId") }) {
-                                Icon(Icons.Default.Inventory, "Mochila",
-                                    tint = Color(0xFFFFD700), modifier = Modifier.size(32.dp))
+                                Icon(
+                                    Icons.Default.Inventory,
+                                    contentDescription = "Mochila",
+                                    tint = Color(0xFFFFD700),
+                                    modifier = Modifier.size(30.dp)
+                                )
                             }
                         }
                         PlayerStatsHeader(hpCurrent = hpCurrent, hpMax = hpMax)
@@ -249,7 +346,20 @@ fun GamePlayScreen(
                                 IconButton(
                                     onClick = {
                                         if (customAction.isNotBlank()) {
-                                            viewModel.sendCustomAction(customAction); customAction = ""
+                                            val actionText = customAction.trim()
+
+                                            viewModel.sendCustomAction(actionText)
+
+                                            journalViewModel.addEntry(
+                                                charId = charId,
+                                                title = "Has tomado una decisión",
+                                                summary = actionText,
+                                                fullText = "$characterName decidió: $actionText",
+                                                type = "story",
+                                                tags = listOf("decision", "accion")
+                                            )
+
+                                            customAction = ""
                                         }
                                     },
                                     enabled = !isLoading && customAction.isNotBlank()

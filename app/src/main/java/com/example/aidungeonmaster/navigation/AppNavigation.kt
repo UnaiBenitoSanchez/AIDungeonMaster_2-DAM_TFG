@@ -23,14 +23,18 @@ import com.example.aidungeonmaster.ui.register.RegisterScreen
 import com.example.aidungeonmaster.viewmodel.AuthViewModel
 import com.example.aidungeonmaster.viewmodel.GameViewModel
 import com.example.aidungeonmaster.viewmodel.InventoryViewModel
-import com.example.aidungeonmaster.viewmodel.WorldMapViewModel   // ← NUEVO
+import com.example.aidungeonmaster.viewmodel.WorldMapViewModel
 // ── LOGROS Y MISIONES ────────────────────────────────────────────────────────
 import com.example.aidungeonmaster.ui.achievements.AchievementsScreen
 import com.example.aidungeonmaster.viewmodel.AchievementViewModel
 // AR
 import com.example.aidungeonmaster.ui.game.ARMapScreen
+// BESTIARIO
 import com.example.aidungeonmaster.ui.game.BestiaryScreen
+// GALERIA DE UBICACIONES
 import com.example.aidungeonmaster.ui.game.LocationsGalleryScreen
+// DIARIO
+import com.example.aidungeonmaster.ui.game.JournalScreen
 
 sealed class Screen(val route: String) {
     object Login : Screen("login")
@@ -64,6 +68,11 @@ sealed class Screen(val route: String) {
     object LocationsGallery : Screen("locations_gallery/{charId}/{characterName}") {
         fun createRoute(charId: String, characterName: String) =
             "locations_gallery/$charId/${characterName.replace(" ", "_")}"
+    }
+
+    // Diario
+    object Journal : Screen("journal/{charId}") {
+        fun createRoute(charId: String) = "journal/$charId"
     }
 }
 
@@ -199,6 +208,15 @@ fun AppNavigation(navController: NavHostController) {
 
             BestiaryScreen(
                 gameId = charId,
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        // ── DIARIO ─────────────────────────────────────────
+        composable(Screen.Journal.route) { backStackEntry ->
+            val charId = backStackEntry.arguments?.getString("charId") ?: ""
+            JournalScreen(
+                charId = charId,
                 onBack = { navController.popBackStack() }
             )
         }
