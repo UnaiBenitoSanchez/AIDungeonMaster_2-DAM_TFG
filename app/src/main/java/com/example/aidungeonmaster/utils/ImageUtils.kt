@@ -184,7 +184,6 @@ object ImageUtils {
         val bytes = response.body?.bytes() ?: throw Exception("Respuesta vacía de Cloudflare")
 
         if (!response.isSuccessful) {
-            // Cloudflare devuelve JSON con el error
             val errorText = try {
                 JSONObject(String(bytes))
                     .optJSONArray("errors")
@@ -197,7 +196,6 @@ object ImageUtils {
             throw Exception("Cloudflare error: $errorText")
         }
 
-        // La respuesta es PNG binario directamente — verificar magic bytes
         if (bytes.size < 8) {
             throw Exception("Respuesta demasiado pequeña (${bytes.size} bytes)")
         }
@@ -206,7 +204,6 @@ object ImageUtils {
         val isJpeg = bytes[0] == 0xFF.toByte() && bytes[1] == 0xD8.toByte()
 
         if (!isPng && !isJpeg) {
-            // Puede ser JSON de error con código 200 — intentar parsear
             val maybeError = try {
                 JSONObject(String(bytes)).optString("error", "")
             } catch (_: Exception) { "" }
@@ -248,12 +245,10 @@ object ImageUtils {
 
         val accountId = BuildConfig.CLOUDFLARE_ACCOUNT_ID
         val apiToken  = BuildConfig.CLOUDFLARE_API_TOKEN
-        // Usamos Llama 3 8B, que es rápido y excelente siguiendo instrucciones
         val model = "@cf/meta/llama-3-8b-instruct"
 
         val url = "https://api.cloudflare.com/client/v4/accounts/$accountId/ai/run/$model"
 
-        // Estructura de mensajes para el modelo conversacional
         val body = JSONObject().apply {
             put("messages", org.json.JSONArray().apply {
                 put(JSONObject().apply {
@@ -280,10 +275,9 @@ object ImageUtils {
 
             if (!response.isSuccessful) {
                 Log.e(TAG, "Error en traducción HTTP ${response.code}: $responseString")
-                return@withContext text // Fallback: devolvemos el original si hay error HTTP
+                return@withContext text
             }
 
-            // Cloudflare devuelve el texto generado dentro de result -> response
             val jsonResponse = JSONObject(responseString)
             val translatedText = jsonResponse.optJSONObject("result")?.optString("response", text) ?: text
 
@@ -292,7 +286,70 @@ object ImageUtils {
 
         } catch (e: Exception) {
             Log.w(TAG, "Excepción al traducir, usando texto original: ${e.message}")
-            return@withContext text // Fallback seguro para no bloquear la app
+            return@withContext text
         }
+    }
+
+    /**
+     * Genera una ilustración de monstruo usando la misma API de Cloudflare Workers AI.
+     * Devuelve una data URL lista para persistir y mostrar con Coil.
+     */
+    suspend fun generateMonsterImageDataUrl(
+        monsterNameEs: String,
+        descriptionEs: String = "",
+        tags: List<String> = emptyList()
+    ): String = withContext(Dispatchers.IO) {
+        val accountId = BuildConfig.CLOUDFLARE_ACCOUNT_ID
+        val apiToken = BuildConfig.CLOUDFLARE_API_TOKEN
+
+        if (accountId.isBlank() || apiToken.isBlank()) {
+            throw Exception(
+                "Faltan las credenciales de Cloudflare. " +
+                        "Añade CLOUDFLARE_ACCOUNT_ID y CLOUDFLARE_API_TOKEN en local.properties."
+            )
+        }
+
+        val flavorEs = buildString {
+            append(monsterNameEs)
+            if (descriptionEs.isNotBlank()) {
+                append(", ")
+                append(descriptionEs)
+            }
+            if (tags.isNotEmpty()) {
+                append(", etiquetas: ")
+                append(tags.joinToString(", "))
+            }
+        }
+
+        val translatedFlavor = translateToEnglish(flavorEs)
+        val prompt = buildMonsterPrompt(translatedFlavor)
+        Log.d(TAG, "Generando monstruo... Prompt final: $prompt")
+
+        var lastError: Exception? = null
+        for (model in MODELS) {
+            try {
+                val base64 = callCloudflare(accountId, apiToken, model, prompt)
+                return@withContext base64ToDataUrl(base64)
+            } catch (e: Exception) {
+                Log.w(TAG, "Fallo generando monstruo con $model: ${e.message}")
+                lastError = e
+            }
+        }
+
+        throw lastError ?: Exception("Todos los modelos de Cloudflare fallaron al generar el monstruo")
+    }
+
+    private fun buildMonsterPrompt(translatedFlavorEn: String): String {
+        val raw = "solo fantasy monster portrait, single creature only, no humans, no adventurers, " +
+                "dark fantasy bestiary concept art, creature design of $translatedFlavorEn, " +
+                "detailed anatomy, intimidating presence, dramatic cinematic lighting, volumetric fog, " +
+                "high detail, sharp focus, polished digital painting, RPG enemy illustration, 4k quality"
+
+        return if (raw.length > 600) raw.take(600) else raw
+    }
+
+    fun base64ToDataUrl(base64: String, mimeType: String = "image/png"): String {
+        val normalized = base64.replace("\n", "").replace("\r", "")
+        return "data:$mimeType;base64,$normalized"
     }
 }

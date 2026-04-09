@@ -27,6 +27,13 @@ import com.example.aidungeonmaster.utils.CombatMusicEngine
 import com.example.aidungeonmaster.viewmodel.*
 import kotlinx.coroutines.delay
 
+import androidx.compose.ui.platform.LocalContext
+import coil.compose.SubcomposeAsyncImage
+
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.asImageBitmap
+import com.example.aidungeonmaster.utils.ImageUtils
+
 private val CombatBg = Color(0xFF080808)
 private val EnemyRed = Color(0xFFCC2222)
 private val PlayerGreen = Color(0xFF22CC55)
@@ -132,6 +139,8 @@ private fun CombatContent(
     val cooldowns by combatVm.cooldowns.collectAsState()
     var activeTab by remember { mutableStateOf(0) }
 
+    val enemyImageUrl by combatVm.enemyImageUrl.collectAsState()
+
     val musicScope = rememberCoroutineScope()
     DisposableEffect(Unit) {
         CombatMusicEngine.start(musicScope)
@@ -161,6 +170,7 @@ private fun CombatContent(
         Column(Modifier.fillMaxSize()) {
             EnemyZone(
                 enemyName = combatVm.enemy.name,
+                imageUrl = enemyImageUrl,
                 hpCurrent = enemyHp,
                 hpMax = enemyHpMax,
                 phase = phase,
@@ -209,6 +219,7 @@ private fun CombatContent(
 @Composable
 private fun EnemyZone(
     enemyName: String,
+    imageUrl: String,
     hpCurrent: Int,
     hpMax: Int,
     phase: CombatPhase,
@@ -246,7 +257,6 @@ private fun EnemyZone(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            val imageUrl = null
             Box(
                 modifier = Modifier
                     .size(90.dp)
@@ -255,23 +265,32 @@ private fun EnemyZone(
                     .background(Color(0xFF1A0000)),
                 contentAlignment = Alignment.Center
             ) {
-                SubcomposeAsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current)
-                        .data(imageUrl)
-                        .crossfade(true)
-                        .build(),
-                    contentDescription = enemyName,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clip(RoundedCornerShape(8.dp)),
-                    loading = {
-                        Text(enemyEmoji(enemyName), fontSize = 40.sp, textAlign = TextAlign.Center)
-                    },
-                    error = {
-                        Text(enemyEmoji(enemyName), fontSize = 40.sp, textAlign = TextAlign.Center)
+                val enemyBitmap = remember(imageUrl) {
+                    try {
+                        when {
+                            imageUrl.startsWith("data:image", ignoreCase = true) -> {
+                                val base64Part = imageUrl.substringAfter("base64,", "")
+                                if (base64Part.isNotBlank()) ImageUtils.base64ToBitmap(base64Part) else null
+                            }
+                            else -> null
+                        }
+                    } catch (_: Exception) {
+                        null
                     }
-                )
+                }
+
+                if (enemyBitmap != null) {
+                    Image(
+                        bitmap = enemyBitmap.asImageBitmap(),
+                        contentDescription = enemyName,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(RoundedCornerShape(8.dp))
+                    )
+                } else {
+                    Text(enemyEmoji(enemyName), fontSize = 40.sp, textAlign = TextAlign.Center)
+                }
             }
 
             Column(modifier = Modifier.weight(1f)) {

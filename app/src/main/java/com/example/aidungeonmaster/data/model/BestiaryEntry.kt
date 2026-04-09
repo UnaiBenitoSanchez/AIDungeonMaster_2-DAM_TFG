@@ -7,6 +7,14 @@ data class MonsterStatSnapshot(
     val abilitiesSeen: List<String> = emptyList()
 )
 
+data class BestiaryLoot(
+    val name: String = "",
+    val category: String = "desconocido",
+    val details: String = "",
+    val quantityObserved: Int = 1,
+    val timesDropped: Int = 1
+)
+
 data class BestiaryEntry(
     val monsterId: String = "",
     val name: String = "",
@@ -25,5 +33,10 @@ data class BestiaryEntry(
     val lastObservedStats: MonsterStatSnapshot = MonsterStatSnapshot(),
 
     val knownLoot: List<String> = emptyList(),
+    val detailedKnownLoot: List<BestiaryLoot> = emptyList(),
+
+    val observedWeaknesses: List<String> = emptyList(),
+    val observedResistances: List<String> = emptyList(),
+
     val notes: String = ""
 )
