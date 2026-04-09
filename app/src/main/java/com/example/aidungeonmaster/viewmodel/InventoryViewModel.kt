@@ -16,6 +16,22 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
+data class StatComparisonLine(
+    val label: String,
+    val current: Int,
+    val projected: Int
+) {
+    val delta: Int get() = projected - current
+}
+
+data class ItemComparison(
+    val slot: String,
+    val replacedItemName: String?,
+    val currentWeaponDamage: String,
+    val projectedWeaponDamage: String,
+    val lines: List<StatComparisonLine>
+)
+
 class InventoryViewModel : ViewModel() {
     private val db = FirebaseFirestore.getInstance()
 
@@ -27,6 +43,57 @@ class InventoryViewModel : ViewModel() {
 
     private val _levelUpEvent = MutableSharedFlow<Int>(replay = 0, extraBufferCapacity = 1)
     val levelUpEvent = _levelUpEvent.asSharedFlow()
+
+    fun getItemComparison(item: Item): ItemComparison? {
+        val char = _character.value ?: return null
+        if (!item.isEquippable) return null
+
+        val slot = item.resolvedEquipSlot
+        if (slot.isBlank()) return null
+
+        val projected = projectCharacterWithItem(char, item)
+
+        val lines = listOf(
+            StatComparisonLine("CA", char.armorClass, projected.armorClass),
+            StatComparisonLine("Ataque", char.meleeAttackBonus, projected.meleeAttackBonus),
+            StatComparisonLine("Daño", char.weaponDamageBonus, projected.weaponDamageBonus),
+            StatComparisonLine("Iniciativa", char.initiativeBonus, projected.initiativeBonus),
+            StatComparisonLine("FUE", char.strTotal, projected.strTotal),
+            StatComparisonLine("DES", char.dexTotal, projected.dexTotal),
+            StatComparisonLine("CON", char.conTotal, projected.conTotal),
+            StatComparisonLine("INT", char.intTotal, projected.intTotal),
+            StatComparisonLine("SAB", char.wisTotal, projected.wisTotal),
+            StatComparisonLine("CAR", char.chaTotal, projected.chaTotal)
+        ).filter { it.current != it.projected }
+
+        return ItemComparison(
+            slot = slot,
+            replacedItemName = char.equipment.itemInSlot(slot)?.name,
+            currentWeaponDamage = char.equippedWeapon?.resolvedWeaponDamage ?: "1d4",
+            projectedWeaponDamage = projected.equippedWeapon?.resolvedWeaponDamage ?: "1d4",
+            lines = lines
+        )
+    }
+
+    private fun projectCharacterWithItem(char: Character, item: Item): Character {
+        val slot = item.resolvedEquipSlot
+        var projectedEquipment = char.equipment
+
+        if (slot == "main_hand" && item.handedness.equals("two_hand", ignoreCase = true)) {
+            projectedEquipment = projectedEquipment.withItem("off_hand", null)
+        }
+
+        if (slot == "off_hand") {
+            val mainHand = projectedEquipment.mainHand
+            if (mainHand?.handedness.equals("two_hand", ignoreCase = true)) {
+                projectedEquipment = projectedEquipment.withItem("main_hand", null)
+            }
+        }
+
+        projectedEquipment = projectedEquipment.withItem(slot, item)
+
+        return char.copy(equipment = projectedEquipment)
+    }
 
     // ─────────────────────────────────────────────────────────────────────────
     // CARGA INVENTARIO + EQUIPO + STATS
@@ -232,7 +299,7 @@ class InventoryViewModel : ViewModel() {
                 var currentHpMax = snap.getLong("hpMax")?.toInt() ?: 20
 
                 val char = _character.value
-                val conMod = ((char?.stats?.get("Constitución") ?: 10) - 10) / 2
+                val conMod = char?.conMod ?: 0
 
                 while (currentXp >= currentLevel * 100) {
                     currentXp -= currentLevel * 100

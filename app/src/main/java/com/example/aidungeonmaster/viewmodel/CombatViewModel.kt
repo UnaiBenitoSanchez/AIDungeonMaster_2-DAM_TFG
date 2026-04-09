@@ -166,29 +166,30 @@ class CombatViewModel(
     private var defenseBonus = 0
     private var hasAdvantage = false
 
-    private fun statMod(stat: String): Int {
-        val v = playerCharacter.stats[stat] ?: 10
-        return (v - 10) / 2
-    }
-
-    private val strMod   get() = statMod("Fuerza")
-    private val dexMod   get() = statMod("Destreza")
-    private val intMod   get() = statMod("Inteligencia")
-    private val wisMod   get() = statMod("Sabiduría")
-    private val profBonus = 2
+    private val strMod get() = playerCharacter.strMod
+    private val dexMod get() = playerCharacter.dexMod
+    private val intMod get() = playerCharacter.intMod
+    private val wisMod get() = playerCharacter.wisMod
+    private val profBonus get() = playerCharacter.profBonus
 
     private val enemyAC: Int = (10 + (enemy.hpMax / 12).coerceIn(0, 5))
-    private val playerAC: Int get() = (10 + dexMod + defenseBonus).coerceIn(8, 22)
+    private val playerAC: Int
+        get() = (playerCharacter.armorClass + defenseBonus).coerceIn(8, 32)
+
+    private fun resolveActiveWeapon(): Item {
+        return playerCharacter.equippedWeapon ?: Item(
+            id = "fist",
+            name = "Puñetazo",
+            description = "Ataque desarmado",
+            type = "arma",
+            weaponDamage = "1d4"
+        )
+    }
 
     val classAbilities: List<ClassAbility> = abilitiesForClass(playerCharacter.characterClass)
 
-    val weapons: List<Item> = playerCharacter.inventory.filter { item ->
-        item.type.contains("arma", ignoreCase = true) ||
-                item.effect.contains("d", ignoreCase = true) ||
-                item.description.uppercase().contains("\\dD\\d".toRegex())
-    }.ifEmpty {
-        listOf(Item(id = "fist", name = "Puñetazo", description = "Ataque desarmado", type = "arma", effect = "1d4"))
-    }
+    val weapons: List<Item>
+        get() = listOf(resolveActiveWeapon())
 
     // ============================================================
     //  INICIO DEL COMBATE
@@ -218,22 +219,26 @@ class CombatViewModel(
         _phase.value = CombatPhase.ROLLING
 
         viewModelScope.launch {
+            val activeWeapon = resolveActiveWeapon()
+            val usedAdvantage = hasAdvantage
+
             val rollA1 = roll(20)
-            val rollA2 = if (hasAdvantage) roll(20) else rollA1
-            val attackRoll = if (hasAdvantage) maxOf(rollA1, rollA2) else rollA1
+            val rollA2 = if (usedAdvantage) roll(20) else rollA1
+            val attackRoll = if (usedAdvantage) maxOf(rollA1, rollA2) else rollA1
             hasAdvantage = false
 
-            val isCrit   = attackRoll == 20
+            val isCrit = attackRoll == 20
             val isFumble = attackRoll == 1
-            val totalAtk = attackRoll + strMod + profBonus
+            val attackBonus = playerCharacter.meleeAttackBonus
+            val totalAtk = attackRoll + attackBonus
 
             showDice(
-                diceLabel   = if (hasAdvantage) "2d20 ventaja" else "1d20",
-                actionLabel = "Ataque con ${weapon.name}",
-                rolls       = listOf(attackRoll),
-                total       = totalAtk,
-                isCrit      = isCrit,
-                isFumble    = isFumble
+                diceLabel = if (usedAdvantage) "2d20 ventaja" else "1d20",
+                actionLabel = "Ataque con ${activeWeapon.name}",
+                rolls = if (usedAdvantage) listOf(rollA1, rollA2) else listOf(attackRoll),
+                total = totalAtk,
+                isCrit = isCrit,
+                isFumble = isFumble
             )
             delay(2000)
             hideDice()
@@ -244,11 +249,10 @@ class CombatViewModel(
                     endPlayerTurn()
                 }
                 isCrit || totalAtk >= enemyAC -> {
-                    val diceExpr = weapon.effect.ifBlank { weapon.description }
-                    val (cnt, sides, bonus) = parseDice(diceExpr)
-                    val count       = if (isCrit) cnt * 2 else cnt
+                    val (cnt, sides, bonus) = parseDice(activeWeapon.resolvedWeaponDamage)
+                    val count = if (isCrit) cnt * 2 else cnt
                     val damageRolls = List(count) { roll(sides) }
-                    val rawDamage   = damageRolls.sum() + bonus + strMod
+                    val rawDamage = damageRolls.sum() + bonus + playerCharacter.weaponDamageBonus
                     val damage      = rawDamage.coerceAtLeast(1)
 
                     // ── LOGRO: Golpe Crítico ─────────────────────────────────
@@ -267,7 +271,7 @@ class CombatViewModel(
                     hideDice()
 
                     log(
-                        "${if (isCrit) "⚡" else "🗡️"} ${weapon.name} golpea a ${enemy.name} " +
+                        "${if (isCrit) "⚡" else "🗡️"} ${activeWeapon.name} golpea a ${enemy.name} " +
                                 "por $damage de daño${if (isCrit) " (¡CRÍTICO!)" else ""}!",
                         if (isCrit) LogType.PLAYER_CRIT else LogType.PLAYER_HIT
                     )
@@ -288,7 +292,7 @@ class CombatViewModel(
                         _coinsReward.emit(coinsGained)
 
                         registerDefeatInBestiary(
-                            damageNotes = listOf(weapon.name),
+                            damageNotes = listOf(activeWeapon.name),
                             knownLoot = if (coinsGained > 0) listOf("$coinsGained monedas de oro") else emptyList()
                         )
 
@@ -297,7 +301,7 @@ class CombatViewModel(
                             summary = "Has derrotado a ${enemy.name} con ${weapon.name}.",
                             fullText = buildString {
                                 append("El combate terminó en victoria. ")
-                                append("${enemy.name} fue derrotado usando ${weapon.name}. ")
+                                append("${enemy.name} fue derrotado usando ${activeWeapon.name}. ")
                                 append("Recompensa obtenida: $xpGained XP")
                                 if (coinsGained > 0) append(" y $coinsGained monedas")
                                 append(".")

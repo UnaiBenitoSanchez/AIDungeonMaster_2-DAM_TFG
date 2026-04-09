@@ -25,6 +25,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.aidungeonmaster.data.model.Character
 import com.example.aidungeonmaster.data.model.Item
 import com.example.aidungeonmaster.viewmodel.InventoryViewModel
+import com.example.aidungeonmaster.viewmodel.ItemComparison
 import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -125,6 +126,7 @@ fun InventoryScreen(
                                 when (page) {
                                     0 -> InventoryPage(
                                         character = currentCharacter,
+                                        getComparison = { item -> viewModel.getItemComparison(item) },
                                         onUse = { usedItem ->
                                             val msg = viewModel.useItem(
                                                 gameId,
@@ -236,6 +238,7 @@ private fun TabChip(
 @Composable
 private fun InventoryPage(
     character: Character,
+    getComparison: (Item) -> ItemComparison?,
     onUse: (Item) -> Unit,
     onEquip: (Item) -> Unit
 ) {
@@ -268,6 +271,7 @@ private fun InventoryPage(
                 itemsIndexed(character.inventory) { _, item ->
                     InventoryItemRow(
                         item = item,
+                        comparison = getComparison(item),
                         onUse = onUse,
                         onEquip = onEquip
                     )
@@ -426,6 +430,48 @@ private fun CharacterHeaderCard(character: Character) {
                     )
                 }
             }
+
+            Spacer(Modifier.height(10.dp))
+
+            Text(
+                text = "Stats finales",
+                color = Color(0xFFFFD700),
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold
+            )
+
+            Spacer(Modifier.height(6.dp))
+
+            Text(
+                text = buildString {
+                    append("FUE ${character.strTotal} (${formatMod(character.strMod)}) · ")
+                    append("DES ${character.dexTotal} (${formatMod(character.dexMod)}) · ")
+                    append("CON ${character.conTotal} (${formatMod(character.conMod)})")
+                },
+                color = Color.White,
+                style = MaterialTheme.typography.bodySmall,
+                fontFamily = FontFamily.Monospace
+            )
+
+            Text(
+                text = buildString {
+                    append("INT ${character.intTotal} (${formatMod(character.intMod)}) · ")
+                    append("SAB ${character.wisTotal} (${formatMod(character.wisMod)}) · ")
+                    append("CAR ${character.chaTotal} (${formatMod(character.chaMod)})")
+                },
+                color = Color.White,
+                style = MaterialTheme.typography.bodySmall,
+                fontFamily = FontFamily.Monospace
+            )
+
+            Spacer(Modifier.height(6.dp))
+
+            Text(
+                text = "Ataque melee: +${character.meleeAttackBonus} · Iniciativa: ${formatMod(character.initiativeBonus)}",
+                color = Color(0xFFBFE3FF),
+                style = MaterialTheme.typography.bodySmall,
+                fontFamily = FontFamily.Monospace
+            )
         }
     }
 }
@@ -515,6 +561,7 @@ private fun EquipmentSlotCard(
 @Composable
 fun InventoryItemRow(
     item: Item,
+    comparison: ItemComparison? = null,
     onUse: ((Item) -> Unit)? = null,
     onEquip: ((Item) -> Unit)? = null
 ) {
@@ -593,6 +640,44 @@ fun InventoryItemRow(
                         style = MaterialTheme.typography.labelSmall,
                         fontFamily = FontFamily.Monospace
                     )
+                }
+
+                comparison?.let { cmp ->
+                    Spacer(Modifier.height(6.dp))
+
+                    val weaponChanged = cmp.currentWeaponDamage != cmp.projectedWeaponDamage
+                    if (weaponChanged) {
+                        Text(
+                            text = "Comparación arma: ${cmp.currentWeaponDamage} → ${cmp.projectedWeaponDamage}",
+                            color = Color(0xFFFFD59A),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+
+                    cmp.replacedItemName?.let {
+                        Text(
+                            text = "Reemplaza: $it",
+                            color = Color(0xFFCCCCCC),
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
+
+                    cmp.lines.takeIf { it.isNotEmpty() }?.forEach { line ->
+                        val sign = if (line.delta > 0) "+" else ""
+                        val color = when {
+                            line.delta > 0 -> Color(0xFF7CFF7C)
+                            line.delta < 0 -> Color(0xFFFF8A8A)
+                            else -> Color.LightGray
+                        }
+
+                        Text(
+                            text = "${line.label}: ${line.current} → ${line.projected} ($sign${line.delta})",
+                            color = color,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
                 }
             }
 
@@ -736,3 +821,5 @@ private fun slotEmoji(slot: String): String = when (slot.lowercase()) {
     "amulet" -> "📿"
     else -> "📦"
 }
+
+private fun formatMod(value: Int): String = if (value >= 0) "+$value" else "$value"

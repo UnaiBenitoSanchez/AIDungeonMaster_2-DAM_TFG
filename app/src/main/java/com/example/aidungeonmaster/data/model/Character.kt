@@ -104,9 +104,26 @@ data class EquippedItems(
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// PERSONAJE
-// ─────────────────────────────────────────────────────────────────────────────
+private fun normalizeStatKey(raw: String): String {
+    return raw.trim()
+        .lowercase()
+        .replace("á", "a")
+        .replace("é", "e")
+        .replace("í", "i")
+        .replace("ó", "o")
+        .replace("ú", "u")
+}
+
+private fun canonicalStatName(raw: String): String = when (normalizeStatKey(raw)) {
+    "fuerza" -> "Fuerza"
+    "destreza" -> "Destreza"
+    "constitucion" -> "Constitución"
+    "inteligencia" -> "Inteligencia"
+    "sabiduria" -> "Sabiduría"
+    "carisma" -> "Carisma"
+    else -> raw
+}
+
 data class Character(
     val id: String = "",
     val name: String = "",
@@ -115,29 +132,19 @@ data class Character(
     val stats: Map<String, Int> = emptyMap(),
     val physicalTraits: String = "",
     val gameTheme: String? = null,
-
-    // --- CAMPOS DE SISTEMA ---
     val hpMax: Int = 20,
     val hpCurrent: Int = 20,
     val inventory: List<Item> = emptyList(),
     val portraitUrl: String = "",
     val lastPlayed: Long = 0L,
-
-    // --- PROGRESIÓN ---
     val xp: Int = 0,
     val level: Int = 1,
-
-    // --- ECONOMÍA ---
     val coins: Int = 0,
-
-    // --- NUEVO: EQUIPAMIENTO REAL ---
     val equipment: EquippedItems = EquippedItems()
 ) {
-    /** XP necesario para pasar al siguiente nivel */
     val xpToNextLevel: Int
         get() = level * 100
 
-    /** Porcentaje de progreso hacia el siguiente nivel (0.0 – 1.0) */
     val xpProgress: Float
         get() = if (xpToNextLevel > 0) {
             (xp.toFloat() / xpToNextLevel).coerceIn(0f, 1f)
@@ -145,7 +152,6 @@ data class Character(
             0f
         }
 
-    /** Bonus de competencia según nivel (igual que D&D) */
     val profBonus: Int
         get() = when {
             level >= 17 -> 6
@@ -155,46 +161,93 @@ data class Character(
             else -> 2
         }
 
-    private fun statValue(name: String): Int = stats[name] ?: 10
-
-    private val dexMod: Int
-        get() = (statValue("Destreza") - 10) / 2
+    private fun baseStatValue(name: String): Int {
+        val canonical = canonicalStatName(name)
+        return stats[canonical] ?: 10
+    }
 
     val equippedStatBonuses: Map<String, Int>
         get() = equipment
             .allEquipped()
-            .flatMap { it.statBonuses.entries }
-            .groupBy({ it.key }, { it.value })
+            .flatMap { item ->
+                item.statBonuses.entries.map { canonicalStatName(it.key) to it.value }
+            }
+            .groupBy({ it.first }, { it.second })
             .mapValues { (_, values) -> values.sum() }
 
-    /**
-     * Clase de armadura real del personaje:
-     * - Sin armadura equipada: 10 + mod DEX
-     * - Con armadura equipada en chest: armorBase + DEX (limitada por maxDexBonus si aplica)
-     * - Escudos / bonus planos: armorBonus
-     */
+    fun totalStat(name: String): Int {
+        val canonical = canonicalStatName(name)
+        return baseStatValue(canonical) + (equippedStatBonuses[canonical] ?: 0)
+    }
+
+    fun statModifier(name: String): Int = (totalStat(name) - 10) / 2
+
+    val strTotal get() = totalStat("Fuerza")
+    val dexTotal get() = totalStat("Destreza")
+    val conTotal get() = totalStat("Constitución")
+    val intTotal get() = totalStat("Inteligencia")
+    val wisTotal get() = totalStat("Sabiduría")
+    val chaTotal get() = totalStat("Carisma")
+
+    val strMod get() = statModifier("Fuerza")
+    val dexMod get() = statModifier("Destreza")
+    val conMod get() = statModifier("Constitución")
+    val intMod get() = statModifier("Inteligencia")
+    val wisMod get() = statModifier("Sabiduría")
+    val chaMod get() = statModifier("Carisma")
+
+    val meleeAttackBonus: Int
+        get() = strMod + profBonus
+
+    val rangedAttackBonus: Int
+        get() = dexMod + profBonus
+
+    val weaponDamageBonus: Int
+        get() = strMod
+
+    val initiativeBonus: Int
+        get() = dexMod
+
+    val finalStats: Map<String, Int>
+        get() = linkedMapOf(
+            "Fuerza" to strTotal,
+            "Destreza" to dexTotal,
+            "Constitución" to conTotal,
+            "Inteligencia" to intTotal,
+            "Sabiduría" to wisTotal,
+            "Carisma" to chaTotal
+        )
+
     val armorClass: Int
         get() {
             val chestArmor = equipment.chest
 
-            val shieldBonus = listOfNotNull(equipment.mainHand, equipment.offHand)
-                .filter { it.isShield }
-                .sumOf { shield ->
-                    if (shield.armorBonus != 0) shield.armorBonus else 2
+            val extraArmorBonus = equipment
+                .allEquipped()
+                .filterNot { it == chestArmor && it.armorBase != null }
+                .sumOf { item ->
+                    when {
+                        item.isShield && item.armorBonus == 0 -> 2
+                        else -> item.armorBonus
+                    }
                 }
 
-            return if (chestArmor != null && chestArmor.armorBase != null) {
+            return if (chestArmor?.armorBase != null) {
                 val dexContribution = chestArmor.maxDexBonus?.let { maxDex ->
                     dexMod.coerceAtMost(maxDex)
                 } ?: dexMod
 
-                (chestArmor.armorBase + dexContribution + chestArmor.armorBonus + shieldBonus)
+                (chestArmor.armorBase + dexContribution + chestArmor.armorBonus + extraArmorBonus)
                     .coerceAtLeast(1)
             } else {
-                (10 + dexMod + shieldBonus).coerceAtLeast(1)
+                (10 + dexMod + extraArmorBonus).coerceAtLeast(1)
             }
         }
 
     val equippedWeapon: Item?
-        get() = equipment.mainHand ?: inventory.firstOrNull { it.isWeapon }
+        get() = when {
+            equipment.mainHand?.isWeapon == true -> equipment.mainHand
+            equipment.offHand?.isWeapon == true -> equipment.offHand
+            else -> null
+        }
 }
