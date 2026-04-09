@@ -15,6 +15,8 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import com.example.aidungeonmaster.data.model.ItemEnchantment
+import com.example.aidungeonmaster.data.model.normalizeEquipSlot
 
 data class StatComparisonLine(
     val label: String,
@@ -75,8 +77,23 @@ class InventoryViewModel : ViewModel() {
         )
     }
 
+    private fun resolveActualEquipSlot(char: Character, item: Item): String {
+        return when (item.resolvedEquipSlot) {
+            "ring" -> {
+                when {
+                    char.equipment.ring == null -> "ring"
+                    char.equipment.ring2 == null -> "ring2"
+                    else -> "ring"
+                }
+            }
+            else -> item.resolvedEquipSlot
+        }
+    }
+
     private fun projectCharacterWithItem(char: Character, item: Item): Character {
-        val slot = item.resolvedEquipSlot
+
+        val slot = resolveActualEquipSlot(char, item)
+
         var projectedEquipment = char.equipment
 
         if (slot == "main_hand" && item.handedness.equals("two_hand", ignoreCase = true)) {
@@ -725,21 +742,25 @@ class InventoryViewModel : ViewModel() {
     private fun parseEquippedItems(raw: Any?): EquippedItems {
         val map = raw as? Map<*, *> ?: return EquippedItems()
 
-        fun parseSlot(slot: String): Item? {
-            val rawItem = map[slot] as? Map<*, *> ?: return null
-            return parseItemMap(rawItem)
+        fun parseSlot(vararg keys: String): Item? {
+            val rawItem = keys
+                .asSequence()
+                .mapNotNull { key -> map[key] }
+                .firstOrNull() ?: return null
+            return parseItemMap(rawItem as Map<*, *>)
         }
 
         return EquippedItems(
-            head = parseSlot("head"),
-            chest = parseSlot("chest"),
-            legs = parseSlot("legs"),
-            feet = parseSlot("feet"),
-            hands = parseSlot("hands"),
-            mainHand = parseSlot("main_hand"),
-            offHand = parseSlot("off_hand"),
-            ring = parseSlot("ring"),
-            amulet = parseSlot("amulet")
+            head = parseSlot("head", "cabeza"),
+            chest = parseSlot("chest", "pecho", "torso"),
+            legs = parseSlot("legs", "piernas"),
+            feet = parseSlot("feet", "pies"),
+            hands = parseSlot("hands", "manos"),
+            mainHand = parseSlot("main_hand", "mano_principal", "mano principal"),
+            offHand = parseSlot("off_hand", "mano_secundaria", "mano secundaria"),
+            ring = parseSlot("ring", "anillo", "ring1", "anillo1"),
+            ring2 = parseSlot("ring2", "anillo2"),
+            amulet = parseSlot("amulet", "amuleto")
         )
     }
 
@@ -754,20 +775,64 @@ class InventoryViewModel : ViewModel() {
             ?.toMap()
             ?: emptyMap()
 
+        val enchantmentsRaw = m["enchantments"] as? List<*>
+        val enchantments = enchantmentsRaw?.mapNotNull { raw ->
+            val map = raw as? Map<*, *> ?: return@mapNotNull null
+
+            val enchStatBonusesRaw = map["statBonuses"] as? Map<*, *>
+            val enchStatBonuses = enchStatBonusesRaw
+                ?.mapNotNull { (k, v) ->
+                    val key = k as? String ?: return@mapNotNull null
+                    val value = (v as? Number)?.toInt() ?: return@mapNotNull null
+                    key to value
+                }
+                ?.toMap()
+                ?: emptyMap()
+
+            ItemEnchantment(
+                id = map["id"] as? String ?: "",
+                name = map["name"] as? String ?: "",
+                description = map["description"] as? String ?: "",
+                statBonuses = enchStatBonuses,
+                armorBonus = (map["armorBonus"] as? Number)?.toInt() ?: 0,
+                attackBonus = (map["attackBonus"] as? Number)?.toInt() ?: 0,
+                weaponDamageBonus = (map["weaponDamageBonus"] as? Number)?.toInt() ?: 0
+            )
+        } ?: emptyList()
+
         return Item(
             id = m["id"] as? String ?: System.currentTimeMillis().toString(),
             name = m["name"] as? String ?: "Objeto sin nombre",
             description = m["description"] as? String ?: "",
             type = m["type"] as? String ?: "consumible",
             effect = m["effect"] as? String ?: "",
-            equipSlot = m["equipSlot"] as? String ?: "",
+            equipSlot = normalizeEquipSlot(m["equipSlot"] as? String ?: ""),
             weaponDamage = m["weaponDamage"] as? String ?: "",
             armorBase = (m["armorBase"] as? Number)?.toInt(),
             armorBonus = (m["armorBonus"] as? Number)?.toInt() ?: 0,
             maxDexBonus = (m["maxDexBonus"] as? Number)?.toInt(),
             handedness = m["handedness"] as? String ?: "one_hand",
-            statBonuses = statBonuses
+            statBonuses = statBonuses,
+            rarity = m["rarity"] as? String ?: "common",
+            enchantments = enchantments,
+            setId = m["setId"] as? String ?: "",
+            setName = m["setName"] as? String ?: ""
         )
+    }
+
+    private fun enchantmentToMap(enchantment: ItemEnchantment): Map<String, Any> {
+        val out = mutableMapOf<String, Any>(
+            "id" to enchantment.id,
+            "name" to enchantment.name,
+            "description" to enchantment.description
+        )
+
+        if (enchantment.statBonuses.isNotEmpty()) out["statBonuses"] = enchantment.statBonuses
+        if (enchantment.armorBonus != 0) out["armorBonus"] = enchantment.armorBonus
+        if (enchantment.attackBonus != 0) out["attackBonus"] = enchantment.attackBonus
+        if (enchantment.weaponDamageBonus != 0) out["weaponDamageBonus"] = enchantment.weaponDamageBonus
+
+        return out
     }
 
     private fun itemToMap(item: Item): Map<String, Any> {
@@ -776,7 +841,8 @@ class InventoryViewModel : ViewModel() {
             "name" to item.name,
             "description" to item.description,
             "type" to item.type,
-            "effect" to item.effect
+            "effect" to item.effect,
+            "rarity" to item.rarity
         )
 
         if (item.equipSlot.isNotBlank()) out["equipSlot"] = item.equipSlot
@@ -788,6 +854,11 @@ class InventoryViewModel : ViewModel() {
             out["handedness"] = item.handedness
         }
         if (item.statBonuses.isNotEmpty()) out["statBonuses"] = item.statBonuses
+        if (item.enchantments.isNotEmpty()) {
+            out["enchantments"] = item.enchantments.map(::enchantmentToMap)
+        }
+        if (item.setId.isNotBlank()) out["setId"] = item.setId
+        if (item.setName.isNotBlank()) out["setName"] = item.setName
 
         return out
     }
@@ -803,6 +874,7 @@ class InventoryViewModel : ViewModel() {
         equipment.mainHand?.let { out["main_hand"] = itemToMap(it) }
         equipment.offHand?.let { out["off_hand"] = itemToMap(it) }
         equipment.ring?.let { out["ring"] = itemToMap(it) }
+        equipment.ring2?.let { out["ring2"] = itemToMap(it) }
         equipment.amulet?.let { out["amulet"] = itemToMap(it) }
 
         return out

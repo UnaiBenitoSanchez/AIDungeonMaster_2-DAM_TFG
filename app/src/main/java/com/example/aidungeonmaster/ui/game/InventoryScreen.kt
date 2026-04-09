@@ -28,6 +28,10 @@ import com.example.aidungeonmaster.viewmodel.InventoryViewModel
 import com.example.aidungeonmaster.viewmodel.ItemComparison
 import kotlinx.coroutines.delay
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun InventoryScreen(
@@ -253,7 +257,17 @@ private fun InventoryPage(
 
         Spacer(Modifier.height(10.dp))
 
-        if (character.inventory.isEmpty()) {
+        val sortedInventory = remember(character.inventory) {
+            character.inventory.sortedWith(
+                compareBy<Item>(
+                    { rarityOrder(it.rarity) },
+                    { itemDisplayOrder(it) },
+                    { it.name.lowercase() }
+                )
+            )
+        }
+
+        if (sortedInventory.isEmpty()) {
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
@@ -268,7 +282,7 @@ private fun InventoryPage(
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                itemsIndexed(character.inventory) { _, item ->
+                itemsIndexed(sortedInventory) { _, item ->
                     InventoryItemRow(
                         item = item,
                         comparison = getComparison(item),
@@ -313,7 +327,8 @@ private fun EquipmentPage(
                 "hands" to "Manos",
                 "main_hand" to "Mano principal",
                 "off_hand" to "Mano secundaria",
-                "ring" to "Anillo",
+                "ring" to "Anillo 1",
+                "ring2" to "Anillo 2",
                 "amulet" to "Amuleto"
             )
 
@@ -335,6 +350,10 @@ private fun EquipmentPage(
 
 @Composable
 private fun CharacterHeaderCard(character: Character) {
+    var statsExpanded by remember(character.id, character.lastPlayed, character.level) {
+        mutableStateOf(false)
+    }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -431,47 +450,84 @@ private fun CharacterHeaderCard(character: Character) {
                 }
             }
 
+            if (character.activeSetNames.isNotEmpty()) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = "Sets activos: ${character.activeSetNames.joinToString(" · ")}",
+                    color = Color(0xFFB8A6FF),
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+
             Spacer(Modifier.height(10.dp))
 
-            Text(
-                text = "Stats finales",
-                color = Color(0xFFFFD700),
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Bold
-            )
+            OutlinedButton(
+                onClick = { statsExpanded = !statsExpanded },
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = Color(0xFFFFD700)
+                ),
+                border = BorderStroke(1.dp, Color(0x55FFD700)),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                modifier = Modifier.height(36.dp)
+            ) {
+                Text(
+                    text = if (statsExpanded) "Ocultar stats finales" else "Ver stats finales",
+                    fontSize = 12.sp,
+                    fontFamily = FontFamily.Monospace
+                )
+                Spacer(Modifier.width(8.dp))
+                Icon(
+                    imageVector = if (statsExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = null
+                )
+            }
 
-            Spacer(Modifier.height(6.dp))
+            AnimatedVisibility(visible = statsExpanded) {
+                Column {
+                    Spacer(Modifier.height(10.dp))
 
-            Text(
-                text = buildString {
-                    append("FUE ${character.strTotal} (${formatMod(character.strMod)}) · ")
-                    append("DES ${character.dexTotal} (${formatMod(character.dexMod)}) · ")
-                    append("CON ${character.conTotal} (${formatMod(character.conMod)})")
-                },
-                color = Color.White,
-                style = MaterialTheme.typography.bodySmall,
-                fontFamily = FontFamily.Monospace
-            )
+                    Text(
+                        text = "Stats finales",
+                        color = Color(0xFFFFD700),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold
+                    )
 
-            Text(
-                text = buildString {
-                    append("INT ${character.intTotal} (${formatMod(character.intMod)}) · ")
-                    append("SAB ${character.wisTotal} (${formatMod(character.wisMod)}) · ")
-                    append("CAR ${character.chaTotal} (${formatMod(character.chaMod)})")
-                },
-                color = Color.White,
-                style = MaterialTheme.typography.bodySmall,
-                fontFamily = FontFamily.Monospace
-            )
+                    Spacer(Modifier.height(6.dp))
 
-            Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = buildString {
+                            append("FUE ${character.strTotal} (${formatMod(character.strMod)}) · ")
+                            append("DES ${character.dexTotal} (${formatMod(character.dexMod)}) · ")
+                            append("CON ${character.conTotal} (${formatMod(character.conMod)})")
+                        },
+                        color = Color.White,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace
+                    )
 
-            Text(
-                text = "Ataque melee: +${character.meleeAttackBonus} · Iniciativa: ${formatMod(character.initiativeBonus)}",
-                color = Color(0xFFBFE3FF),
-                style = MaterialTheme.typography.bodySmall,
-                fontFamily = FontFamily.Monospace
-            )
+                    Text(
+                        text = buildString {
+                            append("INT ${character.intTotal} (${formatMod(character.intMod)}) · ")
+                            append("SAB ${character.wisTotal} (${formatMod(character.wisMod)}) · ")
+                            append("CAR ${character.chaTotal} (${formatMod(character.chaMod)})")
+                        },
+                        color = Color.White,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace
+                    )
+
+                    Spacer(Modifier.height(6.dp))
+
+                    Text(
+                        text = "Ataque melee: +${character.meleeAttackBonus} · Iniciativa: ${formatMod(character.initiativeBonus)} · Daño: ${formatMod(character.weaponDamageBonus)}",
+                        color = Color(0xFFBFE3FF),
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            }
         }
     }
 }
@@ -517,11 +573,26 @@ private fun EquipmentSlotCard(
                         style = MaterialTheme.typography.bodySmall
                     )
                 } else {
+                    val rarityColor = when (item.rarity.lowercase()) {
+                        "uncommon" -> Color(0xFF7CFF7C)
+                        "rare" -> Color(0xFF6EC6FF)
+                        "epic" -> Color(0xFFC58CFF)
+                        "legendary" -> Color(0xFFFFC857)
+                        else -> Color(0xFFCCCCCC)
+                    }
+
                     Text(
                         text = item.name,
                         color = Color.White,
                         fontWeight = FontWeight.SemiBold,
                         style = MaterialTheme.typography.bodyLarge
+                    )
+
+                    Text(
+                        text = friendlyRarityName(item.rarity),
+                        color = rarityColor,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontFamily = FontFamily.Monospace
                     )
 
                     val details = buildEquipmentDetailText(item)
@@ -565,68 +636,69 @@ fun InventoryItemRow(
     onUse: ((Item) -> Unit)? = null,
     onEquip: ((Item) -> Unit)? = null
 ) {
-    val normalizedType = normalizeItemType(item.type)
-
-    val isConsumable =
-        normalizedType == "pocion" ||
-                normalizedType == "consumible" ||
-                normalizedType == "comida" ||
-                normalizedType == "pergamino" ||
-                normalizedType == "veneno" ||
-                normalizedType == "explosivo" ||
-                normalizedType.contains("pocion") ||
-                normalizedType.contains("consumible") ||
-                normalizedType.contains("pergamino")
-
-    val isEquippable = item.isEquippable
-
-    val typeEmoji = when {
-        normalizedType == "pocion" || normalizedType.contains("pocion") -> "🧪"
-        normalizedType == "arma" || normalizedType.contains("arma") -> "⚔️"
-        normalizedType == "armadura" || normalizedType.contains("armadura") -> "🛡️"
-        normalizedType == "pergamino" || normalizedType.contains("pergamino") -> "📜"
-        normalizedType == "veneno" || normalizedType.contains("veneno") -> "☠️"
-        normalizedType == "explosivo" || normalizedType.contains("explosivo") -> "💣"
-        normalizedType == "reliquia" || normalizedType.contains("reliquia") -> "✨"
-        else -> "🎒"
+    val rarityColor = when (item.rarity.lowercase()) {
+        "uncommon" -> Color(0xFF7CFF7C)
+        "rare" -> Color(0xFF6EC6FF)
+        "epic" -> Color(0xFFC58CFF)
+        "legendary" -> Color(0xFFFFC857)
+        else -> Color(0xFFCCCCCC)
     }
+
+    val isActuallyEquippable = item.resolvedEquipSlot.isNotBlank() || item.isWeapon || item.isArmor
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(8.dp)),
+            .border(1.dp, rarityColor.copy(alpha = 0.45f), RoundedCornerShape(8.dp)),
         colors = CardDefaults.cardColors(containerColor = Color(0x22FFFFFF))
     ) {
         Row(
             modifier = Modifier
-                .padding(12.dp)
-                .fillMaxWidth(),
+                .fillMaxWidth()
+                .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(typeEmoji, fontSize = 28.sp)
-            Spacer(Modifier.width(12.dp))
+            Text(
+                text = iconForItemType(item),
+                fontSize = 28.sp,
+                modifier = Modifier.padding(end = 12.dp)
+            )
 
-            Column(modifier = Modifier.weight(1f)) {
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
                 Text(
-                    item.name,
+                    text = item.name,
                     color = Color.White,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
 
-                if (item.description.isNotEmpty()) {
+                Text(
+                    text = buildString {
+                        append(friendlyRarityName(item.rarity))
+                        if (item.setName.isNotBlank()) append(" · ${item.setName}")
+                    },
+                    color = rarityColor,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontFamily = FontFamily.Monospace
+                )
+
+                if (item.description.isNotBlank()) {
+                    Spacer(Modifier.height(2.dp))
                     Text(
-                        item.description,
-                        color = Color.LightGray,
+                        text = item.description,
+                        color = Color(0xFFEAEAEA),
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
 
-                if (item.effect.isNotEmpty()) {
+                if (item.effect.isNotBlank()) {
+                    Spacer(Modifier.height(2.dp))
                     Text(
-                        "✦ ${item.effect}",
-                        color = Color.Cyan,
-                        style = MaterialTheme.typography.labelSmall,
+                        text = item.effect,
+                        color = Color(0xFF00F5FF),
+                        style = MaterialTheme.typography.bodySmall,
                         fontFamily = FontFamily.Monospace
                     )
                 }
@@ -635,11 +707,23 @@ fun InventoryItemRow(
                 if (detail.isNotBlank()) {
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        detail,
+                        text = detail,
                         color = Color(0xFFBFE3FF),
                         style = MaterialTheme.typography.labelSmall,
                         fontFamily = FontFamily.Monospace
                     )
+                }
+
+                if (item.enchantments.isNotEmpty()) {
+                    Spacer(Modifier.height(4.dp))
+                    item.enchantments.forEach { enchantment ->
+                        Text(
+                            text = "✧ ${enchantment.name}: ${enchantment.description.ifBlank { "encantamiento activo" }}",
+                            color = Color(0xFFB8A6FF),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
                 }
 
                 comparison?.let { cmp ->
@@ -663,7 +747,7 @@ fun InventoryItemRow(
                         )
                     }
 
-                    cmp.lines.takeIf { it.isNotEmpty() }?.forEach { line ->
+                    cmp.lines.forEach { line ->
                         val sign = if (line.delta > 0) "+" else ""
                         val color = when {
                             line.delta > 0 -> Color(0xFF7CFF7C)
@@ -681,41 +765,30 @@ fun InventoryItemRow(
                 }
             }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (onUse != null && isConsumable) {
+            Spacer(Modifier.width(10.dp))
+
+            when {
+                isActuallyEquippable && onEquip != null -> {
                     Button(
-                        onClick = { onUse(item) },
-                        modifier = Modifier.height(36.dp),
+                        onClick = { onEquip(item) },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF004400)
-                        ),
-                        border = BorderStroke(1.dp, Color(0xFF22CC55)),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp)
-                    ) {
-                        Text(
-                            "Usar",
-                            color = Color(0xFF22CC55),
-                            fontSize = 12.sp,
-                            fontFamily = FontFamily.Monospace
+                            containerColor = Color(0xFF2E7D32),
+                            contentColor = Color.White
                         )
+                    ) {
+                        Text("Equipar")
                     }
                 }
 
-                if (onEquip != null && isEquippable) {
-                    OutlinedButton(
-                        onClick = { onEquip(item) },
-                        modifier = Modifier.height(36.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = Color(0xFFFFD700)
-                        ),
-                        border = BorderStroke(1.dp, Color(0xFFFFD700)),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp)
-                    ) {
-                        Text(
-                            "Equipar",
-                            fontSize = 12.sp,
-                            fontFamily = FontFamily.Monospace
+                !isActuallyEquippable && onUse != null -> {
+                    Button(
+                        onClick = { onUse(item) },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF1565C0),
+                            contentColor = Color.White
                         )
+                    ) {
+                        Text("Usar")
                     }
                 }
             }
@@ -727,7 +800,7 @@ private fun buildInventoryItemDetailText(item: Item): String {
     val parts = mutableListOf<String>()
 
     if (item.resolvedEquipSlot.isNotBlank()) {
-        parts += "slot=${friendlySlotName(item.resolvedEquipSlot)}"
+        parts += friendlySlotName(item.resolvedEquipSlot)
     }
 
     if (item.resolvedWeaponDamage.isNotBlank()) {
@@ -738,9 +811,9 @@ private fun buildInventoryItemDetailText(item: Item): String {
         parts += "CA base=$it"
     }
 
-    if (item.armorBonus != 0) {
-        val sign = if (item.armorBonus > 0) "+" else ""
-        parts += "bonus CA=${sign}${item.armorBonus}"
+    if (item.totalArmorBonus != 0) {
+        val sign = if (item.totalArmorBonus > 0) "+" else ""
+        parts += "bonus CA=${sign}${item.totalArmorBonus}"
     }
 
     item.maxDexBonus?.let {
@@ -751,12 +824,30 @@ private fun buildInventoryItemDetailText(item: Item): String {
         parts += "dos manos"
     }
 
-    if (item.statBonuses.isNotEmpty()) {
-        val bonusText = item.statBonuses.entries.joinToString(", ") { (stat, value) ->
+    if (item.totalAttackBonus != 0) {
+        val sign = if (item.totalAttackBonus > 0) "+" else ""
+        parts += "ataque=${sign}${item.totalAttackBonus}"
+    }
+
+    if (item.totalWeaponDamageBonus != 0) {
+        val sign = if (item.totalWeaponDamageBonus > 0) "+" else ""
+        parts += "daño bonus=${sign}${item.totalWeaponDamageBonus}"
+    }
+
+    if (item.totalStatBonuses.isNotEmpty()) {
+        val bonusText = item.totalStatBonuses.entries.joinToString(", ") { (stat, value) ->
             val sign = if (value > 0) "+" else ""
             "$stat $sign$value"
         }
         parts += bonusText
+    }
+
+    if (item.setName.isNotBlank()) {
+        parts += "set=${item.setName}"
+    }
+
+    if (item.enchantments.isNotEmpty()) {
+        parts += "encant=${item.enchantments.joinToString { it.name }}"
     }
 
     return parts.joinToString(" · ")
@@ -764,6 +855,8 @@ private fun buildInventoryItemDetailText(item: Item): String {
 
 private fun buildEquipmentDetailText(item: Item): String {
     val parts = mutableListOf<String>()
+
+    parts += friendlyRarityName(item.rarity)
 
     if (item.resolvedWeaponDamage.isNotBlank()) {
         parts += "Daño ${item.resolvedWeaponDamage}"
@@ -773,13 +866,27 @@ private fun buildEquipmentDetailText(item: Item): String {
         parts += "CA base $it"
     }
 
-    if (item.armorBonus != 0) {
-        val sign = if (item.armorBonus > 0) "+" else ""
-        parts += "CA ${sign}${item.armorBonus}"
+    if (item.totalArmorBonus != 0) {
+        val sign = if (item.totalArmorBonus > 0) "+" else ""
+        parts += "CA ${sign}${item.totalArmorBonus}"
     }
 
     item.maxDexBonus?.let {
         parts += "DEX máx $it"
+    }
+
+    if (item.totalAttackBonus != 0) {
+        val sign = if (item.totalAttackBonus > 0) "+" else ""
+        parts += "Ataque ${sign}${item.totalAttackBonus}"
+    }
+
+    if (item.totalWeaponDamageBonus != 0) {
+        val sign = if (item.totalWeaponDamageBonus > 0) "+" else ""
+        parts += "Daño ${sign}${item.totalWeaponDamageBonus}"
+    }
+
+    if (item.setName.isNotBlank()) {
+        parts += item.setName
     }
 
     return parts.joinToString(" · ")
@@ -796,30 +903,74 @@ private fun normalizeItemType(raw: String): String {
         .replace("ú", "u")
 }
 
-private fun friendlySlotName(slot: String): String = when (slot.lowercase()) {
-    "head" -> "cabeza"
-    "chest" -> "pecho"
-    "legs" -> "piernas"
-    "feet" -> "pies"
-    "hands" -> "manos"
-    "main_hand" -> "mano principal"
-    "off_hand" -> "mano secundaria"
-    "ring" -> "anillo"
-    "amulet" -> "amuleto"
+private fun friendlySlotName(slot: String): String = when (normalizeItemType(slot)) {
+    "head", "cabeza" -> "cabeza"
+    "chest", "pecho", "torso" -> "pecho"
+    "legs", "piernas" -> "piernas"
+    "feet", "pies" -> "pies"
+    "hands", "manos" -> "manos"
+    "main_hand", "mano principal", "mano_principal" -> "mano principal"
+    "off_hand", "mano secundaria", "mano_secundaria" -> "mano secundaria"
+    "ring", "anillo", "ring1", "anillo1" -> "anillo"
+    "ring2", "anillo2" -> "anillo 2"
+    "amulet", "amuleto" -> "amuleto"
     else -> slot
 }
 
-private fun slotEmoji(slot: String): String = when (slot.lowercase()) {
-    "head" -> "🪖"
-    "chest" -> "🦺"
-    "legs" -> "👖"
-    "feet" -> "🥾"
-    "hands" -> "🧤"
-    "main_hand" -> "⚔️"
-    "off_hand" -> "🛡️"
-    "ring" -> "💍"
-    "amulet" -> "📿"
+private fun slotEmoji(slot: String): String = when (normalizeItemType(slot)) {
+    "head", "cabeza" -> "🪖"
+    "chest", "pecho", "torso" -> "🦺"
+    "legs", "piernas" -> "👖"
+    "feet", "pies" -> "🥾"
+    "hands", "manos" -> "🧤"
+    "main_hand", "mano principal", "mano_principal" -> "⚔️"
+    "off_hand", "mano secundaria", "mano_secundaria" -> "🛡️"
+    "ring", "anillo", "ring1", "anillo1", "ring2", "anillo2" -> "💍"
+    "amulet", "amuleto" -> "📿"
     else -> "📦"
 }
 
 private fun formatMod(value: Int): String = if (value >= 0) "+$value" else "$value"
+
+private fun friendlyRarityName(rarity: String): String = when (rarity.lowercase()) {
+    "common" -> "Común"
+    "uncommon" -> "Poco común"
+    "rare" -> "Raro"
+    "epic" -> "Épico"
+    "legendary" -> "Legendario"
+    else -> rarity.replaceFirstChar { it.uppercase() }
+}
+
+private fun rarityOrder(rarity: String): Int = when (rarity.lowercase()) {
+    "legendary" -> 0
+    "epic" -> 1
+    "rare" -> 2
+    "uncommon" -> 3
+    "common" -> 4
+    else -> 5
+}
+
+private fun itemDisplayOrder(item: Item): Int = when {
+    item.isWeapon -> 0
+    item.isArmor -> 1
+    item.resolvedEquipSlot == "ring" || item.resolvedEquipSlot == "ring2" -> 2
+    item.resolvedEquipSlot == "amulet" -> 3
+    else -> 4
+}
+
+private fun iconForItemType(item: Item): String = when {
+    item.resolvedEquipSlot == "ring" || item.resolvedEquipSlot == "ring2" -> "💍"
+    item.resolvedEquipSlot == "amulet" -> "📿"
+    item.resolvedEquipSlot == "main_hand" -> "⚔️"
+    item.resolvedEquipSlot == "off_hand" && item.name.contains("escudo", ignoreCase = true) -> "🛡️"
+    item.resolvedEquipSlot == "head" -> "🪖"
+    item.resolvedEquipSlot == "chest" -> "🦺"
+    item.resolvedEquipSlot == "legs" -> "👖"
+    item.resolvedEquipSlot == "feet" -> "🥾"
+    item.resolvedEquipSlot == "hands" -> "🧤"
+    item.isWeapon -> "⚔️"
+    item.isArmor -> "🛡️"
+    item.type.contains("pocion", ignoreCase = true) || item.name.contains("poción", ignoreCase = true) -> "🧪"
+    item.type.contains("consum", ignoreCase = true) -> "🍖"
+    else -> "🎒"
+}
