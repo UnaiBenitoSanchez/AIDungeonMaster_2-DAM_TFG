@@ -181,7 +181,12 @@ class InventoryViewModel : ViewModel() {
     // ─────────────────────────────────────────────────────────────────────────
     // EQUIPAR / DESEQUIPAR
     // ─────────────────────────────────────────────────────────────────────────
-    fun equipItem(gameId: String, item: Item, onResult: (String) -> Unit = {}) {
+    fun equipItem(
+        gameId: String,
+        item: Item,
+        targetSlot: String? = null,
+        onResult: (String) -> Unit = {}
+    ) {
         if (!item.isEquippable) {
             onResult("❌ ${item.name} no se puede equipar")
             return
@@ -194,7 +199,10 @@ class InventoryViewModel : ViewModel() {
                     return@launch
                 }
 
-                val slot = item.resolvedEquipSlot
+                val slot = targetSlot?.let(::normalizeEquipSlot)
+                    ?.takeIf { it.isNotBlank() }
+                    ?: resolveActualEquipSlot(char, item)
+
                 if (slot.isBlank()) {
                     onResult("❌ ${item.name} no tiene slot válido")
                     return@launch
@@ -586,10 +594,22 @@ class InventoryViewModel : ViewModel() {
     // ─────────────────────────────────────────────────────────────────────────
     fun useItem(gameId: String, item: Item, hpCurrent: Int, hpMax: Int): String {
         val effect = item.effect.lowercase().trim()
+        val looksHealingItem = item.type.contains("pocion", ignoreCase = true) ||
+                item.type.contains("consum", ignoreCase = true) ||
+                item.name.contains("poción", ignoreCase = true) ||
+                item.name.contains("pocion", ignoreCase = true) ||
+                item.name.contains("elixir", ignoreCase = true) ||
+                item.description.contains("cura", ignoreCase = true) ||
+                item.description.contains("restaura", ignoreCase = true) ||
+                item.description.contains("regenera", ignoreCase = true)
+
         return when {
-            effect.startsWith("cura:") -> {
-                val expr = effect.removePrefix("cura:").trim()
-                val healed = rollDiceExpression(expr)
+            effect.startsWith("cura:") || looksHealingItem -> {
+                val expr = when {
+                    effect.startsWith("cura:") -> effect.removePrefix("cura:").trim()
+                    else -> extractHealingExpression(item)
+                }
+                val healed = rollDiceExpression(expr).coerceAtLeast(1)
                 val newHp = (hpCurrent + healed).coerceAtMost(hpMax)
                 updateHp(gameId, newHp)
                 removeItemFromInventory(gameId, item)
@@ -993,6 +1013,24 @@ class InventoryViewModel : ViewModel() {
         "ring" -> "anillo"
         "amulet" -> "amuleto"
         else -> slot
+    }
+
+    private fun extractHealingExpression(item: Item): String {
+        val candidates = listOf(item.effect, item.description, item.name)
+        val diceRegex = Regex("""(\d*d\d+(?:\+\d+)?)""", RegexOption.IGNORE_CASE)
+
+        for (candidate in candidates) {
+            val found = diceRegex.find(candidate)?.value
+            if (!found.isNullOrBlank()) return found
+        }
+
+        val plainNumberRegex = Regex("""\b(\d+)\b""")
+        for (candidate in candidates) {
+            val found = plainNumberRegex.find(candidate)?.groupValues?.getOrNull(1)
+            if (!found.isNullOrBlank()) return found
+        }
+
+        return "1d4"
     }
 
     // ─────────────────────────────────────────────────────────────────────────

@@ -12,17 +12,17 @@ fun normalizeEquipSlot(raw: String): String {
         .replace("ú", "u")
         .let { slot ->
             when (slot) {
-                "cabeza" -> "head"
-                "pecho", "torso" -> "chest"
-                "piernas" -> "legs"
-                "pies" -> "feet"
-                "manos" -> "hands"
-                "mano_principal", "mano principal", "arma" -> "main_hand"
-                "mano_secundaria", "mano secundaria", "escudo" -> "off_hand"
-                "anillo" -> "ring"
-                "anillo1" -> "ring"
-                "anillo2" -> "ring2"
-                "amuleto" -> "amulet"
+                "cabeza", "casco", "yelmo", "helmet" -> "head"
+                "pecho", "torso", "armadura", "coraza", "peto", "chestplate" -> "chest"
+                "piernas", "grebas", "pantalones", "leggings" -> "legs"
+                "pies", "botas", "boots" -> "feet"
+                "manos", "guantes", "gloves" -> "hands"
+                "mano_principal", "mano principal", "arma", "weapon" -> "main_hand"
+                "mano_secundaria", "mano secundaria", "escudo", "shield" -> "off_hand"
+                "anillo", "ring" -> "ring"
+                "anillo1", "ring1" -> "ring"
+                "anillo2", "ring2" -> "ring2"
+                "amuleto", "amulet" -> "amulet"
                 else -> slot
             }
         }
@@ -95,11 +95,29 @@ data class Item(
             equipSlot.isNotBlank() -> normalizeEquipSlot(equipSlot)
             isWeapon -> "main_hand"
             isArmor && name.contains("escudo", ignoreCase = true) -> "off_hand"
+            isArmor && (
+                    name.contains("casco", ignoreCase = true) ||
+                            name.contains("yelmo", ignoreCase = true) ||
+                            name.contains("helmet", ignoreCase = true)
+                    ) -> "head"
+            isArmor && (
+                    name.contains("guante", ignoreCase = true) ||
+                            name.contains("glove", ignoreCase = true)
+                    ) -> "hands"
+            isArmor && (
+                    name.contains("bota", ignoreCase = true) ||
+                            name.contains("boot", ignoreCase = true)
+                    ) -> "feet"
+            isArmor && (
+                    name.contains("greba", ignoreCase = true) ||
+                            name.contains("pantal", ignoreCase = true) ||
+                            name.contains("legging", ignoreCase = true)
+                    ) -> "legs"
             isArmor -> "chest"
-            name.contains("anillo", ignoreCase = true) -> "ring"
-            name.contains("amuleto", ignoreCase = true) -> "amulet"
-            type.contains("anillo", ignoreCase = true) -> "ring"
-            type.contains("amuleto", ignoreCase = true) -> "amulet"
+            name.contains("anillo", ignoreCase = true) || name.contains("ring", ignoreCase = true) -> "ring"
+            name.contains("amuleto", ignoreCase = true) || name.contains("amulet", ignoreCase = true) -> "amulet"
+            type.contains("anillo", ignoreCase = true) || type.contains("ring", ignoreCase = true) -> "ring"
+            type.contains("amuleto", ignoreCase = true) || type.contains("amulet", ignoreCase = true) -> "amulet"
             else -> ""
         }
 

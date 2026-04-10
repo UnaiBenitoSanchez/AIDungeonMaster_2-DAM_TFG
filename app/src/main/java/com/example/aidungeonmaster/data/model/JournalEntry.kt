@@ -8,8 +8,10 @@ data class JournalEntry(
 
     val timestamp: Long = 0L,
     val chapter: String = "",
+    val chapterIndex: Int = 0,
+    val sceneIndex: Int = 0,
 
-    val type: String = "", // "story", "combat", "loot", "location", "quest", "system"
+    val type: String = "", // story, combat, loot, location, quest, system
     val tags: List<String> = emptyList(),
 
     val locationName: String = "",
@@ -18,5 +20,11 @@ data class JournalEntry(
 
     val hpChange: Int = 0,
     val coinsChange: Int = 0,
-    val xpGained: Int = 0
+    val xpGained: Int = 0,
+
+    val repeatGroupKey: String = "",
+    val repeatCount: Int = 1,
+
+    val toneVersion: String = "normal",
+    val epicText: String = ""
 )

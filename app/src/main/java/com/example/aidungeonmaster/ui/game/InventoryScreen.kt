@@ -49,6 +49,8 @@ fun InventoryScreen(
     var feedbackMsg by remember { mutableStateOf<String?>(null) }
     val pagerState = rememberPagerState(pageCount = { 2 })
 
+    var pendingRingItem by remember { mutableStateOf<Item?>(null) }
+
     LaunchedEffect(feedbackMsg) {
         if (feedbackMsg != null) {
             delay(2500)
@@ -141,8 +143,12 @@ fun InventoryScreen(
                                             feedbackMsg = msg
                                         },
                                         onEquip = { equippable ->
-                                            viewModel.equipItem(gameId, equippable) { msg ->
-                                                feedbackMsg = msg
+                                            if (equippable.resolvedEquipSlot == "ring") {
+                                                pendingRingItem = equippable
+                                            } else {
+                                                viewModel.equipItem(gameId, equippable) { msg ->
+                                                    feedbackMsg = msg
+                                                }
                                             }
                                         }
                                     )
@@ -159,6 +165,20 @@ fun InventoryScreen(
                             }
                         }
                     }
+                }
+
+                pendingRingItem?.let { ringItem ->
+                    RingSlotChooserDialog(
+                        item = ringItem,
+                        currentEquipment = character?.equipment,
+                        onDismiss = { pendingRingItem = null },
+                        onChoose = { chosenSlot ->
+                            pendingRingItem = null
+                            viewModel.equipItem(gameId, ringItem, targetSlot = chosenSlot) { msg ->
+                                feedbackMsg = msg
+                            }
+                        }
+                    )
                 }
 
                 feedbackMsg?.let { msg ->
@@ -973,4 +993,36 @@ private fun iconForItemType(item: Item): String = when {
     item.type.contains("pocion", ignoreCase = true) || item.name.contains("poción", ignoreCase = true) -> "🧪"
     item.type.contains("consum", ignoreCase = true) -> "🍖"
     else -> "🎒"
+}
+
+@Composable
+private fun RingSlotChooserDialog(
+    item: Item,
+    currentEquipment: com.example.aidungeonmaster.data.model.EquippedItems?,
+    onDismiss: () -> Unit,
+    onChoose: (String) -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Elegir slot de anillo") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("¿Dónde quieres equipar ${item.name}?")
+                Text(
+                    text = "Anillo 1: ${currentEquipment?.ring?.name ?: "vacío"}\n" +
+                            "Anillo 2: ${currentEquipment?.ring2?.name ?: "vacío"}",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+        },
+        confirmButton = {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = { onChoose("ring") }) { Text("Anillo 1") }
+                TextButton(onClick = { onChoose("ring2") }) { Text("Anillo 2") }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancelar") }
+        }
+    )
 }
