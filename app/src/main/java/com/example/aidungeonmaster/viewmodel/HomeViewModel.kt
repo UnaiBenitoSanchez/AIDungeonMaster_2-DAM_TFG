@@ -4,7 +4,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.aidungeonmaster.data.model.Character
-import com.example.aidungeonmaster.viewmodel.RankingViewModel
+import com.example.aidungeonmaster.data.repository.CharacterDeletionRepository
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,6 +15,7 @@ import kotlinx.coroutines.tasks.await
 class HomeViewModel : ViewModel() {
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
+    private val deletionRepository = CharacterDeletionRepository(db)
 
     private val _characters = MutableStateFlow<List<Character>>(emptyList())
     val characters = _characters.asStateFlow()
@@ -51,8 +52,7 @@ class HomeViewModel : ViewModel() {
                     .add(charData)
                     .await()
 
-                // 2. Crear documento en partidas/{userId}_{name} con HP y mochila vacía
-                //    Así loadInventory siempre encuentra el documento desde el primer momento
+                // 2. Crear documento base en partidas/{userId}_{name}
                 val charId = "${userId}_${name}"
                 db.collection("partidas")
                     .document(charId)
@@ -65,14 +65,13 @@ class HomeViewModel : ViewModel() {
                             "hpCurrent"      to 20,
                             "inventory"      to emptyList<Any>(),
                             "lastPlayed"     to 0L,
-
                             "xp"             to 0,
                             "level"          to 1
                         ),
                         com.google.firebase.firestore.SetOptions.merge()
                     ).await()
 
-                // 3. Escribir en ranking global (colección pública) — con campos aplanados
+                // 3. Escribir en ranking global
                 db.collection("ranking")
                     .document(charId)
                     .set(
@@ -104,21 +103,23 @@ class HomeViewModel : ViewModel() {
                     val baseList = snapshot.documents.mapNotNull { doc ->
                         doc.toObject(Character::class.java)?.copy(id = doc.id)
                     }
-                    // Enriquecer con HP real y lastPlayed desde partidas
+
                     viewModelScope.launch {
                         val enriched = baseList.map { char ->
                             try {
                                 val charId = "${userId}_${char.name}"
                                 val partidaSnap = db.collection("partidas")
-                                    .document(charId).get().await()
+                                    .document(charId)
+                                    .get()
+                                    .await()
+
                                 if (partidaSnap.exists()) {
                                     char.copy(
-                                        hpMax      = partidaSnap.getLong("hpMax")?.toInt()     ?: char.hpMax,
+                                        hpMax      = partidaSnap.getLong("hpMax")?.toInt() ?: char.hpMax,
                                         hpCurrent  = partidaSnap.getLong("hpCurrent")?.toInt() ?: char.hpCurrent,
-                                        lastPlayed = partidaSnap.getLong("lastPlayed")         ?: 0L,
-
-                                        xp         = partidaSnap.getLong("xp")?.toInt()        ?: char.xp,
-                                        level      = partidaSnap.getLong("level")?.toInt()     ?: char.level
+                                        lastPlayed = partidaSnap.getLong("lastPlayed") ?: 0L,
+                                        xp         = partidaSnap.getLong("xp")?.toInt() ?: char.xp,
+                                        level      = partidaSnap.getLong("level")?.toInt() ?: char.level
                                     )
                                 } else {
                                     char
@@ -127,7 +128,7 @@ class HomeViewModel : ViewModel() {
                                 char
                             }
                         }
-                        // El último jugado aparece arriba
+
                         _characters.value = enriched.sortedByDescending { it.lastPlayed }
                         Log.d("APP_FIRESTORE", "Lista actualizada: ${enriched.size} personajes")
                     }
@@ -148,18 +149,21 @@ class HomeViewModel : ViewModel() {
             val enriched = current.map { char ->
                 try {
                     val charId = "${userId}_${char.name}"
-                    val snap   = db.collection("partidas").document(charId).get().await()
+                    val snap = db.collection("partidas").document(charId).get().await()
                     if (snap.exists()) {
                         char.copy(
-                            hpMax      = snap.getLong("hpMax")?.toInt()     ?: char.hpMax,
+                            hpMax      = snap.getLong("hpMax")?.toInt() ?: char.hpMax,
                             hpCurrent  = snap.getLong("hpCurrent")?.toInt() ?: char.hpCurrent,
-                            lastPlayed = snap.getLong("lastPlayed")         ?: char.lastPlayed,
-
-                            xp         = snap.getLong("xp")?.toInt()        ?: char.xp,
-                            level      = snap.getLong("level")?.toInt()     ?: char.level
+                            lastPlayed = snap.getLong("lastPlayed") ?: char.lastPlayed,
+                            xp         = snap.getLong("xp")?.toInt() ?: char.xp,
+                            level      = snap.getLong("level")?.toInt() ?: char.level
                         )
-                    } else char
-                } catch (e: Exception) { char }
+                    } else {
+                        char
+                    }
+                } catch (e: Exception) {
+                    char
+                }
             }
             _characters.value = enriched.sortedByDescending { it.lastPlayed }
         }
@@ -167,26 +171,17 @@ class HomeViewModel : ViewModel() {
 
     fun deleteCharacter(characterId: String, characterName: String) {
         val userId = auth.currentUser?.uid ?: return
-        val charId = "${userId}_${characterName}"
+
         viewModelScope.launch {
             try {
-                // 1. Borrar de users/{uid}/characters
-                db.collection("users")
-                    .document(userId)
-                    .collection("characters")
-                    .document(characterId)
-                    .delete()
-                    .await()
-
-                // 2. Borrar del ranking global
-                db.collection("ranking")
-                    .document(charId)
-                    .delete()
-                    .await()
-
-                Log.d("APP_SUCCESS", "Personaje y ranking eliminados: $charId")
+                deletionRepository.deleteEverywhere(
+                    userId = userId,
+                    characterName = characterName,
+                    userCharacterDocId = characterId
+                )
+                Log.d("APP_SUCCESS", "Personaje eliminado completamente: ${userId}_${characterName}")
             } catch (e: Exception) {
-                Log.e("APP_ERROR", "Error eliminando: ${e.message}")
+                Log.e("APP_ERROR", "Error eliminando personaje completo: ${e.message}", e)
             }
         }
     }
@@ -211,5 +206,4 @@ class HomeViewModel : ViewModel() {
             }
         }
     }
-
 }

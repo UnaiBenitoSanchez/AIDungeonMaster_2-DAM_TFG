@@ -733,7 +733,7 @@ private fun CombatEndOverlay(victory: Boolean) {
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                if (victory) "Regresando a la aventura..." else "El DM continúa la historia...",
+                if (victory) "Regresando a la aventura..." else "Game over",
                 color = Color.White.copy(0.6f),
                 fontSize = 13.sp,
                 fontFamily = FontFamily.Monospace
