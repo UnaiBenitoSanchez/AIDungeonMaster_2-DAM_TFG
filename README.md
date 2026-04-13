@@ -259,8 +259,3 @@ Proyecto académico de TFG orientado a exploración de:
 Proyecto TFG DAM  
 AIDungeonMaster
 
----
-
-## Licencia
-
-- Licencia académica/no comercial
