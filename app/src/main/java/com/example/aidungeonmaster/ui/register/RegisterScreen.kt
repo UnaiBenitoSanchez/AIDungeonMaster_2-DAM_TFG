@@ -1,17 +1,37 @@
 package com.example.aidungeonmaster.ui.register
 
+import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AlternateEmail
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material3.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -20,6 +40,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -31,8 +52,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.aidungeonmaster.R
 import com.example.aidungeonmaster.viewmodel.AuthViewModel
-import android.widget.Toast
-import androidx.compose.ui.platform.LocalContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -43,7 +62,9 @@ fun RegisterScreen(
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
-    var characterName by remember { mutableStateOf("") }
+    var displayName by remember { mutableStateOf("") }
+    var username by remember { mutableStateOf("") }
+
     val context = LocalContext.current
 
     Box(
@@ -76,7 +97,6 @@ fun RegisterScreen(
         ) {
             Spacer(modifier = Modifier.height(40.dp))
 
-            // Header
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.padding(bottom = 32.dp)
@@ -105,7 +125,6 @@ fun RegisterScreen(
                 )
             }
 
-            // Tarjeta de registro
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -126,108 +145,94 @@ fun RegisterScreen(
                     verticalArrangement = Arrangement.spacedBy(20.dp)
                 ) {
                     Text(
-                        text = "Hoja del Personaje",
+                        text = "Hoja del Aventurero",
                         style = MaterialTheme.typography.headlineMedium,
                         color = MaterialTheme.colorScheme.onSurface
                     )
 
-                    // Nombre del personaje
                     OutlinedTextField(
-                        value = characterName,
-                        onValueChange = { characterName = it },
-                        label = { Text("Nombre del Aventurero") },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Default.Person,
-                                contentDescription = null
-                            )
-                        },
-                        placeholder = { Text("Ej: Aragorn, Gandalf, etc.") },
+                        value = displayName,
+                        onValueChange = { displayName = it },
+                        label = { Text("Nombre visible") },
+                        leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
+                        placeholder = { Text("Ej: Unai García") },
                         modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
-                        ),
+                        colors = OutlinedTextFieldDefaults.colors(),
                         shape = RoundedCornerShape(12.dp)
                     )
 
-                    // Email
+                    OutlinedTextField(
+                        value = username,
+                        onValueChange = {
+                            username = it
+                                .lowercase()
+                                .replace(" ", "_")
+                                .filter { ch -> ch.isLetterOrDigit() || ch == '_' || ch == '.' }
+                        },
+                        label = { Text("Nombre de usuario") },
+                        leadingIcon = { Icon(Icons.Default.AlternateEmail, contentDescription = null) },
+                        placeholder = { Text("Ej: unai_gm") },
+                        modifier = Modifier.fillMaxWidth(),
+                        supportingText = { Text("Será el identificador para buscarte.") },
+                        colors = OutlinedTextFieldDefaults.colors(),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+
                     OutlinedTextField(
                         value = email,
                         onValueChange = { email = it },
                         label = { Text("Pergamino Mágico (Email)") },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Default.Email,
-                                contentDescription = null
-                            )
-                        },
+                        leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
                         modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
-                        ),
+                        colors = OutlinedTextFieldDefaults.colors(),
                         shape = RoundedCornerShape(12.dp)
                     )
 
-                    // Contraseña
                     OutlinedTextField(
                         value = password,
                         onValueChange = { password = it },
                         label = { Text("Sello Secreto (Contraseña)") },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Default.Lock,
-                                contentDescription = null
-                            )
-                        },
+                        leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
                         modifier = Modifier.fillMaxWidth(),
                         visualTransformation = PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
-                        ),
+                        colors = OutlinedTextFieldDefaults.colors(),
                         shape = RoundedCornerShape(12.dp)
                     )
 
-                    // Confirmar contraseña
                     OutlinedTextField(
                         value = confirmPassword,
                         onValueChange = { confirmPassword = it },
                         label = { Text("Confirmar Sello") },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Default.Lock,
-                                contentDescription = null
-                            )
-                        },
+                        leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
                         modifier = Modifier.fillMaxWidth(),
                         visualTransformation = PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
-                        ),
+                        colors = OutlinedTextFieldDefaults.colors(),
                         shape = RoundedCornerShape(12.dp)
                     )
 
-                    // Botón de registro
                     Button(
                         onClick = {
-                            if (password == confirmPassword) {
-                                viewModel.register(email, password) {
-                                    // El registro y el envío del correo fueron exitosos
-                                    Toast.makeText(
-                                        context,
-                                        "¡Revisa tu pergamino mágico! Te hemos enviado un correo de verificación.",
-                                        Toast.LENGTH_LONG
-                                    ).show()
-
-                                    navController.popBackStack()
+                            when {
+                                displayName.isBlank() -> viewModel.errorMessage = "Introduce un nombre visible."
+                                username.length < 3 -> viewModel.errorMessage = "El nombre de usuario debe tener al menos 3 caracteres."
+                                password != confirmPassword -> viewModel.errorMessage = "Las contraseñas no coinciden."
+                                else -> {
+                                    viewModel.register(
+                                        email = email,
+                                        pass = password,
+                                        displayName = displayName,
+                                        username = username
+                                    ) {
+                                        Toast.makeText(
+                                            context,
+                                            "¡Revisa tu correo! Te hemos enviado un email de verificación.",
+                                            Toast.LENGTH_LONG
+                                        ).show()
+                                        navController.popBackStack()
+                                    }
                                 }
-                            } else {
-                                viewModel.errorMessage = "Los sellos mágicos (contraseñas) no coinciden"
                             }
                         },
                         modifier = Modifier
@@ -237,7 +242,11 @@ fun RegisterScreen(
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.tertiary
                         ),
-                        enabled = email.isNotEmpty() && password.isNotEmpty() && confirmPassword.isNotEmpty()
+                        enabled = email.isNotBlank()
+                                && password.isNotBlank()
+                                && confirmPassword.isNotBlank()
+                                && displayName.isNotBlank()
+                                && username.isNotBlank()
                     ) {
                         Text(
                             text = "FORJAR DESTINO",
@@ -246,7 +255,6 @@ fun RegisterScreen(
                         )
                     }
 
-                    // Botón para volver
                     TextButton(
                         onClick = { navController.popBackStack() },
                         modifier = Modifier.fillMaxWidth()
@@ -259,7 +267,6 @@ fun RegisterScreen(
                 }
             }
 
-            // Footer y términos
             Spacer(modifier = Modifier.height(32.dp))
 
             Text(
@@ -270,7 +277,6 @@ fun RegisterScreen(
                 textAlign = TextAlign.Center
             )
 
-            // Mensaje de error
             viewModel.errorMessage?.let {
                 Spacer(modifier = Modifier.height(16.dp))
                 Card(

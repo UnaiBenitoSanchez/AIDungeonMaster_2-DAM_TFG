@@ -35,7 +35,8 @@ import com.example.aidungeonmaster.viewmodel.RankingViewModel
 import com.example.aidungeonmaster.viewmodel.WorldMapViewModel
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.launch
-
+import com.example.aidungeonmaster.ui.social.FriendRequestsScreen
+import com.example.aidungeonmaster.ui.social.UserSearchScreen
 sealed class Screen(val route: String) {
     object Login : Screen("login")
     object Register : Screen("register")
@@ -72,6 +73,9 @@ sealed class Screen(val route: String) {
     object Journal : Screen("journal/{charId}") {
         fun createRoute(charId: String) = "journal/$charId"
     }
+
+    object UserSearch : Screen("user_search")
+    object FriendRequests : Screen("friend_requests")
 }
 
 @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
@@ -241,6 +245,18 @@ fun AppNavigation(navController: NavHostController) {
             val charId = backStackEntry.arguments?.getString("charId") ?: ""
             JournalScreen(
                 charId = charId,
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Screen.UserSearch.route) {
+            UserSearchScreen(
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Screen.FriendRequests.route) {
+            FriendRequestsScreen(
                 onBack = { navController.popBackStack() }
             )
         }

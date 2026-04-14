@@ -42,6 +42,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.GroupAdd
+import androidx.compose.material.icons.filled.Mail
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -69,6 +71,21 @@ fun HomeScreen(navController: NavHostController, viewModel: HomeViewModel = view
             TopAppBar(
                 title = { Text("Tus Personajes", fontWeight = FontWeight.Bold) },
                 actions = {
+                    IconButton(onClick = { navController.navigate(Screen.UserSearch.route) }) {
+                        Icon(
+                            Icons.Default.GroupAdd,
+                            contentDescription = "Buscar amigos",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    IconButton(onClick = { navController.navigate(Screen.FriendRequests.route) }) {
+                        Icon(
+                            Icons.Default.Mail,
+                            contentDescription = "Solicitudes de amistad",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
                     IconButton(onClick = { navController.navigate("ranking") }) {
                         Icon(Icons.Default.EmojiEvents, contentDescription = "Ranking Mundial", tint = Color(0xFFFFD700))
                     }
