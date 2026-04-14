@@ -2,15 +2,21 @@ package com.example.aidungeonmaster.data.repository
 
 import com.example.aidungeonmaster.data.model.AppUser
 import com.example.aidungeonmaster.data.model.FriendRequest
+import com.example.aidungeonmaster.data.model.FriendWithProfile
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
 class SocialRepository {
 
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     fun currentUid(): String? = auth.currentUser?.uid
 
@@ -125,9 +131,35 @@ class SocialRepository {
         require(request.toUid == myUid) { "No puedes aceptar una solicitud que no es tuya." }
 
         val now = System.currentTimeMillis()
+        val friendshipId = buildFriendshipId(request.fromUid, request.toUid)
+        val userA = minOf(request.fromUid, request.toUid)
+        val userB = maxOf(request.fromUid, request.toUid)
+
+        val friendshipRef = db.collection("friendships").document(friendshipId)
+        val requestRef = db.collection("friend_requests").document(request.id)
+
+        val friendForReceiverRef = db.collection("users")
+            .document(request.toUid)
+            .collection("friends")
+            .document(request.fromUid)
+
+        val friendForSenderRef = db.collection("users")
+            .document(request.fromUid)
+            .collection("friends")
+            .document(request.toUid)
 
         db.runBatch { batch ->
-            val requestRef = db.collection("friend_requests").document(request.id)
+            batch.set(
+                friendshipRef,
+                mapOf(
+                    "userA" to userA,
+                    "userB" to userB,
+                    "members" to listOf(userA, userB),
+                    "createdAt" to now,
+                    "createdBy" to myUid
+                )
+            )
+
             batch.update(
                 requestRef,
                 mapOf(
@@ -136,15 +168,27 @@ class SocialRepository {
                 )
             )
 
-            val friendshipId = buildFriendshipId(request.fromUid, request.toUid)
-            val friendshipRef = db.collection("friendships").document(friendshipId)
             batch.set(
-                friendshipRef,
+                friendForReceiverRef,
                 mapOf(
-                    "userA" to minOf(request.fromUid, request.toUid),
-                    "userB" to maxOf(request.fromUid, request.toUid),
-                    "createdAt" to now,
-                    "createdBy" to myUid
+                    "uid" to request.fromUid,
+                    "displayName" to request.fromDisplayName,
+                    "username" to request.fromUsername,
+                    "photoUrl" to "",
+                    "friendshipId" to friendshipId,
+                    "createdAt" to now
+                )
+            )
+
+            batch.set(
+                friendForSenderRef,
+                mapOf(
+                    "uid" to request.toUid,
+                    "displayName" to request.toDisplayName,
+                    "username" to request.toUsername,
+                    "photoUrl" to "",
+                    "friendshipId" to friendshipId,
+                    "createdAt" to now
                 )
             )
         }.await()
@@ -163,6 +207,37 @@ class SocialRepository {
                 )
             )
             .await()
+    }
+
+    fun listenFriends(
+        onChange: (List<FriendWithProfile>) -> Unit,
+        onError: (String) -> Unit
+    ): ListenerRegistration? {
+        val myUid = currentUid() ?: return null
+
+        return db.collection("users")
+            .document(myUid)
+            .collection("friends")
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    onError(error.message ?: "Error escuchando amistades")
+                    return@addSnapshotListener
+                }
+
+                val friends = snapshot?.documents.orEmpty()
+                    .mapNotNull { doc ->
+                        FriendWithProfile(
+                            uid = doc.getString("uid").orEmpty(),
+                            displayName = doc.getString("displayName").orEmpty(),
+                            username = doc.getString("username").orEmpty(),
+                            photoUrl = doc.getString("photoUrl").orEmpty(),
+                            friendshipId = doc.getString("friendshipId").orEmpty()
+                        )
+                    }
+                    .sortedBy { it.username.lowercase() }
+
+                onChange(friends)
+            }
     }
 
     companion object {

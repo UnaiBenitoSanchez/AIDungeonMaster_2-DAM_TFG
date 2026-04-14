@@ -37,6 +37,11 @@ import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.launch
 import com.example.aidungeonmaster.ui.social.FriendRequestsScreen
 import com.example.aidungeonmaster.ui.social.UserSearchScreen
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
+import com.example.aidungeonmaster.ui.social.FriendsListScreen
+import com.example.aidungeonmaster.ui.social.PrivateChatScreen
+
 sealed class Screen(val route: String) {
     object Login : Screen("login")
     object Register : Screen("register")
@@ -76,6 +81,12 @@ sealed class Screen(val route: String) {
 
     object UserSearch : Screen("user_search")
     object FriendRequests : Screen("friend_requests")
+    object FriendsList : Screen("friends_list")
+    object PrivateChat : Screen("private_chat/{friendUid}/{friendName}") {
+        fun createRoute(friendUid: String, friendName: String): String {
+            return "private_chat/$friendUid/$friendName"
+        }
+    }
 }
 
 @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
@@ -257,6 +268,32 @@ fun AppNavigation(navController: NavHostController) {
 
         composable(Screen.FriendRequests.route) {
             FriendRequestsScreen(
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Screen.FriendsList.route) {
+            FriendsListScreen(
+                onBack = { navController.popBackStack() },
+                onOpenChat = { friendUid, friendName ->
+                    navController.navigate(Screen.PrivateChat.createRoute(friendUid, friendName))
+                }
+            )
+        }
+
+        composable(
+            route = Screen.PrivateChat.route,
+            arguments = listOf(
+                navArgument("friendUid") { type = NavType.StringType },
+                navArgument("friendName") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val friendUid = backStackEntry.arguments?.getString("friendUid").orEmpty()
+            val friendName = backStackEntry.arguments?.getString("friendName").orEmpty()
+
+            PrivateChatScreen(
+                friendUid = friendUid,
+                friendName = friendName,
                 onBack = { navController.popBackStack() }
             )
         }

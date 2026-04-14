@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.aidungeonmaster.data.model.AppUser
 import com.example.aidungeonmaster.data.model.FriendRequest
+import com.example.aidungeonmaster.data.model.FriendWithProfile
 import com.example.aidungeonmaster.data.repository.SocialRepository
 import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,6 +15,7 @@ class SocialViewModel : ViewModel() {
 
     private val repository = SocialRepository()
     private var incomingRequestsListener: ListenerRegistration? = null
+    private var friendsListener: ListenerRegistration? = null
 
     private val _searchResults = MutableStateFlow<List<AppUser>>(emptyList())
     val searchResults = _searchResults.asStateFlow()
@@ -21,15 +23,14 @@ class SocialViewModel : ViewModel() {
     private val _incomingRequests = MutableStateFlow<List<FriendRequest>>(emptyList())
     val incomingRequests = _incomingRequests.asStateFlow()
 
+    private val _friends = MutableStateFlow<List<FriendWithProfile>>(emptyList())
+    val friends = _friends.asStateFlow()
+
     private val _isSearching = MutableStateFlow(false)
     val isSearching = _isSearching.asStateFlow()
 
     private val _message = MutableStateFlow<String?>(null)
     val message = _message.asStateFlow()
-
-    init {
-        startIncomingRequestsListener()
-    }
 
     fun searchUsers(query: String) {
         viewModelScope.launch {
@@ -44,6 +45,34 @@ class SocialViewModel : ViewModel() {
         }
     }
 
+    fun startIncomingRequestsListener() {
+        if (incomingRequestsListener != null) return
+
+        incomingRequestsListener = repository.listenIncomingRequests(
+            onChange = { _incomingRequests.value = it },
+            onError = { _message.value = it }
+        )
+    }
+
+    fun stopIncomingRequestsListener() {
+        incomingRequestsListener?.remove()
+        incomingRequestsListener = null
+    }
+
+    fun startFriendsListener() {
+        if (friendsListener != null) return
+
+        friendsListener = repository.listenFriends(
+            onChange = { _friends.value = it },
+            onError = { _message.value = it }
+        )
+    }
+
+    fun stopFriendsListener() {
+        friendsListener?.remove()
+        friendsListener = null
+    }
+
     fun sendFriendRequest(user: AppUser) {
         viewModelScope.launch {
             try {
@@ -53,14 +82,6 @@ class SocialViewModel : ViewModel() {
                 _message.value = e.message ?: "No se pudo enviar la solicitud"
             }
         }
-    }
-
-    private fun startIncomingRequestsListener() {
-        incomingRequestsListener?.remove()
-        incomingRequestsListener = repository.listenIncomingRequests(
-            onChange = { _incomingRequests.value = it },
-            onError = { _message.value = it }
-        )
     }
 
     fun acceptRequest(request: FriendRequest) {
@@ -90,7 +111,8 @@ class SocialViewModel : ViewModel() {
     }
 
     override fun onCleared() {
-        incomingRequestsListener?.remove()
+        stopIncomingRequestsListener()
+        stopFriendsListener()
         super.onCleared()
     }
 }
