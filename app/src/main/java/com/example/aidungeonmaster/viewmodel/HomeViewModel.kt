@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.aidungeonmaster.data.model.Character
 import com.example.aidungeonmaster.data.repository.CharacterDeletionRepository
+import com.example.aidungeonmaster.data.repository.SocialRepository
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,6 +17,7 @@ class HomeViewModel : ViewModel() {
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
     private val deletionRepository = CharacterDeletionRepository(db)
+    private val socialRepository = SocialRepository()
 
     private val _characters = MutableStateFlow<List<Character>>(emptyList())
     val characters = _characters.asStateFlow()
@@ -187,8 +189,11 @@ class HomeViewModel : ViewModel() {
     }
 
     fun logout(onLogout: () -> Unit) {
-        FirebaseAuth.getInstance().signOut()
-        onLogout()
+        viewModelScope.launch {
+            runCatching { socialRepository.updatePresence(false) }
+            FirebaseAuth.getInstance().signOut()
+            onLogout()
+        }
     }
 
     fun updateCharacterTheme(characterId: String, theme: String) {

@@ -1,22 +1,24 @@
 package com.example.aidungeonmaster.data.repository
 
+import android.content.Context
+import android.net.Uri
 import com.example.aidungeonmaster.data.model.AppUser
 import com.example.aidungeonmaster.data.model.FriendRequest
 import com.example.aidungeonmaster.data.model.FriendWithProfile
+import com.example.aidungeonmaster.data.model.Guild
+import com.example.aidungeonmaster.data.model.GuildMembership
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.DocumentSnapshot
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
 class SocialRepository {
 
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val friendProfileListeners = mutableListOf<ListenerRegistration>()
 
     fun currentUid(): String? = auth.currentUser?.uid
 
@@ -28,7 +30,7 @@ class SocialRepository {
         val usernameResults = db.collection("users")
             .orderBy("usernameLower")
             .startAt(q)
-            .endAt(q + "\uf8ff")
+            .endAt(q + "")
             .limit(20)
             .get()
             .await()
@@ -37,7 +39,7 @@ class SocialRepository {
         val displayResults = db.collection("users")
             .orderBy("displayNameLower")
             .startAt(q)
-            .endAt(q + "\uf8ff")
+            .endAt(q + "")
             .limit(20)
             .get()
             .await()
@@ -45,9 +47,7 @@ class SocialRepository {
 
         return (usernameResults + displayResults)
             .distinctBy { it.id }
-            .mapNotNull { doc ->
-                doc.toObject(AppUser::class.java)?.copy(uid = doc.id)
-            }
+            .mapNotNull { doc -> doc.toAppUser() }
             .filter { it.uid != myUid }
             .sortedBy { it.usernameLower }
     }
@@ -57,7 +57,7 @@ class SocialRepository {
         require(targetUser.uid != myUid) { "No puedes enviarte una solicitud a ti mismo." }
 
         val myDoc = db.collection("users").document(myUid).get().await()
-        val me = myDoc.toObject(AppUser::class.java)?.copy(uid = myDoc.id)
+        val me = myDoc.toAppUser()
             ?: throw IllegalStateException("No se encontró tu perfil público.")
 
         val existingPendingSent = db.collection("friend_requests")
@@ -96,9 +96,7 @@ class SocialRepository {
             updatedAt = now
         )
 
-        db.collection("friend_requests")
-            .add(payload)
-            .await()
+        db.collection("friend_requests").add(payload).await()
     }
 
     fun listenIncomingRequests(
@@ -117,9 +115,7 @@ class SocialRepository {
                 }
 
                 val requests = snapshot?.documents.orEmpty()
-                    .mapNotNull { doc ->
-                        doc.toObject(FriendRequest::class.java)?.copy(id = doc.id)
-                    }
+                    .mapNotNull { doc -> doc.toObject(FriendRequest::class.java)?.copy(id = doc.id) }
                     .sortedByDescending { it.createdAt }
 
                 onChange(requests)
@@ -137,12 +133,10 @@ class SocialRepository {
 
         val friendshipRef = db.collection("friendships").document(friendshipId)
         val requestRef = db.collection("friend_requests").document(request.id)
-
         val friendForReceiverRef = db.collection("users")
             .document(request.toUid)
             .collection("friends")
             .document(request.fromUid)
-
         val friendForSenderRef = db.collection("users")
             .document(request.fromUid)
             .collection("friends")
@@ -160,13 +154,7 @@ class SocialRepository {
                 )
             )
 
-            batch.update(
-                requestRef,
-                mapOf(
-                    "status" to "accepted",
-                    "updatedAt" to now
-                )
-            )
+            batch.update(requestRef, mapOf("status" to "accepted", "updatedAt" to now))
 
             batch.set(
                 friendForReceiverRef,
@@ -200,12 +188,7 @@ class SocialRepository {
 
         db.collection("friend_requests")
             .document(request.id)
-            .update(
-                mapOf(
-                    "status" to "rejected",
-                    "updatedAt" to System.currentTimeMillis()
-                )
-            )
+            .update(mapOf("status" to "rejected", "updatedAt" to System.currentTimeMillis()))
             .await()
     }
 
@@ -214,6 +197,9 @@ class SocialRepository {
         onError: (String) -> Unit
     ): ListenerRegistration? {
         val myUid = currentUid() ?: return null
+        clearFriendProfileListeners()
+
+        val liveFriends = linkedMapOf<String, FriendWithProfile>()
 
         return db.collection("users")
             .document(myUid)
@@ -224,20 +210,404 @@ class SocialRepository {
                     return@addSnapshotListener
                 }
 
-                val friends = snapshot?.documents.orEmpty()
-                    .mapNotNull { doc ->
-                        FriendWithProfile(
-                            uid = doc.getString("uid").orEmpty(),
-                            displayName = doc.getString("displayName").orEmpty(),
-                            username = doc.getString("username").orEmpty(),
-                            photoUrl = doc.getString("photoUrl").orEmpty(),
-                            friendshipId = doc.getString("friendshipId").orEmpty()
-                        )
-                    }
-                    .sortedBy { it.username.lowercase() }
+                clearFriendProfileListeners()
+                liveFriends.clear()
 
-                onChange(friends)
+                val baseDocs = snapshot?.documents.orEmpty()
+                if (baseDocs.isEmpty()) {
+                    onChange(emptyList())
+                    return@addSnapshotListener
+                }
+
+                baseDocs.forEach { doc ->
+                    val friendUid = doc.getString("uid").orEmpty()
+                    val friendshipId = doc.getString("friendshipId").orEmpty()
+                    if (friendUid.isBlank()) return@forEach
+
+                    val reg = db.collection("users")
+                        .document(friendUid)
+                        .addSnapshotListener { userSnapshot, userError ->
+                            if (userError != null) {
+                                onError(userError.message ?: "Error escuchando perfiles de amigos")
+                                return@addSnapshotListener
+                            }
+
+                            val user = userSnapshot?.toAppUser()
+                            if (user == null) {
+                                liveFriends.remove(friendUid)
+                            } else {
+                                liveFriends[friendUid] = FriendWithProfile(
+                                    uid = user.uid,
+                                    displayName = user.displayName,
+                                    username = user.username,
+                                    photoUrl = user.photoUrl,
+                                    friendshipId = friendshipId,
+                                    bio = user.bio,
+                                    accentColor = user.accentColor,
+                                    profileBackgroundColor = user.profileBackgroundColor,
+                                    isOnline = user.isOnline,
+                                    lastSeen = user.lastSeen
+                                )
+                            }
+
+                            onChange(liveFriends.values.sortedBy { it.username.lowercase() })
+                        }
+
+                    friendProfileListeners += reg
+                }
             }
+    }
+
+    suspend fun getUserProfile(userUid: String): AppUser {
+        val snap = db.collection("users").document(userUid).get().await()
+        return snap.toAppUser()
+            ?: throw IllegalStateException("No se pudo cargar el perfil.")
+    }
+
+    suspend fun updateMyProfile(
+        displayName: String,
+        bio: String,
+        accentColor: String,
+        profileBackgroundColor: String
+    ) {
+        val myUid = currentUid() ?: throw IllegalStateException("Usuario no autenticado")
+        val now = System.currentTimeMillis()
+
+        db.collection("users")
+            .document(myUid)
+            .update(
+                mapOf(
+                    "displayName" to displayName.trim(),
+                    "displayNameLower" to displayName.trim().lowercase(),
+                    "bio" to bio.trim(),
+
+                    // Esquema usado por la app
+                    "accentColor" to accentColor,
+                    "profileBackgroundColor" to profileBackgroundColor,
+
+                    // Esquema esperado por tus reglas
+                    "profileAccentColor" to accentColor,
+                    "profilePrimaryColor" to profileBackgroundColor,
+                    "profileSecondaryColor" to profileBackgroundColor,
+
+                    "updatedAt" to now
+                )
+            )
+            .await()
+    }
+
+    suspend fun updatePresence(isOnline: Boolean) {
+        val uid = auth.currentUser?.uid ?: return
+        val now = System.currentTimeMillis()
+
+        db.collection("users")
+            .document(uid)
+            .update(
+                mapOf(
+                    "isOnline" to isOnline,
+                    "lastSeen" to now,
+                    "updatedAt" to now
+                )
+            )
+            .await()
+    }
+
+    suspend fun updateMyProfilePhoto(context: Context, uri: Uri) {
+        val myUid = currentUid() ?: throw IllegalStateException("Usuario no autenticado")
+
+        val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+            ?: throw IllegalStateException("No se pudo leer la imagen seleccionada")
+
+        val originalBitmap = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+            ?: throw IllegalStateException("No se pudo decodificar la imagen")
+
+        val maxSize = 256
+        val ratio = minOf(
+            maxSize.toFloat() / originalBitmap.width.toFloat(),
+            maxSize.toFloat() / originalBitmap.height.toFloat(),
+            1f
+        )
+
+        val targetWidth = (originalBitmap.width * ratio).toInt().coerceAtLeast(1)
+        val targetHeight = (originalBitmap.height * ratio).toInt().coerceAtLeast(1)
+
+        val scaledBitmap = android.graphics.Bitmap.createScaledBitmap(
+            originalBitmap,
+            targetWidth,
+            targetHeight,
+            true
+        )
+
+        var quality = 75
+        var finalBytes: ByteArray
+
+        do {
+            val outputStream = java.io.ByteArrayOutputStream()
+            scaledBitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, quality, outputStream)
+            finalBytes = outputStream.toByteArray()
+            quality -= 10
+        } while (finalBytes.size > 350_000 && quality >= 25)
+
+        val base64 = android.util.Base64.encodeToString(finalBytes, android.util.Base64.NO_WRAP)
+        val dataUrl = "data:image/jpeg;base64,$base64"
+
+        db.collection("users")
+            .document(myUid)
+            .update(
+                mapOf(
+                    "photoUrl" to dataUrl,
+                    "updatedAt" to System.currentTimeMillis()
+                )
+            )
+            .await()
+    }
+
+    suspend fun createGuild(name: String, description: String, accentColor: String, bannerColor: String) {
+        val myUid = currentUid() ?: throw IllegalStateException("Usuario no autenticado")
+        val me = getUserProfile(myUid)
+        val guildName = name.trim()
+        require(guildName.length >= 3) { "El nombre del gremio debe tener al menos 3 caracteres." }
+
+        val now = System.currentTimeMillis()
+        val guildRef = db.collection("guilds").document()
+
+        val guild = Guild(
+            id = guildRef.id,
+            name = guildName,
+            nameLower = guildName.lowercase(),
+            description = description.trim(),
+            ownerUid = myUid,
+            ownerDisplayName = me.displayName,
+            accentColor = accentColor,
+            bannerColor = bannerColor,
+            memberCount = 1,
+            createdAt = now,
+            updatedAt = now,
+            joined = false
+        )
+
+        val membership = GuildMembership(
+            guildId = guildRef.id,
+            uid = myUid,
+            role = "owner",
+            joinedAt = now,
+            displayName = me.displayName,
+            username = me.username
+        )
+
+        db.runBatch { batch ->
+            batch.set(guildRef, guild)
+            batch.set(guildRef.collection("members").document(myUid), membership)
+            batch.set(
+                db.collection("users").document(myUid).collection("guilds").document(guildRef.id),
+                mapOf(
+                    "guildId" to guildRef.id,
+                    "name" to guildName,
+                    "accentColor" to accentColor,
+                    "bannerColor" to bannerColor,
+                    "joinedAt" to now,
+                    "role" to "owner"
+                )
+            )
+        }.await()
+    }
+
+    suspend fun searchGuilds(query: String): List<Guild> {
+        val q = query.trim().lowercase()
+        if (q.isBlank()) return emptyList()
+        val myUid = currentUid().orEmpty()
+
+        val memberGuildIds = db.collection("users")
+            .document(myUid)
+            .collection("guilds")
+            .get()
+            .await()
+            .documents
+            .map { it.id }
+            .toSet()
+
+        return db.collection("guilds")
+            .orderBy("nameLower")
+            .startAt(q)
+            .endAt(q + "")
+            .limit(20)
+            .get()
+            .await()
+            .documents
+            .mapNotNull { doc ->
+                doc.toObject(Guild::class.java)?.copy(
+                    id = doc.id,
+                    joined = memberGuildIds.contains(doc.id)
+                )
+            }
+            .sortedBy { it.nameLower }
+    }
+
+    suspend fun joinGuild(guild: Guild) {
+        val myUid = auth.currentUser?.uid ?: throw IllegalStateException("Usuario no autenticado")
+        val me = getUserProfile(myUid)
+        val now = System.currentTimeMillis()
+
+        val guildRef = db.collection("guilds").document(guild.id)
+        val memberRef = guildRef.collection("members").document(myUid)
+        val userGuildRef = db.collection("users")
+            .document(myUid)
+            .collection("guilds")
+            .document(guild.id)
+
+        val guildSnap = guildRef.get().await()
+        if (!guildSnap.exists()) {
+            throw IllegalStateException("El gremio ya no existe.")
+        }
+
+        val memberSnap = memberRef.get().await()
+        val userGuildSnap = userGuildRef.get().await()
+
+        // Ya estaba unido correctamente
+        if (memberSnap.exists() && userGuildSnap.exists()) {
+            throw IllegalStateException("Ya formas parte de este gremio.")
+        }
+
+        val membership = mapOf(
+            "guildId" to guild.id,
+            "uid" to myUid,
+            "role" to "member",
+            "joinedAt" to now,
+            "displayName" to me.displayName,
+            "username" to me.username
+        )
+
+        val currentMemberCount = (guildSnap.getLong("memberCount") ?: 0L).toInt()
+        val nextMemberCount = if (memberSnap.exists()) currentMemberCount else currentMemberCount + 1
+
+        val userGuild = mapOf(
+            "guildId" to guild.id,
+            "name" to guild.name,
+            "accentColor" to guild.accentColor,
+            "bannerColor" to guild.bannerColor,
+            "joinedAt" to now,
+            "role" to "member"
+        )
+
+        db.runBatch { batch ->
+            if (!memberSnap.exists()) {
+                batch.set(memberRef, membership)
+                batch.update(
+                    guildRef,
+                    mapOf(
+                        "memberCount" to FieldValue.increment(1),
+                        "updatedAt" to now
+                    )
+                )
+            }
+
+            if (!userGuildSnap.exists()) {
+                batch.set(userGuildRef, userGuild)
+            }
+        }.await()
+    }
+
+    fun listenMyGuilds(
+        onChange: (List<Guild>) -> Unit,
+        onError: (String) -> Unit
+    ): ListenerRegistration? {
+        val myUid = currentUid() ?: return null
+
+        val guildDocListeners = mutableListOf<ListenerRegistration>()
+        val liveGuilds = linkedMapOf<String, Guild>()
+
+        return db.collection("users")
+            .document(myUid)
+            .collection("guilds")
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    onError(error.message ?: "Error escuchando gremios")
+                    return@addSnapshotListener
+                }
+
+                guildDocListeners.forEach { it.remove() }
+                guildDocListeners.clear()
+                liveGuilds.clear()
+
+                val docs = snapshot?.documents.orEmpty()
+                if (docs.isEmpty()) {
+                    onChange(emptyList())
+                    return@addSnapshotListener
+                }
+
+                docs.forEach { userGuildDoc ->
+                    val guildId = userGuildDoc.getString("guildId").orEmpty()
+                    if (guildId.isBlank()) return@forEach
+
+                    val reg = db.collection("guilds")
+                        .document(guildId)
+                        .addSnapshotListener { guildSnapshot, guildError ->
+                            if (guildError != null) {
+                                onError(guildError.message ?: "Error escuchando datos del gremio")
+                                return@addSnapshotListener
+                            }
+
+                            if (guildSnapshot == null || !guildSnapshot.exists()) {
+                                liveGuilds.remove(guildId)
+                            } else {
+                                liveGuilds[guildId] = Guild(
+                                    id = guildSnapshot.id,
+                                    name = guildSnapshot.getString("name").orEmpty(),
+                                    nameLower = guildSnapshot.getString("nameLower").orEmpty(),
+                                    description = guildSnapshot.getString("description").orEmpty(),
+                                    ownerUid = guildSnapshot.getString("ownerUid").orEmpty(),
+                                    ownerDisplayName = guildSnapshot.getString("ownerDisplayName").orEmpty(),
+                                    accentColor = guildSnapshot.getString("accentColor") ?: "#8E24AA",
+                                    bannerColor = guildSnapshot.getString("bannerColor") ?: "#1F1235",
+                                    memberCount = (guildSnapshot.getLong("memberCount") ?: 0L).toInt(),
+                                    createdAt = guildSnapshot.getLong("createdAt") ?: 0L,
+                                    updatedAt = guildSnapshot.getLong("updatedAt") ?: 0L,
+                                    joined = true
+                                )
+                            }
+
+                            onChange(liveGuilds.values.sortedBy { it.name.lowercase() })
+                        }
+
+                    guildDocListeners += reg
+                }
+            }
+    }
+
+    private fun clearFriendProfileListeners() {
+        friendProfileListeners.forEach { it.remove() }
+        friendProfileListeners.clear()
+    }
+
+    private fun DocumentSnapshot.toAppUser(): AppUser? {
+        if (!exists()) return null
+
+        val accent = getString("profileAccentColor")
+            ?.takeIf { it.isNotBlank() }
+            ?: getString("accentColor")
+            ?: "#D4AF37"
+
+        val background = getString("profilePrimaryColor")
+            ?.takeIf { it.isNotBlank() }
+            ?: getString("profileBackgroundColor")
+            ?: "#1E1E1E"
+
+        return AppUser(
+            uid = id,
+            email = getString("email").orEmpty(),
+            displayName = getString("displayName").orEmpty(),
+            displayNameLower = getString("displayNameLower").orEmpty(),
+            username = getString("username").orEmpty(),
+            usernameLower = getString("usernameLower").orEmpty(),
+            photoUrl = getString("photoUrl").orEmpty(),
+            bio = getString("bio").orEmpty(),
+            accentColor = accent,
+            profileBackgroundColor = background,
+            isOnline = getBoolean("isOnline") ?: false,
+            lastSeen = getLong("lastSeen") ?: 0L,
+            createdAt = getLong("createdAt") ?: 0L,
+            updatedAt = getLong("updatedAt") ?: 0L
+        )
     }
 
     companion object {

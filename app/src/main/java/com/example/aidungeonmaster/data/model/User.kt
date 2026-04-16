@@ -8,6 +8,11 @@ data class AppUser(
     val username: String = "",
     val usernameLower: String = "",
     val photoUrl: String = "",
+    val bio: String = "",
+    val accentColor: String = "#D4AF37",
+    val profileBackgroundColor: String = "#1E1E1E",
+    val isOnline: Boolean = false,
+    val lastSeen: Long = 0L,
     val createdAt: Long = 0L,
     val updatedAt: Long = 0L
 )

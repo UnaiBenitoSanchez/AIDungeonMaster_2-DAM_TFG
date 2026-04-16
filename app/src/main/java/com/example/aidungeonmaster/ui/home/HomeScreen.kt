@@ -208,6 +208,10 @@ fun HomeScreen(
     if (showSocialSheet) {
         SocialMenuSheet(
             onDismiss = { showSocialSheet = false },
+            onMyProfile = {
+                showSocialSheet = false
+                navController.navigate(Screen.MyProfile.route)
+            },
             onSearchUsers = {
                 showSocialSheet = false
                 navController.navigate(Screen.UserSearch.route)
@@ -219,6 +223,10 @@ fun HomeScreen(
             onFriendsList = {
                 showSocialSheet = false
                 navController.navigate(Screen.FriendsList.route)
+            },
+            onGuilds = {
+                showSocialSheet = false
+                navController.navigate(Screen.Guilds.route)
             }
         )
     }

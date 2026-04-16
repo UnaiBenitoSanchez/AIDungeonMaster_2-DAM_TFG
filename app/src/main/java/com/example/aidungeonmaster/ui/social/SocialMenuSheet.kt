@@ -8,8 +8,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.GroupAdd
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Mail
 import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -25,9 +27,11 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun SocialMenuSheet(
     onDismiss: () -> Unit,
+    onMyProfile: () -> Unit,
     onSearchUsers: () -> Unit,
     onFriendRequests: () -> Unit,
-    onFriendsList: () -> Unit
+    onFriendsList: () -> Unit,
+    onGuilds: () -> Unit
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -47,6 +51,13 @@ fun SocialMenuSheet(
             )
 
             SocialActionCard(
+                title = "Mi perfil",
+                subtitle = "Personaliza colores, biografía y presencia",
+                icon = { Icon(Icons.Default.Person, contentDescription = null) },
+                onClick = onMyProfile
+            )
+
+            SocialActionCard(
                 title = "Buscar aventureros",
                 subtitle = "Busca usuarios y envía solicitudes",
                 icon = { Icon(Icons.Default.GroupAdd, contentDescription = null) },
@@ -62,9 +73,16 @@ fun SocialMenuSheet(
 
             SocialActionCard(
                 title = "Mis amigos",
-                subtitle = "Abre un chat privado con tus amigos",
+                subtitle = "Abre perfiles y chatea por separado",
                 icon = { Icon(Icons.Default.People, contentDescription = null) },
                 onClick = onFriendsList
+            )
+
+            SocialActionCard(
+                title = "Gremios",
+                subtitle = "Crea un gremio o únete a uno existente",
+                icon = { Icon(Icons.Default.Groups, contentDescription = null) },
+                onClick = onGuilds
             )
         }
     }

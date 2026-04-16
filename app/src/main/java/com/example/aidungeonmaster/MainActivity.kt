@@ -1,12 +1,15 @@
 package com.example.aidungeonmaster
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.RequiresApi
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -20,56 +23,31 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
 import androidx.navigation.compose.rememberNavController
 import com.example.aidungeonmaster.navigation.AppNavigation
 import com.example.aidungeonmaster.ui.theme.AIDungeonMasterTheme
-import androidx.core.view.WindowCompat
 
 class MainActivity : ComponentActivity() {
 
-    // ── Estado compartido con el Composable para mostrar el diálogo ──────────
-    private val showLocationRationale = mutableStateOf(false)
+    private val pendingPermissions = ArrayDeque<String>()
+    private val showPermissionRationale = mutableStateOf(false)
+    private var currentPermission by mutableStateOf<String?>(null)
 
-    // ── Launcher para solicitar el permiso POST_NOTIFICATIONS (Android 13+) ──
-    private val notificationPermissionLauncher = registerForActivityResult(
+    private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { /* El usuario puede activarlo luego desde Ajustes si rechaza. */ }
-
-    // ── Launcher para solicitar ubicación precisa + aproximada juntas ─────────
-    private val locationPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { grants ->
-        val fineGranted   = grants[Manifest.permission.ACCESS_FINE_LOCATION]   == true
-        val coarseGranted = grants[Manifest.permission.ACCESS_COARSE_LOCATION] == true
-        if (!fineGranted && !coarseGranted) {
-            // El usuario denegó ambos: el worker de supermercados no funcionará,
-            // pero la app sigue operativa. Podríamos informarle si quisiéramos.
-        }
+    ) { _ ->
+        requestNextPermissionInQueue()
     }
 
+    @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // ── 1. Permiso de notificaciones (Android 13+) ────────────────────────
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(
-                    this, Manifest.permission.POST_NOTIFICATIONS
-                ) != PackageManager.PERMISSION_GRANTED
-            ) {
-                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-            }
-        }
-
-        // ── 2. Permiso de ubicación ───────────────────────────────────────────
-        requestLocationPermissionIfNeeded()
-
-        // ── Configuración de barras del sistema ───────────────────────────────
         WindowCompat.setDecorFitsSystemWindows(window, false)
         val windowInsetsController = WindowCompat.getInsetsController(window, window.decorView)
         windowInsetsController?.isAppearanceLightStatusBars = false
@@ -77,122 +55,107 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             AIDungeonMasterTheme {
-                androidx.compose.material3.Surface(
-                    color    = Color.Black,
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    // ── Diálogo de justificación de ubicación ─────────────────
-                    val showRationale by showLocationRationale
-
+                androidx.compose.material3.Surface(color = Color.Black, modifier = Modifier.fillMaxSize()) {
+                    val showRationale by showPermissionRationale
                     if (showRationale) {
-                        LocationPermissionRationaleDialog(
+                        PermissionRationaleDialog(
+                            permission = currentPermission,
                             onConfirm = {
-                                showLocationRationale.value = false
-                                launchLocationPermission()
+                                showPermissionRationale.value = false
+                                currentPermission?.let { permissionLauncher.launch(it) }
                             },
                             onDismiss = {
-                                showLocationRationale.value = false
+                                showPermissionRationale.value = false
+                                requestNextPermissionInQueue()
                             }
                         )
                     }
 
                     Scaffold(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .windowInsetsPadding(WindowInsets.safeDrawing)
+                        modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)
                     ) { paddingValues ->
                         val navController = rememberNavController()
-                        androidx.compose.foundation.layout.Box(
-                            modifier = Modifier.padding(paddingValues)
-                        ) {
+                        Box(modifier = Modifier.padding(paddingValues)) {
                             AppNavigation(navController = navController)
                         }
                     }
                 }
             }
         }
+
+        launchInitialPermissionFlowIfNeeded()
     }
 
-    // ── Lógica de solicitud de ubicación ─────────────────────────────────────
+    private fun launchInitialPermissionFlowIfNeeded() {
+        val prefs = getSharedPreferences("first_run_permissions", Context.MODE_PRIVATE)
+        if (prefs.getBoolean("done", false)) return
 
-    private fun requestLocationPermissionIfNeeded() {
-        val fineGranted = ContextCompat.checkSelfPermission(
-            this, Manifest.permission.ACCESS_FINE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED
+        buildInitialPermissionQueue()
+        requestNextPermissionInQueue()
+        prefs.edit().putBoolean("done", true).apply()
+    }
 
-        val coarseGranted = ContextCompat.checkSelfPermission(
-            this, Manifest.permission.ACCESS_COARSE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED
+    private fun buildInitialPermissionQueue() {
+        pendingPermissions.clear()
 
-        if (fineGranted || coarseGranted) return  // Ya tenemos permiso, nada que hacer
-
-        // Si Android recomienda mostrar una justificación previa, la mostramos
-        // mediante el diálogo Compose (se activa en el setContent de arriba)
-        if (shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_FINE_LOCATION)) {
-            showLocationRationale.value = true
-        } else {
-            // Primera vez o "No volver a preguntar" → pedimos directamente
-            launchLocationPermission()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !hasPermission(Manifest.permission.POST_NOTIFICATIONS)) {
+            pendingPermissions.add(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        if (!hasPermission(Manifest.permission.CAMERA)) {
+            pendingPermissions.add(Manifest.permission.CAMERA)
+        }
+        if (!hasPermission(Manifest.permission.ACCESS_FINE_LOCATION)) {
+            pendingPermissions.add(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+        if (!hasPermission(Manifest.permission.ACCESS_COARSE_LOCATION)) {
+            pendingPermissions.add(Manifest.permission.ACCESS_COARSE_LOCATION)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !hasPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION)) {
+            pendingPermissions.add(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
         }
     }
 
-    private fun launchLocationPermission() {
-        locationPermissionLauncher.launch(
-            arrayOf(
-                Manifest.permission.ACCESS_FINE_LOCATION,
-                Manifest.permission.ACCESS_COARSE_LOCATION
-            )
-        )
+    private fun requestNextPermissionInQueue() {
+        while (pendingPermissions.isNotEmpty()) {
+            val nextPermission = pendingPermissions.removeFirst()
+            if (hasPermission(nextPermission)) continue
+
+            currentPermission = nextPermission
+            if (shouldShowRequestPermissionRationale(nextPermission)) {
+                showPermissionRationale.value = true
+            } else {
+                permissionLauncher.launch(nextPermission)
+            }
+            return
+        }
+        currentPermission = null
+    }
+
+    private fun hasPermission(permission: String): Boolean {
+        return ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
     }
 }
 
-// ── Diálogo de justificación ─────────────────────────────────────────────────
-
-/**
- * Explica al usuario POR QUÉ la app necesita la ubicación antes de lanzar
- * el diálogo del sistema. Es una buena práctica recomendada por Google cuando
- * [shouldShowRequestPermissionRationale] devuelve true.
- */
 @Composable
-private fun LocationPermissionRationaleDialog(
+private fun PermissionRationaleDialog(
+    permission: String?,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val (title, body) = when (permission) {
+        Manifest.permission.POST_NOTIFICATIONS -> "Permiso de notificaciones" to "Se usa para avisos de inactividad, ranking y eventos del juego."
+        Manifest.permission.CAMERA -> "Permiso de cámara" to "Se usa para escanear QR, reconocer texto y activar funciones contextuales."
+        Manifest.permission.ACCESS_FINE_LOCATION,
+        Manifest.permission.ACCESS_COARSE_LOCATION -> "Permiso de ubicación" to "Se usa para funciones contextuales, detección de lugares cercanos y exploración del mundo."
+        Manifest.permission.ACCESS_BACKGROUND_LOCATION -> "Ubicación en segundo plano" to "Permite mantener activas las mecánicas contextuales y los recordatorios geolocalizados aunque no tengas la app abierta."
+        else -> "Permiso" to "La aplicación necesita este permiso para funcionar correctamente."
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("📍 Permiso de ubicación") },
-        text  = {
-            Text(
-                "AI Dungeon Master necesita conocer tu ubicación para detectar " +
-                        "supermercados cercanos y convertirlos en tiendas de aventuras.\n\n" +
-                        "Tu posición nunca se almacena ni se comparte; solo se usa para " +
-                        "buscar comercios en un radio de 500 m."
-            )
-        },
-        confirmButton = {
-            Button(onClick = onConfirm) {
-                Text("Conceder permiso")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Ahora no")
-            }
-        }
+        title = { Text(title) },
+        text = { Text(body) },
+        confirmButton = { Button(onClick = onConfirm) { Text("Continuar") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Saltar") } }
     )
-}
-
-// ── Preview ───────────────────────────────────────────────────────────────────
-
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(text = "Hello $name!", modifier = modifier)
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    AIDungeonMasterTheme {
-        Greeting("Android")
-    }
 }

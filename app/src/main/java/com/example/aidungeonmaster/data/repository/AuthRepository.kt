@@ -29,8 +29,10 @@ class AuthRepository {
         onSuccess: () -> Unit,
         onError: (String) -> Unit
     ) {
-        val usernameLower = username.trim().lowercase()
-        val displayNameLower = displayName.trim().lowercase()
+        val usernameTrimmed = username.trim()
+        val displayNameTrimmed = displayName.trim()
+        val usernameLower = usernameTrimmed.lowercase()
+        val displayNameLower = displayNameTrimmed.lowercase()
 
         auth.createUserWithEmailAndPassword(email, password)
             .addOnSuccessListener { authResult ->
@@ -45,11 +47,24 @@ class AuthRepository {
                 val profile = hashMapOf(
                     "uid" to user.uid,
                     "email" to email.trim(),
-                    "displayName" to displayName.trim(),
+                    "displayName" to displayNameTrimmed,
                     "displayNameLower" to displayNameLower,
-                    "username" to username.trim(),
+                    "username" to usernameTrimmed,
                     "usernameLower" to usernameLower,
                     "photoUrl" to "",
+                    "bio" to "Aventurero recién llegado a la taberna.",
+
+                    // Esquema usado por la app
+                    "accentColor" to "#D4AF37",
+                    "profileBackgroundColor" to "#1E1E1E",
+
+                    // Esquema esperado por tus reglas
+                    "profileAccentColor" to "#D4AF37",
+                    "profilePrimaryColor" to "#1E1E1E",
+                    "profileSecondaryColor" to "#1E1E1E",
+
+                    "isOnline" to false,
+                    "lastSeen" to now,
                     "createdAt" to now,
                     "updatedAt" to now
                 )

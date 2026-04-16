@@ -9,9 +9,11 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavType
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.navArgument
 import com.example.aidungeonmaster.data.repository.CharacterDeletionRepository
 import com.example.aidungeonmaster.ui.achievements.AchievementsScreen
 import com.example.aidungeonmaster.ui.game.ARMapScreen
@@ -27,6 +29,12 @@ import com.example.aidungeonmaster.ui.home.HomeScreen
 import com.example.aidungeonmaster.ui.home.RankingScreen
 import com.example.aidungeonmaster.ui.login.LoginScreen
 import com.example.aidungeonmaster.ui.register.RegisterScreen
+import com.example.aidungeonmaster.ui.social.FriendRequestsScreen
+import com.example.aidungeonmaster.ui.social.FriendsListScreen
+import com.example.aidungeonmaster.ui.social.GuildsScreen
+import com.example.aidungeonmaster.ui.social.PrivateChatScreen
+import com.example.aidungeonmaster.ui.social.SocialProfileScreen
+import com.example.aidungeonmaster.ui.social.UserSearchScreen
 import com.example.aidungeonmaster.viewmodel.AchievementViewModel
 import com.example.aidungeonmaster.viewmodel.AuthViewModel
 import com.example.aidungeonmaster.viewmodel.GameViewModel
@@ -35,17 +43,13 @@ import com.example.aidungeonmaster.viewmodel.RankingViewModel
 import com.example.aidungeonmaster.viewmodel.WorldMapViewModel
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.launch
-import com.example.aidungeonmaster.ui.social.FriendRequestsScreen
-import com.example.aidungeonmaster.ui.social.UserSearchScreen
-import androidx.navigation.NavType
-import androidx.navigation.navArgument
-import com.example.aidungeonmaster.ui.social.FriendsListScreen
-import com.example.aidungeonmaster.ui.social.PrivateChatScreen
 
 sealed class Screen(val route: String) {
     object Login : Screen("login")
     object Register : Screen("register")
     object Home : Screen("home")
+    object MyProfile : Screen("my_profile")
+    object Guilds : Screen("guilds")
 
     object Inventory : Screen("inventory/{userId}") {
         fun createRoute(userId: String) = "inventory/$userId"
@@ -58,7 +62,6 @@ sealed class Screen(val route: String) {
     }
 
     object Ranking : Screen("ranking")
-
     object Achievements : Screen("achievements")
 
     object GamePlay : Screen("game_play/{userId}/{characterName}/{theme}") {
@@ -82,6 +85,9 @@ sealed class Screen(val route: String) {
     object UserSearch : Screen("user_search")
     object FriendRequests : Screen("friend_requests")
     object FriendsList : Screen("friends_list")
+    object FriendProfile : Screen("friend_profile/{friendUid}") {
+        fun createRoute(friendUid: String): String = "friend_profile/$friendUid"
+    }
     object PrivateChat : Screen("private_chat/{friendUid}/{friendName}") {
         fun createRoute(friendUid: String, friendName: String): String {
             return "private_chat/$friendUid/$friendName"
@@ -107,20 +113,18 @@ fun AppNavigation(navController: NavHostController) {
         composable(Screen.Login.route) { LoginScreen(navController) }
         composable(Screen.Register.route) { RegisterScreen(navController) }
         composable(Screen.Home.route) { HomeScreen(navController) }
+        composable(Screen.MyProfile.route) {
+            val myUid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+            SocialProfileScreen(userUid = myUid, isMe = true, onBack = { navController.popBackStack() })
+        }
 
         composable(Screen.Ranking.route) {
             val rankingViewModel: RankingViewModel = viewModel()
-            RankingScreen(
-                onBack = { navController.popBackStack() },
-                viewModel = rankingViewModel
-            )
+            RankingScreen(onBack = { navController.popBackStack() }, viewModel = rankingViewModel)
         }
 
         composable(Screen.Achievements.route) {
-            AchievementsScreen(
-                viewModel = achievementViewModel,
-                onBack = { navController.popBackStack() }
-            )
+            AchievementsScreen(viewModel = achievementViewModel, onBack = { navController.popBackStack() })
         }
 
         composable(Screen.GameSetup.route) { backStackEntry ->
@@ -148,23 +152,16 @@ fun AppNavigation(navController: NavHostController) {
 
         composable("qr_scanner/{gameId}") { backStackEntry ->
             val gameId = backStackEntry.arguments?.getString("gameId") ?: ""
-            QRScannerScreen(
-                gameId = gameId,
-                onBack = { navController.popBackStack() }
-            )
+            QRScannerScreen(gameId = gameId, onBack = { navController.popBackStack() })
         }
 
         composable(Screen.Inventory.route) { backStackEntry ->
             val idParaElInventario = backStackEntry.arguments?.getString("userId") ?: ""
-            InventoryScreen(
-                gameId = idParaElInventario,
-                onBack = { navController.popBackStack() }
-            )
+            InventoryScreen(gameId = idParaElInventario, onBack = { navController.popBackStack() })
         }
 
         composable("combat/{gameId}") { backStackEntry ->
             val gameId = backStackEntry.arguments?.getString("gameId") ?: ""
-
             CombatScreen(
                 gameViewModel = gameViewModel,
                 inventoryViewModel = inventoryViewModel,
@@ -186,10 +183,7 @@ fun AppNavigation(navController: NavHostController) {
 
                         scope.launch {
                             try {
-                                deletionRepository.deleteEverywhere(
-                                    userId = currentUserId,
-                                    characterName = characterName
-                                )
+                                deletionRepository.deleteEverywhere(userId = currentUserId, characterName = characterName)
                             } catch (e: Exception) {
                                 Log.e("APP_NAV", "Error borrando personaje al morir: ${e.message}", e)
                             } finally {
@@ -206,79 +200,69 @@ fun AppNavigation(navController: NavHostController) {
 
         composable(Screen.ARMap.route) { backStackEntry ->
             val charId = backStackEntry.arguments?.getString("charId") ?: ""
-
             LaunchedEffect(charId) {
                 if (charId.isNotBlank()) worldMapViewModel.loadMap(charId)
             }
-
             val mapState by worldMapViewModel.worldMapState.collectAsState()
             val characterName = charId.substringAfter("_")
 
             ARMapScreen(
                 mapState = mapState,
                 onBack = { navController.popBackStack() },
-                onOpen3DGallery = {
-                    navController.navigate(
-                        Screen.LocationsGallery.createRoute(charId, characterName)
-                    )
-                }
+                onOpen3DGallery = { navController.navigate(Screen.LocationsGallery.createRoute(charId, characterName)) }
             )
         }
 
         composable(Screen.LocationsGallery.route) { backStackEntry ->
             val charId = backStackEntry.arguments?.getString("charId") ?: ""
-            val characterName = backStackEntry.arguments?.getString("characterName")
-                ?.replace("_", " ") ?: ""
+            val characterName = backStackEntry.arguments?.getString("characterName")?.replace("_", " ") ?: ""
 
             LaunchedEffect(charId) {
                 if (charId.isNotBlank()) worldMapViewModel.loadMap(charId)
             }
-
             val mapState by worldMapViewModel.worldMapState.collectAsState()
 
-            LocationsGalleryScreen(
-                mapState = mapState,
-                characterName = characterName,
-                onBack = { navController.popBackStack() }
-            )
+            LocationsGalleryScreen(mapState = mapState, characterName = characterName, onBack = { navController.popBackStack() })
         }
 
         composable("bestiary/{charId}") { backStackEntry ->
             val charId = backStackEntry.arguments?.getString("charId").orEmpty()
-
-            BestiaryScreen(
-                gameId = charId,
-                onBack = { navController.popBackStack() }
-            )
+            BestiaryScreen(gameId = charId, onBack = { navController.popBackStack() })
         }
 
         composable(Screen.Journal.route) { backStackEntry ->
             val charId = backStackEntry.arguments?.getString("charId") ?: ""
-            JournalScreen(
-                charId = charId,
-                onBack = { navController.popBackStack() }
-            )
+            JournalScreen(charId = charId, onBack = { navController.popBackStack() })
         }
 
         composable(Screen.UserSearch.route) {
-            UserSearchScreen(
-                onBack = { navController.popBackStack() }
-            )
+            UserSearchScreen(onBack = { navController.popBackStack() })
         }
 
         composable(Screen.FriendRequests.route) {
-            FriendRequestsScreen(
-                onBack = { navController.popBackStack() }
-            )
+            FriendRequestsScreen(onBack = { navController.popBackStack() })
         }
 
         composable(Screen.FriendsList.route) {
             FriendsListScreen(
                 onBack = { navController.popBackStack() },
-                onOpenChat = { friendUid, friendName ->
-                    navController.navigate(Screen.PrivateChat.createRoute(friendUid, friendName))
-                }
+                onOpenProfile = { friendUid -> navController.navigate(Screen.FriendProfile.createRoute(friendUid)) },
+                onOpenChat = { friendUid, friendName -> navController.navigate(Screen.PrivateChat.createRoute(friendUid, friendName)) }
             )
+        }
+
+        composable(Screen.FriendProfile.route) { backStackEntry ->
+            val friendUid = backStackEntry.arguments?.getString("friendUid").orEmpty()
+            SocialProfileScreen(
+                userUid = friendUid,
+                isMe = false,
+                onBack = { navController.popBackStack() },
+                onOpenChat = { uid, name -> navController.navigate(Screen.PrivateChat.createRoute(uid, name)) }
+            )
+        }
+
+        composable(Screen.Guilds.route) {
+            GuildsScreen(onBack = { navController.popBackStack() })
         }
 
         composable(
@@ -290,12 +274,7 @@ fun AppNavigation(navController: NavHostController) {
         ) { backStackEntry ->
             val friendUid = backStackEntry.arguments?.getString("friendUid").orEmpty()
             val friendName = backStackEntry.arguments?.getString("friendName").orEmpty()
-
-            PrivateChatScreen(
-                friendUid = friendUid,
-                friendName = friendName,
-                onBack = { navController.popBackStack() }
-            )
+            PrivateChatScreen(friendUid = friendUid, friendName = friendName, onBack = { navController.popBackStack() })
         }
     }
 }
