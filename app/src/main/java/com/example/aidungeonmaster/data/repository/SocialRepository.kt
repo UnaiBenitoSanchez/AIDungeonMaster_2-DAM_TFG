@@ -124,71 +124,92 @@ class SocialRepository {
 
     suspend fun acceptFriendRequest(request: FriendRequest) {
         val myUid = currentUid() ?: throw IllegalStateException("Usuario no autenticado")
-        require(request.toUid == myUid) { "No puedes aceptar una solicitud que no es tuya." }
+        require(request.toUid == myUid) { "Solo el receptor puede aceptar la solicitud." }
 
-        val now = System.currentTimeMillis()
         val friendshipId = buildFriendshipId(request.fromUid, request.toUid)
-        val userA = minOf(request.fromUid, request.toUid)
-        val userB = maxOf(request.fromUid, request.toUid)
+        val now = System.currentTimeMillis()
 
-        val friendshipRef = db.collection("friendships").document(friendshipId)
-        val requestRef = db.collection("friend_requests").document(request.id)
-        val friendForReceiverRef = db.collection("users")
-            .document(request.toUid)
-            .collection("friends")
-            .document(request.fromUid)
-        val friendForSenderRef = db.collection("users")
-            .document(request.fromUid)
-            .collection("friends")
-            .document(request.toUid)
+        val friendship = mapOf(
+            "userA" to minOf(request.fromUid, request.toUid),
+            "userB" to maxOf(request.fromUid, request.toUid),
+            "members" to listOf(request.fromUid, request.toUid),
+            "createdAt" to now,
+            "createdBy" to myUid
+        )
+
+        val requesterProfile = db.collection("users").document(request.fromUid).get().await().toAppUser()
+            ?: throw IllegalStateException("No se encontró el perfil del remitente.")
+
+        val myProfile = db.collection("users").document(myUid).get().await().toAppUser()
+            ?: throw IllegalStateException("No se encontró tu perfil.")
+
+        val myFriendMirror = mapOf(
+            "uid" to requesterProfile.uid,
+            "displayName" to requesterProfile.displayName,
+            "username" to requesterProfile.username,
+            "photoUrl" to requesterProfile.photoUrl,
+            "friendshipId" to friendshipId,
+            "createdAt" to now
+        )
+
+        val otherFriendMirror = mapOf(
+            "uid" to myProfile.uid,
+            "displayName" to myProfile.displayName,
+            "username" to myProfile.username,
+            "photoUrl" to myProfile.photoUrl,
+            "friendshipId" to friendshipId,
+            "createdAt" to now
+        )
+
+        val chatId = friendshipId
+        val chat = mapOf(
+            "members" to listOf(request.fromUid, request.toUid),
+            "friendshipId" to friendshipId,
+            "createdAt" to now,
+            "lastMessage" to "",
+            "lastMessageAt" to now,
+            "lastSenderUid" to myUid
+        )
 
         db.runBatch { batch ->
-            batch.set(
-                friendshipRef,
+            batch.update(
+                db.collection("friend_requests").document(request.id),
                 mapOf(
-                    "userA" to userA,
-                    "userB" to userB,
-                    "members" to listOf(userA, userB),
-                    "createdAt" to now,
-                    "createdBy" to myUid
+                    "status" to "accepted",
+                    "updatedAt" to now
                 )
             )
 
-            batch.update(requestRef, mapOf("status" to "accepted", "updatedAt" to now))
+            batch.set(db.collection("friendships").document(friendshipId), friendship)
 
             batch.set(
-                friendForReceiverRef,
-                mapOf(
-                    "uid" to request.fromUid,
-                    "displayName" to request.fromDisplayName,
-                    "username" to request.fromUsername,
-                    "photoUrl" to "",
-                    "friendshipId" to friendshipId,
-                    "createdAt" to now
-                )
+                db.collection("users").document(myUid)
+                    .collection("friends").document(request.fromUid),
+                myFriendMirror
             )
 
             batch.set(
-                friendForSenderRef,
-                mapOf(
-                    "uid" to request.toUid,
-                    "displayName" to request.toDisplayName,
-                    "username" to request.toUsername,
-                    "photoUrl" to "",
-                    "friendshipId" to friendshipId,
-                    "createdAt" to now
-                )
+                db.collection("users").document(request.fromUid)
+                    .collection("friends").document(myUid),
+                otherFriendMirror
             )
+
+            batch.set(db.collection("private_chats").document(chatId), chat)
         }.await()
     }
 
     suspend fun rejectFriendRequest(request: FriendRequest) {
         val myUid = currentUid() ?: throw IllegalStateException("Usuario no autenticado")
-        require(request.toUid == myUid) { "No puedes rechazar una solicitud que no es tuya." }
+        require(request.toUid == myUid) { "Solo el receptor puede rechazar la solicitud." }
 
         db.collection("friend_requests")
             .document(request.id)
-            .update(mapOf("status" to "rejected", "updatedAt" to System.currentTimeMillis()))
+            .update(
+                mapOf(
+                    "status" to "rejected",
+                    "updatedAt" to System.currentTimeMillis()
+                )
+            )
             .await()
     }
 
@@ -197,38 +218,37 @@ class SocialRepository {
         onError: (String) -> Unit
     ): ListenerRegistration? {
         val myUid = currentUid() ?: return null
-        clearFriendProfileListeners()
-
-        val liveFriends = linkedMapOf<String, FriendWithProfile>()
 
         return db.collection("users")
             .document(myUid)
             .collection("friends")
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
-                    onError(error.message ?: "Error escuchando amistades")
+                    onError(error.message ?: "Error escuchando amigos")
                     return@addSnapshotListener
                 }
 
                 clearFriendProfileListeners()
-                liveFriends.clear()
 
-                val baseDocs = snapshot?.documents.orEmpty()
-                if (baseDocs.isEmpty()) {
+                val docs = snapshot?.documents.orEmpty()
+                if (docs.isEmpty()) {
                     onChange(emptyList())
                     return@addSnapshotListener
                 }
 
-                baseDocs.forEach { doc ->
-                    val friendUid = doc.getString("uid").orEmpty()
-                    val friendshipId = doc.getString("friendshipId").orEmpty()
+                val liveFriends = linkedMapOf<String, FriendWithProfile>()
+
+                docs.forEach { friendDoc ->
+                    val friendUid = friendDoc.getString("uid").orEmpty()
                     if (friendUid.isBlank()) return@forEach
+
+                    val friendshipId = friendDoc.getString("friendshipId").orEmpty()
 
                     val reg = db.collection("users")
                         .document(friendUid)
                         .addSnapshotListener { userSnapshot, userError ->
                             if (userError != null) {
-                                onError(userError.message ?: "Error escuchando perfiles de amigos")
+                                onError(userError.message ?: "Error escuchando perfil del amigo")
                                 return@addSnapshotListener
                             }
 
@@ -280,16 +300,11 @@ class SocialRepository {
                     "displayName" to displayName.trim(),
                     "displayNameLower" to displayName.trim().lowercase(),
                     "bio" to bio.trim(),
-
-                    // Esquema usado por la app
                     "accentColor" to accentColor,
                     "profileBackgroundColor" to profileBackgroundColor,
-
-                    // Esquema esperado por tus reglas
                     "profileAccentColor" to accentColor,
                     "profilePrimaryColor" to profileBackgroundColor,
                     "profileSecondaryColor" to profileBackgroundColor,
-
                     "updatedAt" to now
                 )
             )
@@ -365,6 +380,7 @@ class SocialRepository {
     suspend fun createGuild(name: String, description: String, accentColor: String, bannerColor: String) {
         val myUid = currentUid() ?: throw IllegalStateException("Usuario no autenticado")
         val me = getUserProfile(myUid)
+
         val guildName = name.trim()
         require(guildName.length >= 3) { "El nombre del gremio debe tener al menos 3 caracteres." }
 
@@ -383,7 +399,7 @@ class SocialRepository {
             memberCount = 1,
             createdAt = now,
             updatedAt = now,
-            joined = false
+            joined = true
         )
 
         val membership = GuildMembership(
@@ -415,6 +431,7 @@ class SocialRepository {
     suspend fun searchGuilds(query: String): List<Guild> {
         val q = query.trim().lowercase()
         if (q.isBlank()) return emptyList()
+
         val myUid = currentUid().orEmpty()
 
         val memberGuildIds = db.collection("users")
@@ -463,7 +480,6 @@ class SocialRepository {
         val memberSnap = memberRef.get().await()
         val userGuildSnap = userGuildRef.get().await()
 
-        // Ya estaba unido correctamente
         if (memberSnap.exists() && userGuildSnap.exists()) {
             throw IllegalStateException("Ya formas parte de este gremio.")
         }
@@ -477,9 +493,6 @@ class SocialRepository {
             "username" to me.username
         )
 
-        val currentMemberCount = (guildSnap.getLong("memberCount") ?: 0L).toInt()
-        val nextMemberCount = if (memberSnap.exists()) currentMemberCount else currentMemberCount + 1
-
         val userGuild = mapOf(
             "guildId" to guild.id,
             "name" to guild.name,
@@ -492,6 +505,13 @@ class SocialRepository {
         db.runBatch { batch ->
             if (!memberSnap.exists()) {
                 batch.set(memberRef, membership)
+            }
+
+            if (!userGuildSnap.exists()) {
+                batch.set(userGuildRef, userGuild)
+            }
+
+            if (!memberSnap.exists() && !userGuildSnap.exists()) {
                 batch.update(
                     guildRef,
                     mapOf(
@@ -500,10 +520,42 @@ class SocialRepository {
                     )
                 )
             }
+        }.await()
+    }
 
-            if (!userGuildSnap.exists()) {
-                batch.set(userGuildRef, userGuild)
-            }
+    suspend fun leaveGuild(guild: Guild) {
+        val myUid = currentUid() ?: throw IllegalStateException("Usuario no autenticado")
+
+        if (guild.ownerUid == myUid) {
+            throw IllegalStateException("El líder no puede abandonar su propio gremio desde aquí.")
+        }
+
+        val guildRef = db.collection("guilds").document(guild.id)
+        val memberRef = guildRef.collection("members").document(myUid)
+        val userGuildRef = db.collection("users")
+            .document(myUid)
+            .collection("guilds")
+            .document(guild.id)
+
+        val memberSnap = memberRef.get().await()
+        val userGuildSnap = userGuildRef.get().await()
+
+        if (!memberSnap.exists() || !userGuildSnap.exists()) {
+            throw IllegalStateException("No formas parte de este gremio.")
+        }
+
+        val now = System.currentTimeMillis()
+
+        db.runBatch { batch ->
+            batch.delete(memberRef)
+            batch.delete(userGuildRef)
+            batch.update(
+                guildRef,
+                mapOf(
+                    "memberCount" to FieldValue.increment(-1),
+                    "updatedAt" to now
+                )
+            )
         }.await()
     }
 
@@ -606,7 +658,8 @@ class SocialRepository {
             isOnline = getBoolean("isOnline") ?: false,
             lastSeen = getLong("lastSeen") ?: 0L,
             createdAt = getLong("createdAt") ?: 0L,
-            updatedAt = getLong("updatedAt") ?: 0L
+            updatedAt = getLong("updatedAt") ?: 0L,
+            characterCount = (getLong("characterCount") ?: 0L).toInt()
         )
     }
 

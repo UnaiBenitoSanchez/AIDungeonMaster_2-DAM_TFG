@@ -7,6 +7,7 @@ import com.example.aidungeonmaster.data.model.Character
 import com.example.aidungeonmaster.data.repository.CharacterDeletionRepository
 import com.example.aidungeonmaster.data.repository.SocialRepository
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -39,12 +40,12 @@ class HomeViewModel : ViewModel() {
                 Log.d("APP_FIRESTORE", "Guardando personaje...")
 
                 val charData = Character(
-                    name           = name,
-                    race           = race,
+                    name = name,
+                    race = race,
                     characterClass = clazz,
-                    stats          = stats,
+                    stats = stats,
                     physicalTraits = physicalTraits,
-                    portraitUrl    = portraitUrl
+                    portraitUrl = portraitUrl
                 )
 
                 // 1. Guardar en users/{uid}/characters
@@ -60,15 +61,15 @@ class HomeViewModel : ViewModel() {
                     .document(charId)
                     .set(
                         mapOf(
-                            "characterName"  to name,
+                            "characterName" to name,
                             "characterClass" to clazz,
-                            "userId"         to userId,
-                            "hpMax"          to 20,
-                            "hpCurrent"      to 20,
-                            "inventory"      to emptyList<Any>(),
-                            "lastPlayed"     to 0L,
-                            "xp"             to 0,
-                            "level"          to 1
+                            "userId" to userId,
+                            "hpMax" to 20,
+                            "hpCurrent" to 20,
+                            "inventory" to emptyList<Any>(),
+                            "lastPlayed" to 0L,
+                            "xp" to 0,
+                            "level" to 1
                         ),
                         com.google.firebase.firestore.SetOptions.merge()
                     ).await()
@@ -82,7 +83,18 @@ class HomeViewModel : ViewModel() {
                     )
                     .await()
 
-                Log.d("APP_SUCCESS", "Personaje, partida y ranking guardados correctamente")
+                // 4. Actualizar contador público de personajes
+                db.collection("users")
+                    .document(userId)
+                    .update(
+                        mapOf(
+                            "characterCount" to FieldValue.increment(1),
+                            "updatedAt" to System.currentTimeMillis()
+                        )
+                    )
+                    .await()
+
+                Log.d("APP_SUCCESS", "Personaje, partida, ranking y contador guardados correctamente")
 
             } catch (e: Exception) {
                 Log.e("APP_ERROR", "Error al guardar: ${e.message}", e)
@@ -107,6 +119,8 @@ class HomeViewModel : ViewModel() {
                     }
 
                     viewModelScope.launch {
+                        syncCharacterCount(userId, baseList.size)
+
                         val enriched = baseList.map { char ->
                             try {
                                 val charId = "${userId}_${char.name}"
@@ -117,11 +131,11 @@ class HomeViewModel : ViewModel() {
 
                                 if (partidaSnap.exists()) {
                                     char.copy(
-                                        hpMax      = partidaSnap.getLong("hpMax")?.toInt() ?: char.hpMax,
-                                        hpCurrent  = partidaSnap.getLong("hpCurrent")?.toInt() ?: char.hpCurrent,
+                                        hpMax = partidaSnap.getLong("hpMax")?.toInt() ?: char.hpMax,
+                                        hpCurrent = partidaSnap.getLong("hpCurrent")?.toInt() ?: char.hpCurrent,
                                         lastPlayed = partidaSnap.getLong("lastPlayed") ?: 0L,
-                                        xp         = partidaSnap.getLong("xp")?.toInt() ?: char.xp,
-                                        level      = partidaSnap.getLong("level")?.toInt() ?: char.level
+                                        xp = partidaSnap.getLong("xp")?.toInt() ?: char.xp,
+                                        level = partidaSnap.getLong("level")?.toInt() ?: char.level
                                     )
                                 } else {
                                     char
@@ -154,11 +168,11 @@ class HomeViewModel : ViewModel() {
                     val snap = db.collection("partidas").document(charId).get().await()
                     if (snap.exists()) {
                         char.copy(
-                            hpMax      = snap.getLong("hpMax")?.toInt() ?: char.hpMax,
-                            hpCurrent  = snap.getLong("hpCurrent")?.toInt() ?: char.hpCurrent,
+                            hpMax = snap.getLong("hpMax")?.toInt() ?: char.hpMax,
+                            hpCurrent = snap.getLong("hpCurrent")?.toInt() ?: char.hpCurrent,
                             lastPlayed = snap.getLong("lastPlayed") ?: char.lastPlayed,
-                            xp         = snap.getLong("xp")?.toInt() ?: char.xp,
-                            level      = snap.getLong("level")?.toInt() ?: char.level
+                            xp = snap.getLong("xp")?.toInt() ?: char.xp,
+                            level = snap.getLong("level")?.toInt() ?: char.level
                         )
                     } else {
                         char
@@ -181,6 +195,10 @@ class HomeViewModel : ViewModel() {
                     characterName = characterName,
                     userCharacterDocId = characterId
                 )
+
+                val remainingCount = (_characters.value.size - 1).coerceAtLeast(0)
+                syncCharacterCount(userId, remainingCount)
+
                 Log.d("APP_SUCCESS", "Personaje eliminado completamente: ${userId}_${characterName}")
             } catch (e: Exception) {
                 Log.e("APP_ERROR", "Error eliminando personaje completo: ${e.message}", e)
@@ -209,6 +227,22 @@ class HomeViewModel : ViewModel() {
             } catch (e: Exception) {
                 Log.e("APP_ERROR", "Error actualizando tema: ${e.message}")
             }
+        }
+    }
+
+    private suspend fun syncCharacterCount(userId: String, count: Int) {
+        runCatching {
+            db.collection("users")
+                .document(userId)
+                .update(
+                    mapOf(
+                        "characterCount" to count,
+                        "updatedAt" to System.currentTimeMillis()
+                    )
+                )
+                .await()
+        }.onFailure {
+            Log.w("APP_WARN", "No se pudo sincronizar characterCount: ${it.message}")
         }
     }
 }

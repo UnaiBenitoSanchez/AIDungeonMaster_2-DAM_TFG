@@ -66,7 +66,8 @@ class AuthRepository {
                     "isOnline" to false,
                     "lastSeen" to now,
                     "createdAt" to now,
-                    "updatedAt" to now
+                    "updatedAt" to now,
+                    "characterCount" to 0
                 )
 
                 db.collection("users")

@@ -14,5 +14,6 @@ data class AppUser(
     val isOnline: Boolean = false,
     val lastSeen: Long = 0L,
     val createdAt: Long = 0L,
-    val updatedAt: Long = 0L
+    val updatedAt: Long = 0L,
+    val characterCount: Int = 0
 )

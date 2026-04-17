@@ -1,23 +1,27 @@
 package com.example.aidungeonmaster.viewmodel
 
+import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.aidungeonmaster.data.model.AppUser
 import com.example.aidungeonmaster.data.model.FriendRequest
 import com.example.aidungeonmaster.data.model.FriendWithProfile
 import com.example.aidungeonmaster.data.model.Guild
+import com.example.aidungeonmaster.data.model.GuildMemberSummary
+import com.example.aidungeonmaster.data.repository.GuildDetailsRepository
 import com.example.aidungeonmaster.data.repository.SocialRepository
 import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import android.net.Uri
-import android.content.Context
-import kotlinx.coroutines.flow.StateFlow
 
 class SocialViewModel : ViewModel() {
 
     private val repository = SocialRepository()
+    private val guildDetailsRepository = GuildDetailsRepository()
+
     private var incomingRequestsListener: ListenerRegistration? = null
     private var friendsListener: ListenerRegistration? = null
     private var guildsListener: ListenerRegistration? = null
@@ -39,6 +43,15 @@ class SocialViewModel : ViewModel() {
 
     private val _guildSearchResults = MutableStateFlow<List<Guild>>(emptyList())
     val guildSearchResults = _guildSearchResults.asStateFlow()
+
+    private val _selectedGuild = MutableStateFlow<Guild?>(null)
+    val selectedGuild = _selectedGuild.asStateFlow()
+
+    private val _selectedGuildMembers = MutableStateFlow<List<GuildMemberSummary>>(emptyList())
+    val selectedGuildMembers = _selectedGuildMembers.asStateFlow()
+
+    private val _isGuildMembersLoading = MutableStateFlow(false)
+    val isGuildMembersLoading = _isGuildMembersLoading.asStateFlow()
 
     private val _isSearching = MutableStateFlow(false)
     val isSearching = _isSearching.asStateFlow()
@@ -157,6 +170,8 @@ class SocialViewModel : ViewModel() {
             try {
                 repository.createGuild(name, description, accentColor, bannerColor)
                 _message.value = "Gremio creado correctamente"
+                startGuildsListener()
+                loadGuildSearchResults(_lastGuildQuery.value)
             } catch (e: Exception) {
                 _message.value = e.message ?: "No se pudo crear el gremio"
             }
@@ -171,8 +186,26 @@ class SocialViewModel : ViewModel() {
                 _message.value = "Te has unido al gremio"
                 startGuildsListener()
                 loadGuildSearchResults(_lastGuildQuery.value)
+                if (_selectedGuild.value?.id == guild.id) {
+                    openGuildDetails(guild.copy(joined = true, memberCount = guild.memberCount + 1))
+                }
             }.onFailure {
                 _message.value = it.message ?: "No se pudo unir al gremio"
+            }
+        }
+    }
+
+    fun leaveGuild(guild: Guild) {
+        viewModelScope.launch {
+            runCatching {
+                repository.leaveGuild(guild)
+            }.onSuccess {
+                _message.value = "Has abandonado el gremio"
+                closeGuildDetails()
+                startGuildsListener()
+                loadGuildSearchResults(_lastGuildQuery.value)
+            }.onFailure {
+                _message.value = it.message ?: "No se pudo abandonar el gremio"
             }
         }
     }
@@ -188,6 +221,38 @@ class SocialViewModel : ViewModel() {
                 _message.value = it.message ?: "Error al buscar gremios"
             }
         }
+    }
+
+    fun openGuildDetails(guild: Guild) {
+        _selectedGuild.value = guild
+        _selectedGuildMembers.value = emptyList()
+
+        viewModelScope.launch {
+            _isGuildMembersLoading.value = true
+            runCatching {
+                guildDetailsRepository.getGuildMembers(guild)
+            }.onSuccess { members ->
+                _selectedGuildMembers.value = members
+            }.onFailure {
+                _message.value = it.message ?: "No se pudieron cargar los integrantes del gremio"
+            }
+            _isGuildMembersLoading.value = false
+        }
+    }
+
+    fun closeGuildDetails() {
+        _selectedGuild.value = null
+        _selectedGuildMembers.value = emptyList()
+        _isGuildMembersLoading.value = false
+    }
+
+    fun canLeaveGuild(guild: Guild): Boolean {
+        val myUid = repository.currentUid().orEmpty()
+        return guild.joined && guild.ownerUid != myUid
+    }
+
+    fun isGuildOwner(guild: Guild): Boolean {
+        return repository.currentUid() == guild.ownerUid
     }
 
     fun sendFriendRequest(user: AppUser) {
