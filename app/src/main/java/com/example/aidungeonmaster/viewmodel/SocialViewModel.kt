@@ -210,6 +210,22 @@ class SocialViewModel : ViewModel() {
         }
     }
 
+    fun transferLeadership(guild: Guild, newLeaderUid: String) {
+        viewModelScope.launch {
+            runCatching {
+                repository.transferGuildLeadership(guild, newLeaderUid)
+            }.onSuccess {
+                _message.value = "Liderazgo transferido correctamente"
+                val updatedGuild = guild.copy(ownerUid = newLeaderUid)
+                openGuildDetails(updatedGuild)
+                startGuildsListener()
+                loadGuildSearchResults(_lastGuildQuery.value)
+            }.onFailure {
+                _message.value = it.message ?: "No se pudo transferir el liderazgo"
+            }
+        }
+    }
+
     fun loadGuildSearchResults(query: String) {
         _lastGuildQuery.value = query
         viewModelScope.launch {
@@ -254,6 +270,8 @@ class SocialViewModel : ViewModel() {
     fun isGuildOwner(guild: Guild): Boolean {
         return repository.currentUid() == guild.ownerUid
     }
+
+    fun currentUserUid(): String = repository.currentUid().orEmpty()
 
     fun sendFriendRequest(user: AppUser) {
         viewModelScope.launch {

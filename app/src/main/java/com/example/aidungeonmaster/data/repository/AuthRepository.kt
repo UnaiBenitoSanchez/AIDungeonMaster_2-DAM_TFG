@@ -53,21 +53,17 @@ class AuthRepository {
                     "usernameLower" to usernameLower,
                     "photoUrl" to "",
                     "bio" to "Aventurero recién llegado a la taberna.",
-
-                    // Esquema usado por la app
                     "accentColor" to "#D4AF37",
                     "profileBackgroundColor" to "#1E1E1E",
-
-                    // Esquema esperado por tus reglas
                     "profileAccentColor" to "#D4AF37",
                     "profilePrimaryColor" to "#1E1E1E",
                     "profileSecondaryColor" to "#1E1E1E",
-
                     "isOnline" to false,
                     "lastSeen" to now,
                     "createdAt" to now,
                     "updatedAt" to now,
-                    "characterCount" to 0
+                    "characterCount" to 0,
+                    "currentGuildId" to ""
                 )
 
                 db.collection("users")

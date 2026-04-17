@@ -74,6 +74,7 @@ fun GuildsScreen(
     var query by remember { mutableStateOf("") }
     var showCreateDialog by remember { mutableStateOf(false) }
     var showLeaveConfirm by remember { mutableStateOf(false) }
+    var pendingTransferMember by remember { mutableStateOf<GuildMemberSummary?>(null) }
 
     LaunchedEffect(Unit) {
         viewModel.startGuildsListener()
@@ -136,11 +137,10 @@ fun GuildsScreen(
                 onValueChange = {
                     query = it
                     if (it.length >= 2) viewModel.searchGuilds(it)
-                    if (it.isBlank()) viewModel.searchGuilds("")
                 },
                 modifier = Modifier.fillMaxWidth(),
                 label = { Text("Buscar gremios") },
-                supportingText = { Text("Pulsa sobre un gremio para ver sus integrantes") }
+                supportingText = { Text("Solo puedes pertenecer a un gremio a la vez") }
             )
 
             LazyColumn(
@@ -176,8 +176,12 @@ fun GuildsScreen(
             isLoading = isGuildMembersLoading,
             canLeave = viewModel.canLeaveGuild(selectedGuild!!),
             isOwner = viewModel.isGuildOwner(selectedGuild!!),
+            currentUserUid = viewModel.currentUserUid(),
             onDismiss = { viewModel.closeGuildDetails() },
-            onLeaveGuild = { showLeaveConfirm = true }
+            onLeaveGuild = { showLeaveConfirm = true },
+            onTransferLeadership = { member ->
+                pendingTransferMember = member
+            }
         )
     }
 
@@ -198,6 +202,31 @@ fun GuildsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showLeaveConfirm = false }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
+
+    if (pendingTransferMember != null && selectedGuild != null) {
+        AlertDialog(
+            onDismissRequest = { pendingTransferMember = null },
+            title = { Text("Transferir liderazgo") },
+            text = {
+                Text("¿Quieres convertir a ${pendingTransferMember!!.displayName.ifBlank { pendingTransferMember!!.username }} en el nuevo líder del gremio?")
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.transferLeadership(selectedGuild!!, pendingTransferMember!!.uid)
+                        pendingTransferMember = null
+                    }
+                ) {
+                    Text("Transferir")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingTransferMember = null }) {
                     Text("Cancelar")
                 }
             }
@@ -278,9 +307,7 @@ private fun GuildCard(
                 )
             }
 
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 MiniBadge(
                     text = "${guild.memberCount} miembros",
                     background = Color.White.copy(alpha = 0.12f),
@@ -322,8 +349,10 @@ private fun GuildMembersDialog(
     isLoading: Boolean,
     canLeave: Boolean,
     isOwner: Boolean,
+    currentUserUid: String,
     onDismiss: () -> Unit,
-    onLeaveGuild: () -> Unit
+    onLeaveGuild: () -> Unit,
+    onTransferLeadership: (GuildMemberSummary) -> Unit
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -355,7 +384,7 @@ private fun GuildMembersDialog(
 
                 if (isOwner) {
                     Text(
-                        "Eres el líder de este gremio.",
+                        "Puedes transferir el liderazgo a otro integrante.",
                         style = MaterialTheme.typography.bodySmall,
                         color = parseColor(guild.accentColor)
                     )
@@ -375,13 +404,13 @@ private fun GuildMembersDialog(
                 } else if (members.isEmpty()) {
                     Text("No hay integrantes visibles en este gremio.")
                 } else {
-                    LazyColumn(
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
+                    LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         items(members, key = { it.uid }) { member ->
                             GuildMemberCard(
                                 member = member,
-                                accentColor = parseColor(guild.accentColor)
+                                accentColor = parseColor(guild.accentColor),
+                                canPromote = isOwner && !member.isOwner && member.uid != currentUserUid,
+                                onPromote = { onTransferLeadership(member) }
                             )
                         }
                     }
@@ -406,61 +435,79 @@ private fun GuildMembersDialog(
 @Composable
 private fun GuildMemberCard(
     member: GuildMemberSummary,
-    accentColor: Color
+    accentColor: Color,
+    canPromote: Boolean,
+    onPromote: () -> Unit
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
         tonalElevation = 2.dp
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(14.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            MemberAvatar(
-                photoUrl = member.photoUrl,
-                displayName = member.displayName
-            )
-
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    member.displayName.ifBlank { "Sin nombre" },
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold
+                MemberAvatar(
+                    photoUrl = member.photoUrl,
+                    displayName = member.displayName
                 )
 
-                Text(
-                    "@${member.username.ifBlank { "usuario" }}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    MiniBadge(
-                        text = if (member.isOwner) "Líder" else member.role.replaceFirstChar { it.uppercase() },
-                        background = accentColor.copy(alpha = 0.15f),
-                        content = accentColor
-                    )
-
-                    MiniBadge(
-                        text = "${member.characterCount} personajes",
-                        background = MaterialTheme.colorScheme.secondaryContainer,
-                        content = MaterialTheme.colorScheme.onSecondaryContainer
-                    )
-                }
-
-                if (member.joinedAt > 0L) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
                     Text(
-                        "Entró el ${formatDate(member.joinedAt)}",
+                        member.displayName.ifBlank { "Sin nombre" },
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+
+                    Text(
+                        "@${member.username.ifBlank { "usuario" }}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        MiniBadge(
+                            text = if (member.isOwner) "Líder" else member.role.replaceFirstChar { it.uppercase() },
+                            background = accentColor.copy(alpha = 0.15f),
+                            content = accentColor
+                        )
+
+                        MiniBadge(
+                            text = "${member.characterCount} personajes",
+                            background = MaterialTheme.colorScheme.secondaryContainer,
+                            content = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    }
+
+                    if (member.joinedAt > 0L) {
+                        Text(
+                            "Entró el ${formatDate(member.joinedAt)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            if (canPromote) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    Button(onClick = onPromote) {
+                        Text("Nombrar líder")
+                    }
                 }
             }
         }

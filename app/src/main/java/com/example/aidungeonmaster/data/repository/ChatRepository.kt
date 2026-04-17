@@ -19,7 +19,7 @@ class ChatRepository {
     }
 
     fun buildChatId(uid1: String, uid2: String): String {
-        return if (uid1 < uid2) "chat_${uid1}_${uid2}" else "chat_${uid2}_${uid1}"
+        return buildFriendshipId(uid1, uid2)
     }
 
     suspend fun getOrCreatePrivateChat(friendUid: String): String {
@@ -27,6 +27,7 @@ class ChatRepository {
         require(friendUid != myUid) { "No puedes crear un chat contigo mismo." }
 
         val friendshipId = buildFriendshipId(myUid, friendUid)
+
         val friendshipDoc = db.collection("friendships")
             .document(friendshipId)
             .get()
@@ -36,23 +37,23 @@ class ChatRepository {
             throw IllegalStateException("Solo puedes escribir a usuarios que sean tus amigos.")
         }
 
-        val chatId = buildChatId(myUid, friendUid)
-        val now = System.currentTimeMillis()
+        val chatId = friendshipId
+        val chatRef = db.collection("private_chats").document(chatId)
+        val chatDoc = chatRef.get().await()
 
-        val chat = PrivateChat(
-            id = chatId,
-            members = listOf(myUid, friendUid).sorted(),
-            friendshipId = friendshipId,
-            createdAt = now,
-            lastMessage = "",
-            lastMessageAt = 0L,
-            lastSenderUid = ""
-        )
-
-        db.collection("private_chats")
-            .document(chatId)
-            .set(chat)
-            .await()
+        if (!chatDoc.exists()) {
+            val now = System.currentTimeMillis()
+            val chat = PrivateChat(
+                id = chatId,
+                members = listOf(myUid, friendUid).sorted(),
+                friendshipId = friendshipId,
+                createdAt = now,
+                lastMessage = "",
+                lastMessageAt = now,
+                lastSenderUid = myUid
+            )
+            chatRef.set(chat).await()
+        }
 
         return chatId
     }
@@ -75,12 +76,14 @@ class ChatRepository {
             seenBy = listOf(myUid)
         )
 
+        val preview = cleanText.take(300)
+
         db.runBatch { batch ->
             batch.set(messageRef, message)
             batch.update(
                 chatRef,
                 mapOf(
-                    "lastMessage" to cleanText,
+                    "lastMessage" to preview,
                     "lastMessageAt" to now,
                     "lastSenderUid" to myUid
                 )

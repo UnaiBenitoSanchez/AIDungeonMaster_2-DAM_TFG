@@ -6,6 +6,7 @@ import com.example.aidungeonmaster.data.model.AppUser
 import com.example.aidungeonmaster.data.model.FriendRequest
 import com.example.aidungeonmaster.data.model.FriendWithProfile
 import com.example.aidungeonmaster.data.model.Guild
+import com.example.aidungeonmaster.data.model.GuildMemberSummary
 import com.example.aidungeonmaster.data.model.GuildMembership
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentSnapshot
@@ -381,6 +382,10 @@ class SocialRepository {
         val myUid = currentUid() ?: throw IllegalStateException("Usuario no autenticado")
         val me = getUserProfile(myUid)
 
+        if (me.currentGuildId.isNotBlank()) {
+            throw IllegalStateException("Ya perteneces a un gremio. Debes abandonarlo antes de crear otro.")
+        }
+
         val guildName = name.trim()
         require(guildName.length >= 3) { "El nombre del gremio debe tener al menos 3 caracteres." }
 
@@ -425,6 +430,13 @@ class SocialRepository {
                     "role" to "owner"
                 )
             )
+            batch.update(
+                db.collection("users").document(myUid),
+                mapOf(
+                    "currentGuildId" to guildRef.id,
+                    "updatedAt" to now
+                )
+            )
         }.await()
     }
 
@@ -463,63 +475,61 @@ class SocialRepository {
     suspend fun joinGuild(guild: Guild) {
         val myUid = auth.currentUser?.uid ?: throw IllegalStateException("Usuario no autenticado")
         val me = getUserProfile(myUid)
-        val now = System.currentTimeMillis()
 
+        if (me.currentGuildId.isNotBlank()) {
+            throw IllegalStateException("Solo puedes pertenecer a un gremio a la vez.")
+        }
+
+        val now = System.currentTimeMillis()
         val guildRef = db.collection("guilds").document(guild.id)
         val memberRef = guildRef.collection("members").document(myUid)
-        val userGuildRef = db.collection("users")
-            .document(myUid)
-            .collection("guilds")
-            .document(guild.id)
+        val userGuildRef = db.collection("users").document(myUid).collection("guilds").document(guild.id)
+        val userRef = db.collection("users").document(myUid)
 
-        val guildSnap = guildRef.get().await()
-        if (!guildSnap.exists()) {
-            throw IllegalStateException("El gremio ya no existe.")
-        }
+        db.runTransaction { tx ->
+            val guildSnap = tx.get(guildRef)
+            if (!guildSnap.exists()) throw IllegalStateException("El gremio ya no existe.")
 
-        val memberSnap = memberRef.get().await()
-        val userGuildSnap = userGuildRef.get().await()
+            val memberSnap = tx.get(memberRef)
+            val userGuildSnap = tx.get(userGuildRef)
+            val userSnap = tx.get(userRef)
 
-        if (memberSnap.exists() && userGuildSnap.exists()) {
-            throw IllegalStateException("Ya formas parte de este gremio.")
-        }
-
-        val membership = mapOf(
-            "guildId" to guild.id,
-            "uid" to myUid,
-            "role" to "member",
-            "joinedAt" to now,
-            "displayName" to me.displayName,
-            "username" to me.username
-        )
-
-        val userGuild = mapOf(
-            "guildId" to guild.id,
-            "name" to guild.name,
-            "accentColor" to guild.accentColor,
-            "bannerColor" to guild.bannerColor,
-            "joinedAt" to now,
-            "role" to "member"
-        )
-
-        db.runBatch { batch ->
-            if (!memberSnap.exists()) {
-                batch.set(memberRef, membership)
+            if ((userSnap.getString("currentGuildId") ?: "").isNotBlank()) {
+                throw IllegalStateException("Solo puedes pertenecer a un gremio a la vez.")
+            }
+            if (memberSnap.exists() || userGuildSnap.exists()) {
+                throw IllegalStateException("Ya formas parte de este gremio.")
             }
 
-            if (!userGuildSnap.exists()) {
-                batch.set(userGuildRef, userGuild)
-            }
+            val currentCount = (guildSnap.getLong("memberCount") ?: 0L).toInt()
 
-            if (!memberSnap.exists() && !userGuildSnap.exists()) {
-                batch.update(
-                    guildRef,
-                    mapOf(
-                        "memberCount" to FieldValue.increment(1),
-                        "updatedAt" to now
-                    )
-                )
-            }
+            tx.set(memberRef, mapOf(
+                "guildId" to guild.id,
+                "uid" to myUid,
+                "role" to "member",
+                "joinedAt" to now,
+                "displayName" to me.displayName,
+                "username" to me.username
+            ))
+
+            tx.set(userGuildRef, mapOf(
+                "guildId" to guild.id,
+                "name" to guild.name,
+                "accentColor" to guild.accentColor,
+                "bannerColor" to guild.bannerColor,
+                "joinedAt" to now,
+                "role" to "member"
+            ))
+
+            tx.update(guildRef, mapOf(
+                "memberCount" to currentCount + 1,
+                "updatedAt" to now
+            ))
+
+            tx.update(userRef, mapOf(
+                "currentGuildId" to guild.id,
+                "updatedAt" to now
+            ))
         }.await()
     }
 
@@ -532,30 +542,92 @@ class SocialRepository {
 
         val guildRef = db.collection("guilds").document(guild.id)
         val memberRef = guildRef.collection("members").document(myUid)
-        val userGuildRef = db.collection("users")
+        val userGuildRef = db.collection("users").document(myUid).collection("guilds").document(guild.id)
+        val userRef = db.collection("users").document(myUid)
+
+        db.runTransaction { tx ->
+            val guildSnap = tx.get(guildRef)
+            val memberSnap = tx.get(memberRef)
+            val userGuildSnap = tx.get(userGuildRef)
+
+            if (!guildSnap.exists()) throw IllegalStateException("El gremio ya no existe.")
+            if (!memberSnap.exists() || !userGuildSnap.exists()) throw IllegalStateException("No formas parte de este gremio.")
+
+            val now = System.currentTimeMillis()
+            val currentCount = (guildSnap.getLong("memberCount") ?: 1L).toInt()
+
+            // ✅ Primero actualizar el gremio (mientras memberRef aún "existe")
+            tx.update(guildRef, mapOf(
+                "memberCount" to maxOf(0, currentCount - 1),
+                "updatedAt" to now
+            ))
+
+            // ✅ Luego actualizar el usuario
+            tx.update(userRef, mapOf(
+                "currentGuildId" to "",
+                "updatedAt" to now
+            ))
+
+            // ✅ Los deletes al final
+            tx.delete(memberRef)
+            tx.delete(userGuildRef)
+        }.await()
+    }
+
+    suspend fun transferGuildLeadership(guild: Guild, newLeaderUid: String) {
+        val myUid = currentUid() ?: throw IllegalStateException("Usuario no autenticado")
+
+        if (guild.ownerUid != myUid) {
+            throw IllegalStateException("Solo el líder actual puede transferir el liderazgo.")
+        }
+
+        if (newLeaderUid == myUid) {
+            throw IllegalStateException("Ya eres el líder de este gremio.")
+        }
+
+        val guildRef = db.collection("guilds").document(guild.id)
+        val oldOwnerMemberRef = guildRef.collection("members").document(myUid)
+        val newOwnerMemberRef = guildRef.collection("members").document(newLeaderUid)
+
+        val oldOwnerUserGuildRef = db.collection("users")
             .document(myUid)
             .collection("guilds")
             .document(guild.id)
 
-        val memberSnap = memberRef.get().await()
-        val userGuildSnap = userGuildRef.get().await()
+        val newOwnerUserGuildRef = db.collection("users")
+            .document(newLeaderUid)
+            .collection("guilds")
+            .document(guild.id)
 
-        if (!memberSnap.exists() || !userGuildSnap.exists()) {
-            throw IllegalStateException("No formas parte de este gremio.")
+        val newOwnerProfile = db.collection("users").document(newLeaderUid).get().await()
+        val newOwnerDisplayName = newOwnerProfile.getString("displayName").orEmpty()
+
+        if (newOwnerDisplayName.isBlank()) {
+            throw IllegalStateException("No se pudo obtener el perfil del nuevo líder.")
+        }
+
+        val newOwnerMemberSnap = newOwnerMemberRef.get().await()
+        if (!newOwnerMemberSnap.exists()) {
+            throw IllegalStateException("El usuario seleccionado no pertenece al gremio.")
         }
 
         val now = System.currentTimeMillis()
 
         db.runBatch { batch ->
-            batch.delete(memberRef)
-            batch.delete(userGuildRef)
             batch.update(
                 guildRef,
                 mapOf(
-                    "memberCount" to FieldValue.increment(-1),
+                    "ownerUid" to newLeaderUid,
+                    "ownerDisplayName" to newOwnerDisplayName,
                     "updatedAt" to now
                 )
             )
+
+            batch.update(newOwnerMemberRef, "role", "owner")
+            batch.update(oldOwnerMemberRef, "role", "member")
+
+            batch.update(newOwnerUserGuildRef, "role", "owner")
+            batch.update(oldOwnerUserGuildRef, "role", "member")
         }.await()
     }
 
@@ -659,7 +731,8 @@ class SocialRepository {
             lastSeen = getLong("lastSeen") ?: 0L,
             createdAt = getLong("createdAt") ?: 0L,
             updatedAt = getLong("updatedAt") ?: 0L,
-            characterCount = (getLong("characterCount") ?: 0L).toInt()
+            characterCount = (getLong("characterCount") ?: 0L).toInt(),
+            currentGuildId = getString("currentGuildId").orEmpty()
         )
     }
 
