@@ -44,6 +44,8 @@ import com.example.aidungeonmaster.viewmodel.JournalViewModel
 
 import androidx.compose.material.icons.filled.MenuBook
 
+import androidx.lifecycle.compose.LifecycleResumeEffect
+
 @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -78,10 +80,13 @@ fun GamePlayScreen(
     var levelUpDialogLevel by remember { mutableStateOf<Int?>(null) }
 
     // ── MÚSICA ───────────────────────────────────────────────────────────────
-    val musicScope = rememberCoroutineScope()
-    DisposableEffect(Unit) {
-        AdventureMusicEngine.start(musicScope)
-        onDispose { AdventureMusicEngine.fadeOutAndStop(musicScope) }
+    LifecycleResumeEffect(theme) {
+        AdventureMusicEngine.enterGameplay(theme)
+
+        onPauseOrDispose {
+            // No parar aquí.  a
+            // El stop total lo controla la navegación al salir del flujo de aventura.
+        }
     }
 
     // ── DETECCIÓN DE SUPERMERCADOS EN TIEMPO REAL ─────────────────────────
@@ -407,7 +412,7 @@ fun GamePlayScreen(
             if (showPixelTransition) {
                 PixelTransitionOverlay {
                     showPixelTransition = false
-                    AdventureMusicEngine.stop()
+                    AdventureMusicEngine.stopNow()
                     navController.navigate("combat/$charId")
                 }
             }
@@ -420,7 +425,7 @@ fun GamePlayScreen(
                         viewModel.resetStory()
                     },
                     onGoHome = {
-                        AdventureMusicEngine.stop()
+                        AdventureMusicEngine.stopNow()
                         navController.popBackStack("home", inclusive = false)
                     }
                 )

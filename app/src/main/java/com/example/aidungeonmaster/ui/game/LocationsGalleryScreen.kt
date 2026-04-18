@@ -28,27 +28,8 @@ import java.text.Normalizer
 import com.example.aidungeonmaster.data.model.WorldLocation
 import com.example.aidungeonmaster.data.model.WorldMapState
 
-/**
- * Pantalla que muestra una galería 3D de todas las ubicaciones visitadas por el personaje.
- *
- * Usa WebView + Three.js para renderizar modelos 3D procedurales para cada tipo de lugar.
- * No requiere pago ni instalaciones adicionales: Three.js se carga desde cdnjs.cloudflare.com.
- *
- * Los modelos varían en función de palabras clave detectadas en la descripción del lugar:
- *  - "montaña/s" → añade picos montañosos al fondo del escenario
- *  - "lago/río/arroyo" → añade agua al fondo
- *  - "bosque/árboles" → añade vegetación extra al fondo
- *  - "niebla/bruma/neblina" → aumenta la densidad de niebla
- *  - "oscur/tenebroso" → oscurece la iluminación general
- *  - "mágico/encantado" → añade partículas brillantes flotantes
- *  - "ruina/s" → añade fragmentos de piedra y muros rotos al fondo
- *  - "pintoresco/hermoso" → aumenta la luz y añade flores de colores
- *  - "nieve/nevado" → añade capa de nieve y copos
- *
- * @param mapState      Estado del mapa con las ubicaciones de ESTE personaje.
- * @param characterName Nombre del personaje, para mostrarlo en el título.
- * @param onBack        Vuelve a la pantalla anterior.
- */
+import com.example.aidungeonmaster.utils.AdventureMusicEngine
+
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun LocationsGalleryScreen(
@@ -58,6 +39,13 @@ fun LocationsGalleryScreen(
 ) {
     var selectedLocation by remember(mapState.locations) {
         mutableStateOf(mapState.locations.firstOrNull())
+    }
+
+    DisposableEffect(Unit) {
+        AdventureMusicEngine.setScreen(AdventureMusicEngine.MusicScreen.GALLERY)
+        onDispose {
+            AdventureMusicEngine.releaseScreen(700L)
+        }
     }
 
     Column(

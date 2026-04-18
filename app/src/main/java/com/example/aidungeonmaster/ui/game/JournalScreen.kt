@@ -64,6 +64,9 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+import androidx.compose.runtime.DisposableEffect
+import com.example.aidungeonmaster.utils.AdventureMusicEngine
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun JournalScreen(
@@ -75,6 +78,13 @@ fun JournalScreen(
 
     LaunchedEffect(charId) {
         viewModel.loadJournal(charId)
+    }
+
+    DisposableEffect(Unit) {
+        AdventureMusicEngine.setScreen(AdventureMusicEngine.MusicScreen.JOURNAL)
+        onDispose {
+            AdventureMusicEngine.releaseScreen(1200L)
+        }
     }
 
     val entries by viewModel.entries.collectAsState()

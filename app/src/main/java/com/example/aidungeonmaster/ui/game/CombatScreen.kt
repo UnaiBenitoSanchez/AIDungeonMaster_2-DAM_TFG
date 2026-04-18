@@ -34,6 +34,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.ui.graphics.asImageBitmap
 import com.example.aidungeonmaster.utils.ImageUtils
 
+import com.example.aidungeonmaster.utils.AdventureMusicEngine
+
 private val CombatBg = Color(0xFF080808)
 private val EnemyRed = Color(0xFFCC2222)
 private val PlayerGreen = Color(0xFF22CC55)
@@ -143,9 +145,12 @@ private fun CombatContent(
 
     val musicScope = rememberCoroutineScope()
     DisposableEffect(Unit) {
+        AdventureMusicEngine.setScreen(AdventureMusicEngine.MusicScreen.MUTED)
         CombatMusicEngine.start(musicScope)
+
         onDispose {
             CombatMusicEngine.stop()
+            AdventureMusicEngine.releaseScreen(500L)
         }
     }
 

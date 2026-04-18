@@ -4,125 +4,330 @@ import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioTrack
 import android.util.Log
-import kotlinx.coroutines.*
-import kotlin.coroutines.coroutineContext
-import kotlin.math.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlin.math.PI
+import kotlin.math.abs
+import kotlin.math.exp
+import kotlin.math.pow
+import kotlin.math.sin
+import kotlin.math.tanh
 
-/**
- * ══════════════════════════════════════════════════════════════════
- *  ADVENTURE MUSIC ENGINE — "Épica de la Aventura"
- *  Traducción del Strudel de la pantalla de aventura.
- *
- *  setcpm(140/4) → 140 BPM, semicorcheas
- *
- *  Capa 1 — Bajo sawtooth,  <d2 d2 f2 c2>*4,  lpf=400 fijo
- *  Capa 2 — Melodía square, 4 barras de 4 notas, lpf=1200, delay=0.1
- *  Capa 3 — Pad sine,       <a2 a2 c3 g2>*2 .slow(2)
- *  Capa 4 — Percusión TR808: bd*2, ~sd~sd, hh*8
- * ══════════════════════════════════════════════════════════════════
- */
 object AdventureMusicEngine {
 
-    private const val SR  = 44100
+    private const val SR = 44100
     private const val TAG = "ADV_MUSIC"
 
-    private const val BPM            = 140.0
-    private const val STEPS_PER_BAR  = 16
-    private val STEP_SEC    = 60.0 / BPM / 4.0
-    private val STEP_SAMPLES get()   = (SR * STEP_SEC).toInt()
+    private const val STEPS_PER_BAR = 16
+    private const val DELAY_BUFFER_SECONDS = 0.75
+    private const val CROSSFADE_STEPS = 8
+    private const val DEFAULT_STOP_DELAY_MS = 900L
 
-    // ── FRECUENCIAS ───────────────────────────────────────────────
-    private fun hz(note: String): Float = when (note) {
-        "d2"  -> 73.42f;  "f2"  -> 87.31f;  "c2"  -> 65.41f
-        "a2"  -> 110.00f; "c3"  -> 130.81f; "g2"  -> 98.00f
-        "d4"  -> 293.66f; "f4"  -> 349.23f; "g4"  -> 392.00f
-        "a4"  -> 440.00f; "e4"  -> 329.63f; "c4"  -> 261.63f
-        "~"   -> 0f;      else  -> 0f
+    private val engineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val DELAY_BUF = (SR * DELAY_BUFFER_SECONDS).toInt().coerceAtLeast(1)
+
+    enum class MusicScreen(val volume: Float) {
+        GAMEPLAY(1.00f),
+        INVENTORY(0.42f),
+        JOURNAL(0.34f),
+        BESTIARY(0.34f),
+        MAP(0.55f),
+        GALLERY(0.46f),
+        BACKGROUND(0.18f),
+        MUTED(0.00f)
     }
 
-    // ── PATRONES ──────────────────────────────────────────────────
-
-    // Bajo: <d2 d2 f2 c2>*4 → 4 notas × 4 reps = 16 pasos, 1 paso/nota
-    private val BASS = listOf(
-        "d2","d2","d2","d2",
-        "f2","f2","f2","f2",
-        "c2","c2","c2","c2",
-        "d2","d2","d2","d2"
-    )
-
-    // Melodía: <d4 ~ f4 g4> <a4 g4 f4 ~> <d4 ~ c4 d4> <e4 d4 c4 ~>
-    // 4 barras × 4 notas = 16 pasos, 1 paso/nota
-    private val MELODY = listOf(
-        "d4","~","f4","g4",
-        "a4","g4","f4","~",
-        "d4","~","c4","d4",
-        "e4","d4","c4","~"
-    )
-
-    // Pad: <a2 a2 c3 g2>*2 .slow(2)
-    // slow(2) → cada nota dura 2 pasos; *2 → 4 notas × 2 reps × 2 pasos = 16
-    private val PAD = listOf(
-        "a2","a2","a2","a2",
-        "c3","c3","c3","c3",
-        "g2","g2","g2","g2",
-        "a2","a2","a2","a2"
-    )
-
-    // Percusión TR808
-    // bd*2    → pasos 0 y 8
-    // ~sd~sd  → pasos 4 y 12
-    // hh*8    → pasos 0,2,4,6,8,10,12,14 (cada 2)
-    private val KICK  = intArrayOf(1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0)
-    private val SNARE = intArrayOf(0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0)
-    private val HIHAT = intArrayOf(1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0)
-
-    // ── ESTADO ────────────────────────────────────────────────────
-    private var audioTrack: AudioTrack? = null
-    private var job: Job? = null
-    @Volatile private var isPlaying = false
-
-    private val DELAY_BUF = (SR * 0.4).toInt()
-    private val delayBufL = FloatArray(DELAY_BUF)
-    private val delayBufR = FloatArray(DELAY_BUF)
-    private var delayIdx  = 0
-
-    // ── API PÚBLICA ───────────────────────────────────────────────
-
-    fun start(scope: CoroutineScope) {
-        if (isPlaying) return
-        isPlaying = true
-        delayBufL.fill(0f); delayBufR.fill(0f); delayIdx = 0
-        Log.d(TAG, "▶ Música de aventura iniciada")
-        job = scope.launch(Dispatchers.Default) { runLoop() }
+    private enum class LeadWave {
+        SQUARE, TRIANGLE, SAW, SINE
     }
 
-    fun stop() {
-        isPlaying = false
-        job?.cancel(); job = null
-        runCatching {
-            audioTrack?.pause(); audioTrack?.flush()
-            audioTrack?.stop();  audioTrack?.release()
+    private data class AdventureThemeProfile(
+        val name: String,
+        val bpm: Double,
+        val bass: List<String>,
+        val melody: List<String>,
+        val pad: List<String>,
+        val kick: IntArray,
+        val snare: IntArray,
+        val hihat: IntArray,
+        val leadWave: LeadWave,
+        val bassGain: Float,
+        val melodyGain: Float,
+        val padGain: Float,
+        val kickGain: Float,
+        val snareGain: Float,
+        val hihatGain: Float,
+        val bassLpf: Float,
+        val melodyLpf: Float,
+        val delaySeconds: Double,
+        val delayFeedback: Float,
+        val stereoSpread: Float
+    ) {
+        companion object {
+            fun fromTheme(theme: String): AdventureThemeProfile {
+                return when (theme.trim().lowercase()) {
+                    "terror gótico", "terror gotico" -> gothic()
+                    "cyberpunk" -> cyberpunk()
+                    "misterio" -> mystery()
+                    else -> epicFantasy()
+                }
+            }
+
+            private fun epicFantasy() = AdventureThemeProfile(
+                name = "Fantasía Épica",
+                bpm = 140.0,
+                bass = listOf(
+                    "d2","d2","d2","d2",
+                    "f2","f2","f2","f2",
+                    "c2","c2","c2","c2",
+                    "d2","d2","d2","d2"
+                ),
+                melody = listOf(
+                    "d4","~","f4","g4",
+                    "a4","g4","f4","~",
+                    "d4","~","c4","d4",
+                    "e4","d4","c4","~"
+                ),
+                pad = listOf(
+                    "a2","a2","a2","a2",
+                    "c3","c3","c3","c3",
+                    "g2","g2","g2","g2",
+                    "a2","a2","a2","a2"
+                ),
+                kick = intArrayOf(1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0),
+                snare = intArrayOf(0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0),
+                hihat = intArrayOf(1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0),
+                leadWave = LeadWave.SQUARE,
+                bassGain = 0.70f,
+                melodyGain = 0.46f,
+                padGain = 0.25f,
+                kickGain = 0.95f,
+                snareGain = 0.80f,
+                hihatGain = 0.28f,
+                bassLpf = 420f,
+                melodyLpf = 1300f,
+                delaySeconds = 0.10,
+                delayFeedback = 0.35f,
+                stereoSpread = 0.12f
+            )
+
+            private fun gothic() = AdventureThemeProfile(
+                name = "Terror Gótico",
+                bpm = 88.0,
+                bass = listOf(
+                    "d2","~","d2","~",
+                    "bb1","~","bb1","~",
+                    "f2","~","f2","~",
+                    "c2","~","c2","~"
+                ),
+                melody = listOf(
+                    "a3","~","c4","~",
+                    "d4","~","f4","~",
+                    "e4","~","d4","~",
+                    "c4","~","a3","~"
+                ),
+                pad = listOf(
+                    "d3","d3","d3","d3",
+                    "bb2","bb2","bb2","bb2",
+                    "f3","f3","f3","f3",
+                    "c3","c3","c3","c3"
+                ),
+                kick = intArrayOf(1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0),
+                snare = intArrayOf(0,0,0,0, 0,0,1,0, 0,0,0,0, 0,0,1,0),
+                hihat = intArrayOf(1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0),
+                leadWave = LeadWave.TRIANGLE,
+                bassGain = 0.62f,
+                melodyGain = 0.38f,
+                padGain = 0.32f,
+                kickGain = 0.70f,
+                snareGain = 0.50f,
+                hihatGain = 0.12f,
+                bassLpf = 250f,
+                melodyLpf = 700f,
+                delaySeconds = 0.22,
+                delayFeedback = 0.48f,
+                stereoSpread = 0.20f
+            )
+
+            private fun cyberpunk() = AdventureThemeProfile(
+                name = "Cyberpunk",
+                bpm = 128.0,
+                bass = listOf(
+                    "d2","d2","f2","e2",
+                    "d2","d2","a1","a1",
+                    "c2","c2","e2","f2",
+                    "d2","d2","a1","c2"
+                ),
+                melody = listOf(
+                    "d4","a4","c5","a4",
+                    "f4","a4","e4","a4",
+                    "g4","c5","a4","f4",
+                    "e4","g4","d4","a4"
+                ),
+                pad = listOf(
+                    "d3","d3","d3","d3",
+                    "f3","f3","f3","f3",
+                    "c3","c3","c3","c3",
+                    "a2","a2","a2","a2"
+                ),
+                kick = intArrayOf(1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0),
+                snare = intArrayOf(0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0),
+                hihat = intArrayOf(1,1,0,1, 1,1,0,1, 1,1,0,1, 1,1,0,1),
+                leadWave = LeadWave.SAW,
+                bassGain = 0.78f,
+                melodyGain = 0.42f,
+                padGain = 0.18f,
+                kickGain = 1.00f,
+                snareGain = 0.72f,
+                hihatGain = 0.22f,
+                bassLpf = 520f,
+                melodyLpf = 2200f,
+                delaySeconds = 0.07,
+                delayFeedback = 0.26f,
+                stereoSpread = 0.08f
+            )
+
+            private fun mystery() = AdventureThemeProfile(
+                name = "Misterio",
+                bpm = 96.0,
+                bass = listOf(
+                    "e2","~","e2","~",
+                    "g2","~","g2","~",
+                    "d2","~","d2","~",
+                    "c2","~","c2","~"
+                ),
+                melody = listOf(
+                    "b3","~","d4","~",
+                    "e4","~","g4","~",
+                    "f4","~","e4","~",
+                    "d4","~","b3","~"
+                ),
+                pad = listOf(
+                    "e3","e3","e3","e3",
+                    "g3","g3","g3","g3",
+                    "d3","d3","d3","d3",
+                    "c3","c3","c3","c3"
+                ),
+                kick = intArrayOf(1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0),
+                snare = intArrayOf(0,0,0,0, 0,0,1,0, 0,0,0,0, 0,0,1,0),
+                hihat = intArrayOf(1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,1,0),
+                leadWave = LeadWave.SINE,
+                bassGain = 0.52f,
+                melodyGain = 0.28f,
+                padGain = 0.34f,
+                kickGain = 0.55f,
+                snareGain = 0.42f,
+                hihatGain = 0.10f,
+                bassLpf = 300f,
+                melodyLpf = 900f,
+                delaySeconds = 0.18,
+                delayFeedback = 0.42f,
+                stereoSpread = 0.18f
+            )
         }
+    }
+
+    private data class RenderState(
+        var profile: AdventureThemeProfile,
+        val delayBufL: FloatArray = FloatArray(DELAY_BUF),
+        val delayBufR: FloatArray = FloatArray(DELAY_BUF),
+        var delayIdx: Int = 0
+    )
+
+    private var audioTrack: AudioTrack? = null
+    private var renderJob: Job? = null
+    private var stopJob: Job? = null
+
+    @Volatile
+    private var isPlaying = false
+
+    @Volatile
+    private var requestedTheme: AdventureThemeProfile =
+        AdventureThemeProfile.fromTheme("Fantasía Épica")
+
+    @Volatile
+    private var requestedScreen: MusicScreen = MusicScreen.GAMEPLAY
+
+    private var activeState = RenderState(AdventureThemeProfile.fromTheme("Fantasía Épica"))
+    private var pendingState: RenderState? = null
+    private var crossfadeProgress = 1f
+    private var currentGain = 0f
+    private var stepCounter = 0
+
+    fun enterGameplay(theme: String) {
+        requestedTheme = AdventureThemeProfile.fromTheme(theme)
+        requestedScreen = MusicScreen.GAMEPLAY
+        stopJob?.cancel()
+        ensurePlaying()
+    }
+
+    fun setScreen(screen: MusicScreen) {
+        requestedScreen = screen
+        stopJob?.cancel()
+    }
+
+    fun releaseScreen(delayMs: Long = DEFAULT_STOP_DELAY_MS) {
+        stopJob?.cancel()
+        stopJob = engineScope.launch {
+            requestedScreen = MusicScreen.MUTED
+            delay(delayMs)
+            if (requestedScreen == MusicScreen.MUTED) {
+                stopNow()
+            }
+        }
+    }
+
+    fun stopNow() {
+        isPlaying = false
+
+        val localRenderJob = renderJob
+        renderJob = null
+        if (localRenderJob != null) {
+            engineScope.launch {
+                runCatching { localRenderJob.cancelAndJoin() }
+            }
+        }
+
+        runCatching {
+            audioTrack?.pause()
+            audioTrack?.flush()
+            audioTrack?.stop()
+            audioTrack?.release()
+        }
+
         audioTrack = null
+        pendingState = null
+        crossfadeProgress = 1f
+        currentGain = 0f
         Log.d(TAG, "■ Música de aventura detenida")
     }
 
-    fun fadeOutAndStop(scope: CoroutineScope) {
-        scope.launch(Dispatchers.Default) {
-            for (v in 10 downTo 0) {
-                audioTrack?.setVolume(v / 10f)
-                delay(80)
-            }
-            stop()
-        }
+    private fun ensurePlaying() {
+        if (isPlaying) return
+
+        isPlaying = true
+        activeState = RenderState(requestedTheme)
+        pendingState = null
+        crossfadeProgress = 1f
+        currentGain = 0f
+        stepCounter = 0
+
+        Log.d(TAG, "▶ Música de aventura iniciada: ${requestedTheme.name}")
+        renderJob = engineScope.launch(Dispatchers.Default) { runLoop() }
     }
 
-    // ── BUCLE PRINCIPAL ───────────────────────────────────────────
-
     private suspend fun runLoop() {
-        val bufSize = AudioTrack.getMinBufferSize(
-            SR, AudioFormat.CHANNEL_OUT_STEREO, AudioFormat.ENCODING_PCM_16BIT
-        ).coerceAtLeast(STEP_SAMPLES * 4)
+        val initialBuffer = AudioTrack.getMinBufferSize(
+            SR,
+            AudioFormat.CHANNEL_OUT_STEREO,
+            AudioFormat.ENCODING_PCM_16BIT
+        ).coerceAtLeast(8192)
 
         audioTrack = AudioTrack.Builder()
             .setAudioAttributes(
@@ -138,143 +343,271 @@ object AdventureMusicEngine {
                     .setChannelMask(AudioFormat.CHANNEL_OUT_STEREO)
                     .build()
             )
-            .setBufferSizeInBytes(bufSize)
+            .setBufferSizeInBytes(initialBuffer)
             .setTransferMode(AudioTrack.MODE_STREAM)
             .build()
 
         audioTrack?.play()
 
-        var step = 0
-        while (isPlaying && coroutineContext.isActive) {
-            val s = step % STEPS_PER_BAR
-            val buf = synthesizeStep(
-                bassFreq   = hz(BASS  [s]),
-                melodyFreq = hz(MELODY[s]),
-                padFreq    = hz(PAD   [s]),
-                hasKick    = KICK [s] == 1,
-                hasSnare   = SNARE[s] == 1,
-                hasHihat   = HIHAT[s] == 1
+        while (isPlaying && engineScope.isActive) {
+            val targetTheme = requestedTheme
+            if (targetTheme.name != activeState.profile.name &&
+                pendingState?.profile?.name != targetTheme.name
+            ) {
+                pendingState = RenderState(targetTheme)
+                crossfadeProgress = 0f
+            }
+
+            val stepSamples = stepSamplesFor(activeState.profile)
+            val activeBuffer = synthesizeStep(
+                renderState = activeState,
+                stepIndex = stepCounter,
+                stepSamples = stepSamples
             )
-            audioTrack?.write(buf, 0, buf.size)
-            step++
+
+            val mixedBuffer = if (pendingState != null) {
+                val incoming = pendingState!!
+                val nextBuffer = synthesizeStep(
+                    renderState = incoming,
+                    stepIndex = stepCounter,
+                    stepSamples = stepSamples
+                )
+
+                val amount = crossfadeProgress.coerceIn(0f, 1f)
+                val out = FloatArray(activeBuffer.size)
+                for (i in out.indices) {
+                    out[i] = activeBuffer[i] * (1f - amount) + nextBuffer[i] * amount
+                }
+
+                crossfadeProgress += (1f / CROSSFADE_STEPS)
+                if (crossfadeProgress >= 1f) {
+                    activeState = incoming
+                    pendingState = null
+                    crossfadeProgress = 1f
+                }
+
+                out
+            } else {
+                activeBuffer
+            }
+
+            val targetGain = requestedScreen.volume
+            val outShorts = applyMasterGainAndConvert(
+                input = mixedBuffer,
+                startGain = currentGain,
+                endGain = targetGain
+            )
+            currentGain = targetGain
+
+            audioTrack?.write(outShorts, 0, outShorts.size)
+            stepCounter++
         }
     }
 
-    // ── SÍNTESIS ──────────────────────────────────────────────────
+    private fun stepSamplesFor(profile: AdventureThemeProfile): Int {
+        val stepSec = 60.0 / profile.bpm / 4.0
+        return (SR * stepSec).toInt().coerceAtLeast(1)
+    }
 
     private fun synthesizeStep(
-        bassFreq: Float, melodyFreq: Float, padFreq: Float,
-        hasKick: Boolean, hasSnare: Boolean, hasHihat: Boolean
-    ): ShortArray {
-        val n   = STEP_SAMPLES
-        val dur = n.toDouble() / SR
-        val buf = ShortArray(n * 2)
+        renderState: RenderState,
+        stepIndex: Int,
+        stepSamples: Int
+    ): FloatArray {
+        val profile = renderState.profile
+        val s = stepIndex % STEPS_PER_BAR
 
-        // LPF fijo para el bajo (lpf=400)
-        val dt    = 1.0 / SR
-        val rc    = 1.0 / (2 * PI * 400.0)
-        val alpha = (dt / (rc + dt)).toFloat()
-        var lpfL  = 0f
+        val bassFreq = hz(profile.bass[s])
+        val melodyFreq = hz(profile.melody[s])
+        val padFreq = hz(profile.pad[s])
+        val hasKick = profile.kick[s] == 1
+        val hasSnare = profile.snare[s] == 1
+        val hasHihat = profile.hihat[s] == 1
 
-        // LPF para melodía (lpf=1200)
-        val rcM   = 1.0 / (2 * PI * 1200.0)
-        val alphaM = (dt / (rcM + dt)).toFloat()
-        var lpfM  = 0f
+        val dur = stepSamples.toDouble() / SR
+        val buf = FloatArray(stepSamples * 2)
 
-        val delayTimeSamples = (0.1 * SR).toInt()  // delay=0.1s
-        val delayFb          = 0.35f               // delayfb implícito suave
+        val dt = 1.0 / SR
 
-        for (i in 0 until n) {
+        val bassCut = profile.bassLpf.toDouble().coerceAtLeast(40.0)
+        val rcBass = 1.0 / (2 * PI * bassCut)
+        val alphaBass = (dt / (rcBass + dt)).toFloat()
+        var bassLpfState = 0f
+
+        val melodyCut = profile.melodyLpf.toDouble().coerceAtLeast(60.0)
+        val rcMel = 1.0 / (2 * PI * melodyCut)
+        val alphaMel = (dt / (rcMel + dt)).toFloat()
+        var melodyLpfState = 0f
+
+        val delayTimeSamples = (profile.delaySeconds * SR)
+            .toInt()
+            .coerceIn(1, DELAY_BUF - 1)
+
+        for (i in 0 until stepSamples) {
             val t = i.toDouble() / SR
 
-            // ── Bajo sawtooth lpf=400 ─────────────────────────────
-            var bassAmp = 0.0
+            var bassAmp = 0f
             if (bassFreq > 0f) {
-                val p   = (t * bassFreq) % 1.0
+                val p = (t * bassFreq) % 1.0
                 val saw = (2.0 * p - 1.0).toFloat()
-                lpfL    = alpha * saw + (1f - alpha) * lpfL
-                val env = adsr(t, dur, 0.005, 0.05, 0.8, 0.1)
-                bassAmp = lpfL * env * 0.7
+                bassLpfState = alphaBass * saw + (1f - alphaBass) * bassLpfState
+                val env = adsr(t, dur, 0.004, 0.05, 0.82, 0.10).toFloat()
+                bassAmp = bassLpfState * env * profile.bassGain
             }
 
-            // ── Melodía square lpf=1200 ───────────────────────────
-            var melAmp = 0.0
+            var melodyAmp = 0f
             if (melodyFreq > 0f) {
-                val p   = (t * melodyFreq) % 1.0
-                val sq  = (if (p < 0.5) 1.0 else -1.0).toFloat()
-                lpfM    = alphaM * sq + (1f - alphaM) * lpfM
-                val env = adsr(t, dur, 0.008, 0.04, 0.7, 0.12)
-                melAmp  = lpfM * env * 0.45
+                val osc = leadOsc(profile.leadWave, melodyFreq.toDouble(), t)
+                melodyLpfState = alphaMel * osc + (1f - alphaMel) * melodyLpfState
+                val env = adsr(t, dur, 0.006, 0.05, 0.72, 0.12).toFloat()
+                melodyAmp = melodyLpfState * env * profile.melodyGain
             }
 
-            // Delay melodía (delay=0.1, room=0.3 → reverb suave)
-            val dIdx    = ((delayIdx - delayTimeSamples) + DELAY_BUF) % DELAY_BUF
-            val dL      = delayBufL[dIdx]
-            val dR      = delayBufR[dIdx]
-            val melWetL = (melAmp + dL * delayFb).toFloat()
-            val melWetR = (melAmp + dR * delayFb).toFloat()
-            delayBufL[delayIdx % DELAY_BUF] = melWetL
-            delayBufR[delayIdx % DELAY_BUF] = melWetR
-            if (i == 0) delayIdx = (delayIdx + 1) % DELAY_BUF
+            val delayedIndex = ((renderState.delayIdx - delayTimeSamples) + DELAY_BUF) % DELAY_BUF
+            val delayedL = renderState.delayBufL[delayedIndex]
+            val delayedR = renderState.delayBufR[delayedIndex]
 
-            // ── Pad sine (slow=2 → nota larga, room=0.6) ─────────
+            val wetL = (melodyAmp + delayedL * profile.delayFeedback)
+            val wetR = (melodyAmp + delayedR * profile.delayFeedback)
+
+            renderState.delayBufL[renderState.delayIdx] =
+                (wetL * 0.62f).coerceIn(-1f, 1f)
+            renderState.delayBufR[renderState.delayIdx] =
+                (wetR * 0.62f).coerceIn(-1f, 1f)
+            renderState.delayIdx = (renderState.delayIdx + 1) % DELAY_BUF
+
             val padAmp = if (padFreq > 0f) {
-                // room=0.6 → reverb simulado con dos reflexiones
-                val direct  = sin(2 * PI * padFreq * t)
-                val reflect = sin(2 * PI * padFreq * (t - 0.03)) * 0.4
-                (direct + reflect) * 0.25 *
-                        adsr(t, dur, 0.02, 0.1, 0.8, 0.2)
-            } else 0.0
-
-            // ── Percusión TR808 ───────────────────────────────────
-            val drumAmp  = when {
-                hasKick  -> kick808(t)
-                hasSnare -> snare808(t)
-                else     -> 0.0
+                val direct = sin(2 * PI * padFreq * t).toFloat()
+                val reflect1 = (sin(2 * PI * padFreq * (t - 0.032)) * 0.35).toFloat()
+                val reflect2 = (sin(2 * PI * padFreq * (t - 0.061)) * 0.18).toFloat()
+                val env = adsr(t, dur, 0.02, 0.10, 0.82, 0.22).toFloat()
+                (direct + reflect1 + reflect2) * profile.padGain * env
+            } else {
+                0f
             }
-            val hihatAmp = if (hasHihat) hihat808(t) else 0.0
 
-            // ── Mezcla + soft clip ────────────────────────────────
-            val mixL = bassAmp + melWetL * 0.5 + padAmp + drumAmp + hihatAmp
-            val mixR = bassAmp + melWetR * 0.5 + padAmp + drumAmp + hihatAmp
+            val drumAmp =
+                (if (hasKick) kick808(t) * profile.kickGain else 0f) +
+                        (if (hasSnare) snare808(t) * profile.snareGain else 0f)
 
-            buf[i * 2]     = (tanh(mixL).coerceIn(-1.0, 1.0) * Short.MAX_VALUE).toInt().toShort()
-            buf[i * 2 + 1] = (tanh(mixR).coerceIn(-1.0, 1.0) * Short.MAX_VALUE).toInt().toShort()
+            val hihatAmp = if (hasHihat) hihat808(t) * profile.hihatGain else 0f
+
+            val spread = profile.stereoSpread
+            val melodyLeft = wetL * (1f - spread)
+            val melodyRight = wetR * (1f + spread)
+
+            val mixL = bassAmp + melodyLeft + padAmp + drumAmp + hihatAmp
+            val mixR = bassAmp + melodyRight + padAmp + drumAmp + hihatAmp
+
+            buf[i * 2] = softClip(mixL)
+            buf[i * 2 + 1] = softClip(mixR)
         }
+
         return buf
     }
 
-    private fun adsr(t: Double, dur: Double, a: Double, d: Double, s: Double, r: Double): Double {
+    private fun applyMasterGainAndConvert(
+        input: FloatArray,
+        startGain: Float,
+        endGain: Float
+    ): ShortArray {
+        val out = ShortArray(input.size)
+        val frames = (input.size / 2).coerceAtLeast(1)
+
+        for (frame in 0 until frames) {
+            val t = if (frames == 1) 1f else frame.toFloat() / (frames - 1).toFloat()
+            val gain = lerp(startGain, endGain, t)
+
+            val left = (input[frame * 2] * gain).coerceIn(-1f, 1f)
+            val right = (input[frame * 2 + 1] * gain).coerceIn(-1f, 1f)
+
+            out[frame * 2] = (left * Short.MAX_VALUE).toInt().toShort()
+            out[frame * 2 + 1] = (right * Short.MAX_VALUE).toInt().toShort()
+        }
+
+        return out
+    }
+
+    private fun lerp(a: Float, b: Float, t: Float): Float {
+        return a + (b - a) * t.coerceIn(0f, 1f)
+    }
+
+    private fun softClip(x: Float): Float {
+        return tanh(x.toDouble()).toFloat().coerceIn(-1f, 1f)
+    }
+
+    private fun leadOsc(wave: LeadWave, freq: Double, t: Double): Float {
+        val p = (t * freq) % 1.0
+        val value = when (wave) {
+            LeadWave.SQUARE -> if (p < 0.5) 1.0 else -1.0
+            LeadWave.TRIANGLE -> 1.0 - 4.0 * abs(p - 0.5)
+            LeadWave.SAW -> 2.0 * p - 1.0
+            LeadWave.SINE -> sin(2.0 * PI * p)
+        }
+        return value.toFloat()
+    }
+
+    private fun hz(note: String): Float {
+        val n = note.trim().lowercase()
+        if (n.isBlank() || n == "~") return 0f
+
+        val match = Regex("^([a-g])(#{1}|b{1})?(-?\\d+)$").matchEntire(n) ?: return 0f
+        val letter = match.groupValues[1]
+        val accidental = match.groupValues[2]
+        val octave = match.groupValues[3].toInt()
+
+        val semitone = when (letter) {
+            "c" -> 0
+            "d" -> 2
+            "e" -> 4
+            "f" -> 5
+            "g" -> 7
+            "a" -> 9
+            "b" -> 11
+            else -> 0
+        } + when (accidental) {
+            "#" -> 1
+            "b" -> -1
+            else -> 0
+        }
+
+        val midi = (octave + 1) * 12 + semitone
+        return (440.0 * 2.0.pow((midi - 69) / 12.0)).toFloat()
+    }
+
+    private fun adsr(
+        t: Double,
+        dur: Double,
+        a: Double,
+        d: Double,
+        s: Double,
+        r: Double
+    ): Double {
         val rStart = (dur - r).coerceAtLeast(a + d)
         return when {
-            t < a      -> t / a
-            t < a + d  -> 1.0 - (1.0 - s) * ((t - a) / d)
+            t < a -> t / a
+            t < a + d -> 1.0 - (1.0 - s) * ((t - a) / d)
             t < rStart -> s
-            t < dur    -> s * (1.0 - (t - rStart) / r)
-            else       -> 0.0
+            t < dur -> s * (1.0 - (t - rStart) / r)
+            else -> 0.0
         }.coerceIn(0.0, 1.0)
     }
 
-    // ── PERCUSIÓN TR808 ───────────────────────────────────────────
-
-    /** Bombo 808: sweep suave, más redondo que el 909 */
-    private fun kick808(t: Double): Double {
-        if (t > 0.35) return 0.0
-        val freq = 65.0 * exp(-12.0 * t) + 40.0   // sweep más suave
-        return sin(2 * PI * freq * t) * exp(-6.0 * t) * 0.9
+    private fun kick808(t: Double): Float {
+        if (t > 0.35) return 0f
+        val freq = 65.0 * exp(-12.0 * t) + 40.0
+        return (sin(2 * PI * freq * t) * exp(-6.0 * t) * 0.9).toFloat()
     }
 
-    /** Caja 808: más airada, ruido + tono más bajo */
-    private fun snare808(t: Double): Double {
-        if (t > 0.22) return 0.0
-        val noise = (Math.random() * 2 - 1) * exp(-22.0 * t)
-        val tone  = sin(2 * PI * 160.0 * t) * exp(-20.0 * t) * 0.35
-        return (noise * 0.6 + tone) * 0.8
+    private fun snare808(t: Double): Float {
+        if (t > 0.22) return 0f
+        val noise = ((Math.random() * 2.0 - 1.0) * exp(-22.0 * t)).toFloat()
+        val tone = (sin(2 * PI * 160.0 * t) * exp(-20.0 * t) * 0.35).toFloat()
+        return ((noise * 0.6f) + tone) * 0.8f
     }
 
-    /** Hi-hat 808: más metálico */
-    private fun hihat808(t: Double): Double {
-        if (t > 0.05) return 0.0
-        return (Math.random() * 2 - 1) * exp(-60.0 * t) * 0.3
+    private fun hihat808(t: Double): Float {
+        if (t > 0.05) return 0f
+        return ((Math.random() * 2.0 - 1.0) * exp(-60.0 * t) * 0.3).toFloat()
     }
 }

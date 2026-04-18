@@ -42,35 +42,17 @@ import io.github.sceneview.rememberNodes
 import io.github.sceneview.rememberOnGestureListener
 import io.github.sceneview.rememberView
 
+import com.example.aidungeonmaster.utils.AdventureMusicEngine
+
 // ── CONSTANTES ────────────────────────────────────────────────────────────────
 
-/** Tamaño del mapa en metros (el mapa ocupa MAP_SCALE × MAP_SCALE metros en el mundo real) */
 private const val MAP_SCALE = 0.8f
 
-/** Radio de las esferas 3D que representan cada ubicación */
 private const val SPHERE_RADIUS = 0.025f
 
-/** Altura a la que flotan las esferas sobre el plano detectado */
 private const val SPHERE_HEIGHT = 0.05f
 
 // ── PANTALLA PRINCIPAL DE AR ──────────────────────────────────────────────────
-
-/**
- * Pantalla de realidad aumentada que proyecta el mapa del mundo sobre
- * una superficie plana detectada por ARCore.
- *
- * Flujo de usuario:
- * 1. La cámara se abre y busca superficies planas (planeRenderer activo).
- * 2. En cuanto detecta un plano horizontal, coloca automáticamente el mapa.
- * 3. Cada ubicación aparece como una esfera 3D flotando sobre el plano.
- *    - Ubicación actual → esfera dorada (pulsante en la UI 2D overlay).
- *    - Otras ubicaciones → esfera azul-plateada.
- * 4. Al tocar una esfera se muestra la tarjeta de detalle en la parte inferior.
- * 5. El botón ↩ vuelve al juego. El botón 🔄 resetea el mapa para reposicionarlo.
- *
- * @param mapState      Estado del mapa con todas las ubicaciones descubiertas.
- * @param onBack        Callback para volver a la pantalla anterior.
- */
 @Composable
 fun ARMapScreen(
     mapState: WorldMapState,
@@ -101,6 +83,13 @@ fun ARMapScreen(
         animationSpec = infiniteRepeatable(tween(900), RepeatMode.Reverse),
         label         = "pulse_alpha"
     )
+
+    DisposableEffect(Unit) {
+        AdventureMusicEngine.setScreen(AdventureMusicEngine.MusicScreen.MAP)
+        onDispose {
+            AdventureMusicEngine.releaseScreen(700L)
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
 

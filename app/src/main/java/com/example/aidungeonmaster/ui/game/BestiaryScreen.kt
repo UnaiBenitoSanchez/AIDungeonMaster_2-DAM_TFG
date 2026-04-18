@@ -73,6 +73,9 @@ import androidx.compose.foundation.Image
 import androidx.compose.ui.graphics.asImageBitmap
 import com.example.aidungeonmaster.utils.ImageUtils
 
+import androidx.compose.runtime.DisposableEffect
+import com.example.aidungeonmaster.utils.AdventureMusicEngine
+
 private enum class BestiaryFilter(val label: String) {
     ALL("Todos"),
     DEFEATED("Derrotados"),
@@ -91,6 +94,13 @@ fun BestiaryScreen(
 ) {
     LaunchedEffect(gameId) {
         viewModel.loadBestiary(gameId)
+    }
+
+    DisposableEffect(Unit) {
+        AdventureMusicEngine.setScreen(AdventureMusicEngine.MusicScreen.BESTIARY)
+        onDispose {
+            AdventureMusicEngine.releaseScreen(1200L)
+        }
     }
 
     val entries by viewModel.entries.collectAsState()

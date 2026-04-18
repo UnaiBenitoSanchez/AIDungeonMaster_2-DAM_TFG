@@ -44,6 +44,11 @@ import com.example.aidungeonmaster.viewmodel.WorldMapViewModel
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.launch
 
+import androidx.compose.runtime.LaunchedEffect
+import androidx.navigation.compose.currentBackStackEntryAsState
+import com.example.aidungeonmaster.utils.AdventureMusicEngine
+import com.example.aidungeonmaster.utils.CombatMusicEngine
+
 sealed class Screen(val route: String) {
     object Login : Screen("login")
     object Register : Screen("register")
@@ -108,6 +113,16 @@ fun AppNavigation(navController: NavHostController) {
     val scope = rememberCoroutineScope()
 
     val startRoute = if (authViewModel.isUserLoggedIn()) Screen.Home.route else Screen.Login.route
+
+    val backStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = backStackEntry?.destination?.route
+
+    LaunchedEffect(currentRoute) {
+        if (!currentRoute.isAdventureRoute()) {
+            AdventureMusicEngine.stopNow()
+            CombatMusicEngine.stop()
+        }
+    }
 
     NavHost(navController = navController, startDestination = startRoute) {
         composable(Screen.Login.route) { LoginScreen(navController) }
@@ -277,4 +292,17 @@ fun AppNavigation(navController: NavHostController) {
             PrivateChatScreen(friendUid = friendUid, friendName = friendName, onBack = { navController.popBackStack() })
         }
     }
+}
+
+private fun String?.isAdventureRoute(): Boolean {
+    val route = this?.lowercase().orEmpty()
+
+    return route.startsWith("gameplay/") ||
+            route.startsWith("gamelayout/") ||
+            route.startsWith("inventory/") ||
+            route.startsWith("journal/") ||
+            route.startsWith("bestiary/") ||
+            route.startsWith("armap/") ||
+            route.startsWith("locationsgallery/") ||
+            route.startsWith("combat/")
 }

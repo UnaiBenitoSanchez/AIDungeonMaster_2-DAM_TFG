@@ -32,6 +32,8 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 
+import com.example.aidungeonmaster.utils.AdventureMusicEngine
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun InventoryScreen(
@@ -55,6 +57,13 @@ fun InventoryScreen(
         if (feedbackMsg != null) {
             delay(2500)
             feedbackMsg = null
+        }
+    }
+
+    DisposableEffect(Unit) {
+        AdventureMusicEngine.setScreen(AdventureMusicEngine.MusicScreen.INVENTORY)
+        onDispose {
+            AdventureMusicEngine.releaseScreen(1200L)
         }
     }
 
