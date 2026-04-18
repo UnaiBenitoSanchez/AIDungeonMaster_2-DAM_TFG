@@ -49,6 +49,9 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import com.example.aidungeonmaster.utils.AdventureMusicEngine
 import com.example.aidungeonmaster.utils.CombatMusicEngine
 
+import android.net.Uri
+import com.example.aidungeonmaster.ui.social.GuildDetailsScreen
+
 sealed class Screen(val route: String) {
     object Login : Screen("login")
     object Register : Screen("register")
@@ -93,9 +96,11 @@ sealed class Screen(val route: String) {
     object FriendProfile : Screen("friend_profile/{friendUid}") {
         fun createRoute(friendUid: String): String = "friend_profile/$friendUid"
     }
-    object PrivateChat : Screen("private_chat/{friendUid}/{friendName}") {
-        fun createRoute(friendUid: String, friendName: String): String {
-            return "private_chat/$friendUid/$friendName"
+    object PrivateChat : Screen("private_chat/{friendUid}/{friendName}?guildId={guildId}") {
+        fun createRoute(friendUid: String, friendName: String, guildId: String? = null): String {
+            val safeName = Uri.encode(friendName)
+            val safeGuildId = Uri.encode(guildId.orEmpty())
+            return "private_chat/$friendUid/$safeName?guildId=$safeGuildId"
         }
     }
 }
@@ -276,20 +281,48 @@ fun AppNavigation(navController: NavHostController) {
             )
         }
 
-        composable(Screen.Guilds.route) {
-            GuildsScreen(onBack = { navController.popBackStack() })
+        composable("guilds") {
+            GuildsScreen(
+                onBack = { navController.popBackStack() },
+                onOpenGuildDetails = { guildId ->
+                    navController.navigate("guild_details/$guildId")
+                }
+            )
+        }
+
+        composable("guild_details/{guildId}") { backStackEntry ->
+            val guildId = backStackEntry.arguments?.getString("guildId").orEmpty()
+
+            GuildDetailsScreen(
+                guildId = guildId,
+                onBack = { navController.popBackStack() },
+                onOpenMemberChat = { memberUid, memberName, guildIdValue ->
+                    navController.navigate("private_chat/$memberUid")
+                }
+            )
         }
 
         composable(
             route = Screen.PrivateChat.route,
             arguments = listOf(
                 navArgument("friendUid") { type = NavType.StringType },
-                navArgument("friendName") { type = NavType.StringType }
+                navArgument("friendName") { type = NavType.StringType },
+                navArgument("guildId") {
+                    type = NavType.StringType
+                    defaultValue = ""
+                }
             )
         ) { backStackEntry ->
             val friendUid = backStackEntry.arguments?.getString("friendUid").orEmpty()
-            val friendName = backStackEntry.arguments?.getString("friendName").orEmpty()
-            PrivateChatScreen(friendUid = friendUid, friendName = friendName, onBack = { navController.popBackStack() })
+            val friendName = Uri.decode(backStackEntry.arguments?.getString("friendName").orEmpty())
+            val guildId = Uri.decode(backStackEntry.arguments?.getString("guildId").orEmpty())
+
+            PrivateChatScreen(
+                friendUid = friendUid,
+                friendName = friendName,
+                guildId = guildId.ifBlank { null },
+                onBack = { navController.popBackStack() }
+            )
         }
     }
 }

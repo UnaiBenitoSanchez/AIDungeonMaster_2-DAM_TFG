@@ -22,7 +22,7 @@ class ChatRepository {
         return buildFriendshipId(uid1, uid2)
     }
 
-    suspend fun getOrCreatePrivateChat(friendUid: String): String {
+    suspend fun getOrCreatePrivateChat(friendUid: String, guildId: String? = null): String {
         val myUid = currentUid() ?: throw IllegalStateException("Usuario no autenticado")
         require(friendUid != myUid) { "No puedes crear un chat contigo mismo." }
 
@@ -33,20 +33,33 @@ class ChatRepository {
             .get()
             .await()
 
-        if (!friendshipDoc.exists()) {
-            throw IllegalStateException("Solo puedes escribir a usuarios que sean tus amigos.")
+        val isFriend = friendshipDoc.exists()
+
+        val allowedByGuild = guildId
+            ?.takeIf { it.isNotBlank() }
+            ?.let { areUsersInSameGuild(it, myUid, friendUid) }
+            ?: false
+
+        if (!isFriend && !allowedByGuild) {
+            throw IllegalStateException("Solo puedes escribir a amigos o miembros de tu gremio.")
         }
 
-        val chatId = friendshipId
+        val chatId = buildChatId(myUid, friendUid)
         val chatRef = db.collection("private_chats").document(chatId)
         val chatDoc = chatRef.get().await()
 
         if (!chatDoc.exists()) {
             val now = System.currentTimeMillis()
+            val contextId = if (isFriend) {
+                friendshipId
+            } else {
+                "guild:${guildId.orEmpty()}"
+            }
+
             val chat = PrivateChat(
                 id = chatId,
                 members = listOf(myUid, friendUid).sorted(),
-                friendshipId = friendshipId,
+                friendshipId = contextId,
                 createdAt = now,
                 lastMessage = "",
                 lastMessageAt = now,
@@ -56,6 +69,15 @@ class ChatRepository {
         }
 
         return chatId
+    }
+
+    private suspend fun areUsersInSameGuild(guildId: String, myUid: String, otherUid: String): Boolean {
+        val guildRef = db.collection("guilds").document(guildId)
+
+        val myMembership = guildRef.collection("members").document(myUid).get().await()
+        val otherMembership = guildRef.collection("members").document(otherUid).get().await()
+
+        return myMembership.exists() && otherMembership.exists()
     }
 
     suspend fun sendMessage(chatId: String, text: String) {

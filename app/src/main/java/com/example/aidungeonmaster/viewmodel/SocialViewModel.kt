@@ -8,6 +8,7 @@ import com.example.aidungeonmaster.data.model.AppUser
 import com.example.aidungeonmaster.data.model.FriendRequest
 import com.example.aidungeonmaster.data.model.FriendWithProfile
 import com.example.aidungeonmaster.data.model.Guild
+import com.example.aidungeonmaster.data.model.GuildChatMessage
 import com.example.aidungeonmaster.data.model.GuildMemberSummary
 import com.example.aidungeonmaster.data.repository.GuildDetailsRepository
 import com.example.aidungeonmaster.data.repository.SocialRepository
@@ -25,6 +26,7 @@ class SocialViewModel : ViewModel() {
     private var incomingRequestsListener: ListenerRegistration? = null
     private var friendsListener: ListenerRegistration? = null
     private var guildsListener: ListenerRegistration? = null
+    private var guildChatListener: ListenerRegistration? = null
 
     private val _searchResults = MutableStateFlow<List<AppUser>>(emptyList())
     val searchResults = _searchResults.asStateFlow()
@@ -50,8 +52,17 @@ class SocialViewModel : ViewModel() {
     private val _selectedGuildMembers = MutableStateFlow<List<GuildMemberSummary>>(emptyList())
     val selectedGuildMembers = _selectedGuildMembers.asStateFlow()
 
+    private val _selectedGuildChat = MutableStateFlow<List<GuildChatMessage>>(emptyList())
+    val selectedGuildChat = _selectedGuildChat.asStateFlow()
+
     private val _isGuildMembersLoading = MutableStateFlow(false)
     val isGuildMembersLoading = _isGuildMembersLoading.asStateFlow()
+
+    private val _isGuildChatLoading = MutableStateFlow(false)
+    val isGuildChatLoading = _isGuildChatLoading.asStateFlow()
+
+    private val _isSendingGuildMessage = MutableStateFlow(false)
+    val isSendingGuildMessage = _isSendingGuildMessage.asStateFlow()
 
     private val _isSearching = MutableStateFlow(false)
     val isSearching = _isSearching.asStateFlow()
@@ -60,7 +71,7 @@ class SocialViewModel : ViewModel() {
     val message = _message.asStateFlow()
 
     private val _lastGuildQuery = MutableStateFlow("")
-    val lastGuildQuery: StateFlow<String> = _lastGuildQuery
+    val lastGuildQuery: StateFlow<String> = _lastGuildQuery.asStateFlow()
 
     fun uploadMyProfilePhoto(context: Context, uri: Uri) {
         viewModelScope.launch {
@@ -103,7 +114,12 @@ class SocialViewModel : ViewModel() {
         }
     }
 
-    fun saveMyProfile(displayName: String, bio: String, accentColor: String, backgroundColor: String) {
+    fun saveMyProfile(
+        displayName: String,
+        bio: String,
+        accentColor: String,
+        backgroundColor: String
+    ) {
         viewModelScope.launch {
             try {
                 repository.updateMyProfile(displayName, bio, accentColor, backgroundColor)
@@ -143,8 +159,36 @@ class SocialViewModel : ViewModel() {
 
     fun startGuildsListener() {
         if (guildsListener != null) return
+
         guildsListener = repository.listenMyGuilds(
-            onChange = { _myGuilds.value = it },
+            onChange = { guilds ->
+                _myGuilds.value = guilds
+
+                val currentSelected = _selectedGuild.value
+                if (currentSelected != null) {
+                    val liveGuild = guilds.firstOrNull { it.id == currentSelected.id }
+                    if (liveGuild != null) {
+                        val changed =
+                            liveGuild.ownerUid != currentSelected.ownerUid ||
+                                    liveGuild.ownerDisplayName != currentSelected.ownerDisplayName ||
+                                    liveGuild.memberCount != currentSelected.memberCount ||
+                                    liveGuild.name != currentSelected.name ||
+                                    liveGuild.description != currentSelected.description ||
+                                    liveGuild.accentColor != currentSelected.accentColor ||
+                                    liveGuild.bannerColor != currentSelected.bannerColor ||
+                                    liveGuild.joined != currentSelected.joined
+
+                        _selectedGuild.value = liveGuild
+
+                        if (changed) {
+                            refreshGuildMembers(liveGuild)
+                            restartGuildChatIfNeeded(liveGuild)
+                        }
+                    } else {
+                        closeGuildDetails()
+                    }
+                }
+            },
             onError = { _message.value = it }
         )
     }
@@ -156,16 +200,48 @@ class SocialViewModel : ViewModel() {
 
     fun searchGuilds(query: String) {
         _lastGuildQuery.value = query
+
+        if (query.trim().length < 2) {
+            _guildSearchResults.value = emptyList()
+            return
+        }
+
         viewModelScope.launch {
-            try {
-                _guildSearchResults.value = repository.searchGuilds(query)
-            } catch (e: Exception) {
-                _message.value = e.message ?: "No se pudieron buscar gremios"
+            runCatching {
+                repository.searchGuilds(query)
+            }.onSuccess {
+                _guildSearchResults.value = it
+            }.onFailure {
+                _message.value = it.message ?: "No se pudieron buscar gremios"
             }
         }
     }
 
-    fun createGuild(name: String, description: String, accentColor: String, bannerColor: String) {
+    fun loadGuildSearchResults(query: String) {
+        _lastGuildQuery.value = query
+
+        if (query.trim().length < 2) {
+            _guildSearchResults.value = emptyList()
+            return
+        }
+
+        viewModelScope.launch {
+            runCatching {
+                repository.searchGuilds(query)
+            }.onSuccess { results ->
+                _guildSearchResults.value = results
+            }.onFailure {
+                _message.value = it.message ?: "Error al buscar gremios"
+            }
+        }
+    }
+
+    fun createGuild(
+        name: String,
+        description: String,
+        accentColor: String,
+        bannerColor: String
+    ) {
         viewModelScope.launch {
             try {
                 repository.createGuild(name, description, accentColor, bannerColor)
@@ -186,8 +262,9 @@ class SocialViewModel : ViewModel() {
                 _message.value = "Te has unido al gremio"
                 startGuildsListener()
                 loadGuildSearchResults(_lastGuildQuery.value)
+
                 if (_selectedGuild.value?.id == guild.id) {
-                    openGuildDetails(guild.copy(joined = true, memberCount = guild.memberCount + 1))
+                    openGuildDetails(guild.copy(joined = true))
                 }
             }.onFailure {
                 _message.value = it.message ?: "No se pudo unir al gremio"
@@ -215,9 +292,20 @@ class SocialViewModel : ViewModel() {
             runCatching {
                 repository.transferGuildLeadership(guild, newLeaderUid)
             }.onSuccess {
+                val newLeaderName = _selectedGuildMembers.value
+                    .firstOrNull { it.uid == newLeaderUid }
+                    ?.displayName
+                    .orEmpty()
+
                 _message.value = "Liderazgo transferido correctamente"
-                val updatedGuild = guild.copy(ownerUid = newLeaderUid)
-                openGuildDetails(updatedGuild)
+
+                openGuildDetails(
+                    guild.copy(
+                        ownerUid = newLeaderUid,
+                        ownerDisplayName = newLeaderName.ifBlank { guild.ownerDisplayName }
+                    )
+                )
+
                 startGuildsListener()
                 loadGuildSearchResults(_lastGuildQuery.value)
             }.onFailure {
@@ -226,23 +314,49 @@ class SocialViewModel : ViewModel() {
         }
     }
 
-    fun loadGuildSearchResults(query: String) {
-        _lastGuildQuery.value = query
+    fun openGuildDetails(guild: Guild) {
+        val previousId = _selectedGuild.value?.id
+        val newId = guild.id
+
+        _selectedGuild.value = guild
+
+        if (previousId != newId) {
+            _selectedGuildMembers.value = emptyList()
+            _selectedGuildChat.value = emptyList()
+        }
+
+        refreshGuildMembers(guild)
+        restartGuildChatIfNeeded(guild)
+    }
+
+    fun openGuildDetailsById(guildId: String) {
+        val fromMine = _myGuilds.value.firstOrNull { it.id == guildId }
+        val fromSearch = _guildSearchResults.value.firstOrNull { it.id == guildId }
+        val cachedGuild = fromMine ?: fromSearch
+
+        if (cachedGuild != null) {
+            openGuildDetails(cachedGuild)
+            return
+        }
+
         viewModelScope.launch {
             runCatching {
-                repository.searchGuilds(query)
-            }.onSuccess { results ->
-                _guildSearchResults.value = results
+                repository.getGuildById(guildId)
+            }.onSuccess { found ->
+                if (found != null) {
+                    openGuildDetails(found)
+                } else {
+                    _message.value = "No se encontró el gremio"
+                    _selectedGuild.value = null
+                }
             }.onFailure {
-                _message.value = it.message ?: "Error al buscar gremios"
+                _message.value = it.message ?: "No se pudo abrir el gremio"
+                _selectedGuild.value = null
             }
         }
     }
 
-    fun openGuildDetails(guild: Guild) {
-        _selectedGuild.value = guild
-        _selectedGuildMembers.value = emptyList()
-
+    private fun refreshGuildMembers(guild: Guild) {
         viewModelScope.launch {
             _isGuildMembersLoading.value = true
             runCatching {
@@ -256,10 +370,60 @@ class SocialViewModel : ViewModel() {
         }
     }
 
+    private fun restartGuildChatIfNeeded(guild: Guild) {
+        stopGuildChatListener()
+        _selectedGuildChat.value = emptyList()
+
+        if (!guild.joined) {
+            _isGuildChatLoading.value = false
+            return
+        }
+
+        _isGuildChatLoading.value = true
+        guildChatListener = guildDetailsRepository.listenGuildChat(
+            guildId = guild.id,
+            onChange = { messages ->
+                _selectedGuildChat.value = messages
+                _isGuildChatLoading.value = false
+            },
+            onError = { error ->
+                _isGuildChatLoading.value = false
+                _message.value = error
+            }
+        )
+    }
+
+    fun sendGuildMessage(text: String) {
+        val guild = _selectedGuild.value ?: return
+        if (!guild.joined) {
+            _message.value = "Debes unirte al gremio para escribir en su chat."
+            return
+        }
+
+        viewModelScope.launch {
+            _isSendingGuildMessage.value = true
+            runCatching {
+                guildDetailsRepository.sendGuildChatMessage(guild.id, text.trim())
+            }.onFailure {
+                _message.value = it.message ?: "No se pudo enviar el mensaje"
+            }
+            _isSendingGuildMessage.value = false
+        }
+    }
+
+    private fun stopGuildChatListener() {
+        guildChatListener?.remove()
+        guildChatListener = null
+    }
+
     fun closeGuildDetails() {
+        stopGuildChatListener()
         _selectedGuild.value = null
         _selectedGuildMembers.value = emptyList()
+        _selectedGuildChat.value = emptyList()
         _isGuildMembersLoading.value = false
+        _isGuildChatLoading.value = false
+        _isSendingGuildMessage.value = false
     }
 
     fun canLeaveGuild(guild: Guild): Boolean {
@@ -314,6 +478,7 @@ class SocialViewModel : ViewModel() {
         stopIncomingRequestsListener()
         stopFriendsListener()
         stopGuildsListener()
+        stopGuildChatListener()
         super.onCleared()
     }
 }

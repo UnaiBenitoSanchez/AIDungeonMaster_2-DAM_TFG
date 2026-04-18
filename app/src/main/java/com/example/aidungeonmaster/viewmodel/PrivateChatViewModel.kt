@@ -26,11 +26,11 @@ class PrivateChatViewModel : ViewModel() {
     private val _message = MutableStateFlow<String?>(null)
     val message = _message.asStateFlow()
 
-    fun openChat(friendUid: String) {
+    fun openChat(friendUid: String, guildId: String? = null) {
         viewModelScope.launch {
             try {
                 _loading.value = true
-                val resolvedChatId = repository.getOrCreatePrivateChat(friendUid)
+                val resolvedChatId = repository.getOrCreatePrivateChat(friendUid, guildId)
                 _chatId.value = resolvedChatId
 
                 messagesListener?.remove()

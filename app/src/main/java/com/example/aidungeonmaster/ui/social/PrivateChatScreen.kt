@@ -47,6 +47,7 @@ import java.util.Locale
 fun PrivateChatScreen(
     friendUid: String,
     friendName: String,
+    guildId: String? = null,
     onBack: () -> Unit,
     viewModel: PrivateChatViewModel = viewModel()
 ) {
@@ -58,8 +59,8 @@ fun PrivateChatScreen(
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
 
-    LaunchedEffect(friendUid) {
-        viewModel.openChat(friendUid)
+    LaunchedEffect(friendUid, guildId) {
+        viewModel.openChat(friendUid, guildId)
     }
 
     LaunchedEffect(messages.size) {

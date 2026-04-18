@@ -472,6 +472,28 @@ class SocialRepository {
             .sortedBy { it.nameLower }
     }
 
+    suspend fun getGuildById(guildId: String): Guild? {
+        val currentUid = auth.currentUser?.uid.orEmpty()
+        val guildSnap = db.collection("guilds").document(guildId).get().await()
+        if (!guildSnap.exists()) return null
+
+        val guild = guildSnap.toObject(Guild::class.java)?.copy(id = guildSnap.id) ?: return null
+
+        val joined = if (currentUid.isBlank()) {
+            false
+        } else {
+            db.collection("users")
+                .document(currentUid)
+                .collection("guilds")
+                .document(guildId)
+                .get()
+                .await()
+                .exists()
+        }
+
+        return guild.copy(joined = joined)
+    }
+
     suspend fun joinGuild(guild: Guild) {
         val myUid = auth.currentUser?.uid ?: throw IllegalStateException("Usuario no autenticado")
         val me = getUserProfile(myUid)
