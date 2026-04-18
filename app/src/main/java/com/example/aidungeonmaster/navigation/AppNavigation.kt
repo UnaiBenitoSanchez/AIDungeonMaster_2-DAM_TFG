@@ -52,6 +52,7 @@ import com.example.aidungeonmaster.utils.CombatMusicEngine
 import android.net.Uri
 import com.example.aidungeonmaster.ui.social.GuildDetailsScreen
 
+
 sealed class Screen(val route: String) {
     object Login : Screen("login")
     object Register : Screen("register")
@@ -96,11 +97,10 @@ sealed class Screen(val route: String) {
     object FriendProfile : Screen("friend_profile/{friendUid}") {
         fun createRoute(friendUid: String): String = "friend_profile/$friendUid"
     }
-    object PrivateChat : Screen("private_chat/{friendUid}/{friendName}?guildId={guildId}") {
-        fun createRoute(friendUid: String, friendName: String, guildId: String? = null): String {
-            val safeName = Uri.encode(friendName)
-            val safeGuildId = Uri.encode(guildId.orEmpty())
-            return "private_chat/$friendUid/$safeName?guildId=$safeGuildId"
+    object PrivateChat : Screen("private_chat/{friendUid}/{friendName}") {
+        fun createRoute(friendUid: String, friendName: String): String {
+            val encodedName = Uri.encode(friendName)
+            return "private_chat/$friendUid/$encodedName"
         }
     }
 }
@@ -296,8 +296,8 @@ fun AppNavigation(navController: NavHostController) {
             GuildDetailsScreen(
                 guildId = guildId,
                 onBack = { navController.popBackStack() },
-                onOpenMemberChat = { memberUid, memberName, guildIdValue ->
-                    navController.navigate("private_chat/$memberUid")
+                onOpenMemberChat = { memberUid, memberName, _ ->
+                    navController.navigate(Screen.PrivateChat.createRoute(memberUid, memberName))
                 }
             )
         }
@@ -306,21 +306,16 @@ fun AppNavigation(navController: NavHostController) {
             route = Screen.PrivateChat.route,
             arguments = listOf(
                 navArgument("friendUid") { type = NavType.StringType },
-                navArgument("friendName") { type = NavType.StringType },
-                navArgument("guildId") {
-                    type = NavType.StringType
-                    defaultValue = ""
-                }
+                navArgument("friendName") { type = NavType.StringType }
             )
         ) { backStackEntry ->
             val friendUid = backStackEntry.arguments?.getString("friendUid").orEmpty()
-            val friendName = Uri.decode(backStackEntry.arguments?.getString("friendName").orEmpty())
-            val guildId = Uri.decode(backStackEntry.arguments?.getString("guildId").orEmpty())
+            val friendNameEncoded = backStackEntry.arguments?.getString("friendName").orEmpty()
+            val friendName = Uri.decode(friendNameEncoded)
 
             PrivateChatScreen(
                 friendUid = friendUid,
                 friendName = friendName,
-                guildId = guildId.ifBlank { null },
                 onBack = { navController.popBackStack() }
             )
         }
