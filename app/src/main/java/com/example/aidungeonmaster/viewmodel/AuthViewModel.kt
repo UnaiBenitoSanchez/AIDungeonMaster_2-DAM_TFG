@@ -22,7 +22,11 @@ class AuthViewModel : ViewModel() {
     var errorMessage by mutableStateOf<String?>(null)
 
     fun isUserLoggedIn(): Boolean {
-        return auth.currentUser != null
+        // BUG FIX: Solo se considera logueado si el email está verificado.
+        // Antes devolvía true aunque el usuario no hubiera verificado el correo,
+        // lo que provocaba que el registro metiera al usuario directamente en la app.
+        val user = auth.currentUser
+        return user != null && user.isEmailVerified
     }
 
     fun login(email: String, pass: String, onSuccess: () -> Unit) {
@@ -56,7 +60,10 @@ class AuthViewModel : ViewModel() {
             displayName = displayName,
             username = username,
             onSuccess = {
-                viewModelScope.launch { socialRepository.updatePresence(true) }
+                // BUG FIX: Se elimina la llamada a updatePresence aquí.
+                // El usuario acaba de registrarse pero su email NO está verificado todavía,
+                // así que no debe establecerse como "online" ni entrar en la app.
+                // onSuccess solo muestra el Toast y hace popBackStack al Login.
                 onSuccess()
             },
             onError = {

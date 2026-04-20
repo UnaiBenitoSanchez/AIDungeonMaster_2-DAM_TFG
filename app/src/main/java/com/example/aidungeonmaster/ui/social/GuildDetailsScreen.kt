@@ -5,6 +5,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -47,6 +48,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -61,14 +63,16 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.SubcomposeAsyncImage
 import com.example.aidungeonmaster.data.model.GuildChatMessage
 import com.example.aidungeonmaster.data.model.GuildMemberSummary
+import com.example.aidungeonmaster.data.repository.GuildRaidRepository
 import com.example.aidungeonmaster.viewmodel.SocialViewModel
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+
 private enum class GuildDetailsScreenTab {
-    RESUMEN, CHAT, MIEMBROS
+    RESUMEN, CHAT, MIEMBROS, JEFE_FINAL
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -77,6 +81,7 @@ fun GuildDetailsScreen(
     guildId: String,
     onBack: () -> Unit,
     onOpenMemberChat: (String, String, String) -> Unit,
+    onOpenBossBattle: (String) -> Unit,
     viewModel: SocialViewModel = viewModel()
 ) {
     val guild by viewModel.selectedGuild.collectAsState()
@@ -85,6 +90,12 @@ fun GuildDetailsScreen(
     val isMembersLoading by viewModel.isGuildMembersLoading.collectAsState()
     val isGuildChatLoading by viewModel.isGuildChatLoading.collectAsState()
     val isSendingGuildMessage by viewModel.isSendingGuildMessage.collectAsState()
+
+    val bossRoom by viewModel.guildBossRoom.collectAsState()
+    val bossParticipants by viewModel.guildBossParticipants.collectAsState()
+    val bossCharacters by viewModel.guildBossCharacters.collectAsState()
+    val isGuildBossLoading by viewModel.isGuildBossLoading.collectAsState()
+    val isGuildBossActing by viewModel.isGuildBossActing.collectAsState()
 
     LaunchedEffect(guildId) {
         viewModel.startGuildsListener()
@@ -135,11 +146,53 @@ fun GuildDetailsScreen(
     val chatListState = rememberLazyListState()
     val chatScope = rememberCoroutineScope()
 
+    var hasNavigatedToBossBattle by rememberSaveable(currentGuild.id) { mutableStateOf(false) }
+    val userExplicitlyLeftBattle by viewModel.userExplicitlyLeftBattle.collectAsState()
+
     LaunchedEffect(guildChatMessages.size, selectedTab) {
         if (selectedTab == GuildDetailsScreenTab.CHAT && guildChatMessages.isNotEmpty()) {
             chatScope.launch {
                 chatListState.animateScrollToItem(guildChatMessages.lastIndex)
             }
+        }
+    }
+
+    LaunchedEffect(currentGuild.id, bossRoom?.status, bossRoom?.currentTurnUid) {
+        if (
+            bossRoom?.status == "battle" &&
+            bossRoom?.currentTurnUid == GuildRaidRepository.BOSS_TURN_UID
+        ) {
+            viewModel.resolveBossTurnIfNeeded()
+        }
+    }
+
+    LaunchedEffect(
+        currentGuild.id,
+        bossRoom?.status,
+        bossRoom?.bossHpMax,
+        bossRoom?.updatedAt,
+        bossParticipants.size
+    ) {
+        val myUid = currentUserUid
+        val amParticipant = bossParticipants.any { it.uid == myUid }
+        val amOwner = currentGuild.ownerUid == myUid
+
+        // FIX NAVEGACIÓN: no redirigimos si el usuario acaba de pulsar "Volver"
+        val shouldEnterBattle =
+            bossRoom?.status == "battle" &&
+                    (bossRoom?.bossHpMax ?: 0) > 0 &&
+                    (amParticipant || amOwner) &&
+                    !userExplicitlyLeftBattle
+
+        if (shouldEnterBattle && !hasNavigatedToBossBattle) {
+            hasNavigatedToBossBattle = true
+            onOpenBossBattle(currentGuild.id)
+        }
+
+        // Limpiar flags cuando la batalla termina
+        if (bossRoom?.status != "battle") {
+            hasNavigatedToBossBattle = false
+            viewModel.clearUserLeftBattle()
         }
     }
 
@@ -257,7 +310,10 @@ fun GuildDetailsScreen(
                 }
             }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
                 GuildDetailsTabChip(
                     title = "Resumen",
                     selected = selectedTab == GuildDetailsScreenTab.RESUMEN,
@@ -275,6 +331,12 @@ fun GuildDetailsScreen(
                     selected = selectedTab == GuildDetailsScreenTab.MIEMBROS,
                     accent = accent,
                     onClick = { selectedTab = GuildDetailsScreenTab.MIEMBROS }
+                )
+                GuildDetailsTabChip(
+                    title = "Jefe final",
+                    selected = selectedTab == GuildDetailsScreenTab.JEFE_FINAL,
+                    accent = accent,
+                    onClick = { selectedTab = GuildDetailsScreenTab.JEFE_FINAL }
                 )
             }
 
@@ -502,6 +564,382 @@ fun GuildDetailsScreen(
                         }
                     }
                 }
+
+                GuildDetailsScreenTab.JEFE_FINAL -> {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(24.dp),
+                        tonalElevation = 3.dp
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(18.dp),
+                            verticalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            Text(
+                                "Jefe final del gremio",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+
+                            if (!currentGuild.joined) {
+                                GuildDetailsEmptyBlock("Debes unirte al gremio para participar.")
+                            } else {
+                                val myUid = currentUserUid
+                                val myParticipant = bossParticipants.firstOrNull { it.uid == myUid }
+                                val allParticipantsReady = bossParticipants.isNotEmpty() && bossParticipants.all { it.ready }
+                                val canStartBattle = isOwner &&
+                                        (bossRoom?.status == "waiting" || bossRoom?.status == "finished") &&
+                                        bossParticipants.isNotEmpty() &&
+                                        bossParticipants.all {
+                                            it.ready && it.alive && it.hpCurrent > 0 && it.hpCurrent == it.hpMax
+                                        } &&
+                                        !isGuildBossActing
+
+                                val roomStatusText = when (bossRoom?.status) {
+                                    "battle" -> "Batalla en curso"
+                                    "finished" -> "Batalla terminada"
+                                    else -> "Sala de espera"
+                                }
+
+                                val turnLabel = when (bossRoom?.currentTurnUid) {
+                                    GuildRaidRepository.BOSS_TURN_UID -> "Turno del jefe"
+                                    myUid -> "Es tu turno"
+                                    null, "" -> "Sin turno activo"
+                                    else -> "Turno de otro miembro"
+                                }
+
+                                Surface(
+                                    shape = RoundedCornerShape(18.dp),
+                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+                                ) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(14.dp),
+                                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Text(
+                                            turnLabel,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+
+                                        Text(
+                                            "Estado: $roomStatusText",
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+
+                                        if (bossRoom?.status == "battle") {
+                                            Text(
+                                                "Ronda ${bossRoom?.round ?: 1}",
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+
+                                            Text(
+                                                "Jefe: ${bossRoom?.bossName.orEmpty()}",
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+
+                                            Text(
+                                                "HP ${bossRoom?.bossHpCurrent ?: 0}/${bossRoom?.bossHpMax ?: 0}",
+                                                color = accent,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+
+                                        if (bossRoom?.winner == "guild") {
+                                            Text(
+                                                "Victoria del gremio",
+                                                color = accent,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        } else if (bossRoom?.winner == "boss") {
+                                            Text(
+                                                "El jefe ha ganado",
+                                                color = Color.Red,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                    }
+                                }
+
+                                Text(
+                                    "1) Elige personaje. 2) Pulsa listo. 3) El líder inicia la pelea cuando todos estén listos.",
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+
+                                HorizontalDivider()
+
+                                Text(
+                                    "Tus personajes",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+
+                                if (isGuildBossLoading) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 20.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        CircularProgressIndicator()
+                                    }
+                                } else if (bossCharacters.isEmpty()) {
+                                    GuildDetailsEmptyBlock("No tienes personajes disponibles.")
+                                } else {
+                                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                        bossCharacters.forEach { character ->
+                                            val isSelected = myParticipant?.selectedCharacterDocId == character.id
+
+                                            Surface(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .clickable(
+                                                        enabled = bossRoom?.status != "battle" && !isGuildBossActing
+                                                    ) {
+                                                        viewModel.selectBossCharacter(character)
+                                                    },
+                                                shape = RoundedCornerShape(18.dp),
+                                                color = if (isSelected) {
+                                                    accent.copy(alpha = 0.18f)
+                                                } else {
+                                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+                                                },
+                                                border = BorderStroke(
+                                                    1.dp,
+                                                    if (isSelected) accent
+                                                    else MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)
+                                                )
+                                            ) {
+                                                Column(
+                                                    modifier = Modifier.padding(14.dp),
+                                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                                ) {
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Text(
+                                                            character.name,
+                                                            style = MaterialTheme.typography.titleMedium,
+                                                            fontWeight = FontWeight.SemiBold
+                                                        )
+
+                                                        if (isSelected) {
+                                                            Text(
+                                                                "Seleccionado",
+                                                                color = accent,
+                                                                style = MaterialTheme.typography.labelMedium,
+                                                                fontWeight = FontWeight.Bold
+                                                            )
+                                                        }
+                                                    }
+
+                                                    Text(
+                                                        "${character.race} • ${character.characterClass}",
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+
+                                                    Text(
+                                                        "Nivel ${character.level} • HP ${character.hpMax}",
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                HorizontalDivider()
+
+                                Text(
+                                    "Participantes",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+
+                                if (bossParticipants.isEmpty()) {
+                                    GuildDetailsEmptyBlock("Aún no hay nadie en la sala.")
+                                } else {
+                                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                        bossParticipants.forEach { participant ->
+                                            val isMe = participant.uid == myUid
+
+                                            Surface(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                shape = RoundedCornerShape(18.dp),
+                                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+                                                border = BorderStroke(
+                                                    1.dp,
+                                                    if (isMe) accent.copy(alpha = 0.45f)
+                                                    else MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
+                                                )
+                                            ) {
+                                                Column(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .padding(14.dp),
+                                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                                ) {
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Column(modifier = Modifier.weight(1f)) {
+                                                            Text(
+                                                                buildString {
+                                                                    append(participant.displayName.ifBlank { participant.username })
+                                                                    if (isMe) append(" (Tú)")
+                                                                },
+                                                                fontWeight = FontWeight.SemiBold
+                                                            )
+                                                            Text(
+                                                                "${participant.selectedCharacterName} • ${participant.selectedCharacterClass}",
+                                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                            )
+                                                        }
+
+                                                        GuildDetailsMiniBadge(
+                                                            text = when {
+                                                                !participant.alive -> "KO"
+                                                                participant.ready -> "Listo"
+                                                                else -> "Esperando"
+                                                            },
+                                                            background = when {
+                                                                !participant.alive -> Color.Red.copy(alpha = 0.18f)
+                                                                participant.ready -> accent.copy(alpha = 0.18f)
+                                                                else -> MaterialTheme.colorScheme.surfaceVariant
+                                                            },
+                                                            content = if (!participant.alive) Color.Red else MaterialTheme.colorScheme.onSurface
+                                                        )
+                                                    }
+
+                                                    Text(
+                                                        "HP ${participant.hpCurrent}/${participant.hpMax}",
+                                                        color = if (participant.alive) {
+                                                            MaterialTheme.colorScheme.onSurfaceVariant
+                                                        } else {
+                                                            Color.Red
+                                                        }
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                HorizontalDivider()
+
+                                if (bossRoom?.status == "waiting" || bossRoom?.status == "finished") {
+                                    Text(
+                                        when {
+                                            bossRoom?.status == "finished" && canStartBattle ->
+                                                "La pelea anterior ha terminado. Todos han vuelto a pulsar Listo y el líder ya puede iniciar otra."
+                                            bossRoom?.status == "finished" ->
+                                                "La pelea anterior ha terminado. Cada participante debe pulsar Listo otra vez para restaurar su estado."
+                                            allParticipantsReady ->
+                                                "Todos los participantes están listos. El líder puede iniciar la pelea."
+                                            else ->
+                                                "Todavía no están todos listos."
+                                        },
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Button(
+                                        onClick = { viewModel.setBossReady(true) },
+                                        enabled = myParticipant != null &&
+                                                bossRoom?.status != "battle" &&
+                                                !isGuildBossActing,
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Text("Listo")
+                                    }
+
+                                    OutlinedButton(
+                                        onClick = { viewModel.setBossReady(false) },
+                                        enabled = myParticipant != null &&
+                                                bossRoom?.status != "battle" &&
+                                                !isGuildBossActing,
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Text("No listo")
+                                    }
+                                }
+
+                                if (isOwner && (bossRoom?.status == "waiting" || bossRoom?.status == "finished")) {
+                                    Button(
+                                        onClick = { viewModel.startBossBattle() },
+                                        enabled = canStartBattle,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text(if (bossRoom?.status == "finished") "Empezar otra pelea" else "Empezar pelea")
+                                    }
+                                }
+
+                                if (bossRoom?.status == "battle" && (bossRoom?.bossHpMax ?: 0) > 0) {
+                                    Button(
+                                        onClick = { onOpenBossBattle(currentGuild.id) },
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text("Entrar en pelea")
+                                    }
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    OutlinedButton(
+                                        onClick = { viewModel.leaveBossRoom() },
+                                        enabled = bossRoom?.status != "battle" && !isGuildBossActing,
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Text("Salir de sala")
+                                    }
+
+                                    if (isOwner) {
+                                        OutlinedButton(
+                                            onClick = { viewModel.resetBossRoom() },
+                                            enabled = !isGuildBossActing,
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text("Reiniciar")
+                                        }
+                                    }
+                                }
+
+                                if (!bossRoom?.battleLog.isNullOrEmpty()) {
+                                    HorizontalDivider()
+
+                                    Text(
+                                        "Registro de batalla",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+
+                                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        bossRoom!!.battleLog.takeLast(12).forEach { line ->
+                                            Text(
+                                                line,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -561,7 +999,7 @@ private fun GuildDetailsMemberRow(
                 }
             }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (canOpenChat) {
                     OutlinedButton(onClick = onOpenChat) {
                         Text("Chat")

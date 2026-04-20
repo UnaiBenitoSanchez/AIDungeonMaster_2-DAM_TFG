@@ -52,6 +52,8 @@ import com.example.aidungeonmaster.utils.CombatMusicEngine
 import android.net.Uri
 import com.example.aidungeonmaster.ui.social.GuildDetailsScreen
 
+import com.example.aidungeonmaster.ui.social.GuildBossBattleScreen
+import com.example.aidungeonmaster.viewmodel.SocialViewModel
 
 sealed class Screen(val route: String) {
     object Login : Screen("login")
@@ -103,6 +105,10 @@ sealed class Screen(val route: String) {
             return "private_chat/$friendUid/$encodedName"
         }
     }
+
+    object GuildBossBattle : Screen("guild_boss_battle/{guildId}") {
+        fun createRoute(guildId: String): String = "guild_boss_battle/$guildId"
+    }
 }
 
 @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
@@ -113,6 +119,7 @@ fun AppNavigation(navController: NavHostController) {
     val inventoryViewModel: InventoryViewModel = viewModel()
     val worldMapViewModel: WorldMapViewModel = viewModel()
     val achievementViewModel: AchievementViewModel = viewModel()
+    val socialViewModel: SocialViewModel = viewModel()
 
     val deletionRepository = CharacterDeletionRepository()
     val scope = rememberCoroutineScope()
@@ -286,7 +293,8 @@ fun AppNavigation(navController: NavHostController) {
                 onBack = { navController.popBackStack() },
                 onOpenGuildDetails = { guildId ->
                     navController.navigate("guild_details/$guildId")
-                }
+                },
+                viewModel = socialViewModel
             )
         }
 
@@ -298,7 +306,13 @@ fun AppNavigation(navController: NavHostController) {
                 onBack = { navController.popBackStack() },
                 onOpenMemberChat = { memberUid, memberName, _ ->
                     navController.navigate(Screen.PrivateChat.createRoute(memberUid, memberName))
-                }
+                },
+                onOpenBossBattle = { battleGuildId ->
+                    navController.navigate(Screen.GuildBossBattle.createRoute(battleGuildId)) {
+                        launchSingleTop = true
+                    }
+                },
+                viewModel = socialViewModel
             )
         }
 
@@ -317,6 +331,16 @@ fun AppNavigation(navController: NavHostController) {
                 friendUid = friendUid,
                 friendName = friendName,
                 onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Screen.GuildBossBattle.route) { backStackEntry ->
+            val guildId = backStackEntry.arguments?.getString("guildId").orEmpty()
+
+            GuildBossBattleScreen(
+                guildId = guildId,
+                onBack = { navController.popBackStack() },
+                viewModel = socialViewModel
             )
         }
     }

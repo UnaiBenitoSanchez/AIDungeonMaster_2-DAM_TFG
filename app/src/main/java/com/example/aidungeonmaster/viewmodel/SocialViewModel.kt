@@ -17,6 +17,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import com.example.aidungeonmaster.data.model.Character
+import com.example.aidungeonmaster.data.model.GuildBossParticipant
+import com.example.aidungeonmaster.data.model.GuildBossRoom
+import com.example.aidungeonmaster.data.repository.GuildRaidRepository
+
+import com.example.aidungeonmaster.data.model.GuildBossAbility
+import com.example.aidungeonmaster.data.model.Item
 
 class SocialViewModel : ViewModel() {
 
@@ -27,6 +34,27 @@ class SocialViewModel : ViewModel() {
     private var friendsListener: ListenerRegistration? = null
     private var guildsListener: ListenerRegistration? = null
     private var guildChatListener: ListenerRegistration? = null
+
+    private val guildRaidRepository = GuildRaidRepository()
+
+    private var guildBossRoomListener: ListenerRegistration? = null
+    private var guildBossParticipantsListener: ListenerRegistration? = null
+    private var activeGuildBossGuildId: String? = null
+
+    private val _guildBossRoom = MutableStateFlow<GuildBossRoom?>(null)
+    val guildBossRoom = _guildBossRoom.asStateFlow()
+
+    private val _guildBossParticipants = MutableStateFlow<List<GuildBossParticipant>>(emptyList())
+    val guildBossParticipants = _guildBossParticipants.asStateFlow()
+
+    private val _guildBossCharacters = MutableStateFlow<List<Character>>(emptyList())
+    val guildBossCharacters = _guildBossCharacters.asStateFlow()
+
+    private val _isGuildBossLoading = MutableStateFlow(false)
+    val isGuildBossLoading = _isGuildBossLoading.asStateFlow()
+
+    private val _isGuildBossActing = MutableStateFlow(false)
+    val isGuildBossActing = _isGuildBossActing.asStateFlow()
 
     private val _searchResults = MutableStateFlow<List<AppUser>>(emptyList())
     val searchResults = _searchResults.asStateFlow()
@@ -72,6 +100,65 @@ class SocialViewModel : ViewModel() {
 
     private val _lastGuildQuery = MutableStateFlow("")
     val lastGuildQuery: StateFlow<String> = _lastGuildQuery.asStateFlow()
+
+    private val _guildBossConsumables = MutableStateFlow<List<Item>>(emptyList())
+    val guildBossConsumables = _guildBossConsumables.asStateFlow()
+
+    fun refreshBossConsumables() {
+        val guildId = _selectedGuild.value?.id ?: return
+        viewModelScope.launch {
+            runCatching {
+                guildRaidRepository.loadBossConsumables(guildId)
+            }.onSuccess {
+                _guildBossConsumables.value = it
+            }.onFailure {
+                _guildBossConsumables.value = emptyList()
+            }
+        }
+    }
+
+    fun useBossAbility(ability: GuildBossAbility) {
+        val guildId = _selectedGuild.value?.id ?: return
+        viewModelScope.launch {
+            _isGuildBossActing.value = true
+            runCatching {
+                guildRaidRepository.useAbility(guildId, ability)
+            }.onFailure {
+                _message.value = it.message ?: "No se pudo usar la habilidad"
+            }
+            _isGuildBossActing.value = false
+        }
+    }
+
+    fun useBossConsumable(item: Item) {
+        val guildId = _selectedGuild.value?.id ?: return
+        viewModelScope.launch {
+            _isGuildBossActing.value = true
+            runCatching {
+                guildRaidRepository.useConsumable(guildId, item)
+            }.onSuccess {
+                refreshBossConsumables()
+            }.onFailure {
+                _message.value = it.message ?: "No se pudo usar el objeto"
+            }
+            _isGuildBossActing.value = false
+        }
+    }
+
+    fun startBossBattle() {
+        val guildId = _selectedGuild.value?.id ?: return
+        viewModelScope.launch {
+            _isGuildBossActing.value = true
+            runCatching {
+                guildRaidRepository.startBattleIfReady(guildId)
+            }.onSuccess {
+                _message.value = "La pelea ha comenzado"
+            }.onFailure {
+                _message.value = it.message ?: "No se pudo iniciar la pelea"
+            }
+            _isGuildBossActing.value = false
+        }
+    }
 
     fun uploadMyProfilePhoto(context: Context, uri: Uri) {
         viewModelScope.launch {
@@ -327,6 +414,18 @@ class SocialViewModel : ViewModel() {
 
         refreshGuildMembers(guild)
         restartGuildChatIfNeeded(guild)
+
+        if (guild.joined) {
+            startGuildBossListeners(guild.id)
+            loadBossCharacters()
+            refreshBossConsumables()
+        } else {
+            stopGuildBossListeners()
+            _guildBossRoom.value = null
+            _guildBossParticipants.value = emptyList()
+            _guildBossCharacters.value = emptyList()
+            _guildBossConsumables.value = emptyList()
+        }
     }
 
     fun openGuildDetailsById(guildId: String) {
@@ -411,6 +510,166 @@ class SocialViewModel : ViewModel() {
         }
     }
 
+    private fun startGuildBossListeners(guildId: String) {
+        if (activeGuildBossGuildId == guildId &&
+            guildBossRoomListener != null &&
+            guildBossParticipantsListener != null
+        ) {
+            return
+        }
+
+        stopGuildBossListeners()
+        _guildBossRoom.value = null
+        _guildBossParticipants.value = emptyList()
+
+        activeGuildBossGuildId = guildId
+
+        guildBossRoomListener = guildRaidRepository.listenBossRoom(
+            guildId = guildId,
+            onChange = { room -> _guildBossRoom.value = room },
+            onError = { _message.value = it }
+        )
+
+        guildBossParticipantsListener = guildRaidRepository.listenBossParticipants(
+            guildId = guildId,
+            onChange = { participants -> _guildBossParticipants.value = participants },
+            onError = { _message.value = it }
+        )
+    }
+
+    private fun stopGuildBossListeners() {
+        guildBossRoomListener?.remove()
+        guildBossRoomListener = null
+        guildBossParticipantsListener?.remove()
+        guildBossParticipantsListener = null
+        activeGuildBossGuildId = null
+    }
+
+    fun loadBossCharacters() {
+        viewModelScope.launch {
+            _isGuildBossLoading.value = true
+            runCatching {
+                guildRaidRepository.getPlayableCharacters()
+            }.onSuccess {
+                _guildBossCharacters.value = it
+            }.onFailure {
+                _message.value = it.message ?: "No se pudieron cargar los personajes"
+            }
+            _isGuildBossLoading.value = false
+        }
+    }
+
+    fun selectBossCharacter(character: Character) {
+        val guildId = _selectedGuild.value?.id ?: return
+        viewModelScope.launch {
+            _isGuildBossActing.value = true
+            runCatching {
+                guildRaidRepository.selectCharacter(guildId, character)
+            }.onSuccess {
+                _message.value = "Personaje seleccionado: ${character.name}"
+                refreshBossConsumables()
+            }.onFailure {
+                _message.value = it.message ?: "No se pudo elegir el personaje"
+            }
+            _isGuildBossActing.value = false
+        }
+    }
+
+    fun setBossReady(ready: Boolean) {
+        val guildId = _selectedGuild.value?.id ?: return
+        viewModelScope.launch {
+            _isGuildBossActing.value = true
+            runCatching {
+                guildRaidRepository.setReady(guildId, ready)
+            }.onFailure {
+                _message.value = it.message ?: "No se pudo actualizar el estado de listo"
+            }
+            _isGuildBossActing.value = false
+        }
+    }
+
+    fun performBossAttack() {
+        val guildId = _selectedGuild.value?.id ?: return
+        viewModelScope.launch {
+            _isGuildBossActing.value = true
+            runCatching {
+                guildRaidRepository.playerAttack(guildId)
+            }.onFailure {
+                _message.value = it.message ?: "No se pudo ejecutar el ataque"
+            }
+            _isGuildBossActing.value = false
+        }
+    }
+
+    fun resolveBossTurnIfNeeded() {
+        val guild = _selectedGuild.value ?: return
+        val guildId = guild.id
+        if (!guild.joined || !isGuildOwner(guild)) return
+
+        viewModelScope.launch {
+            _isGuildBossActing.value = true
+            runCatching {
+                guildRaidRepository.resolveBossTurn(guildId)
+            }.onFailure {
+                _message.value = it.message ?: "No se pudo resolver el turno del jefe"
+            }
+            _isGuildBossActing.value = false
+        }
+    }
+
+    fun leaveBossRoom() {
+        val guildId = _selectedGuild.value?.id ?: return
+        viewModelScope.launch {
+            _isGuildBossActing.value = true
+            runCatching {
+                guildRaidRepository.leaveBossRoom(guildId)
+            }.onFailure {
+                _message.value = it.message ?: "No se pudo salir de la sala"
+            }
+            _isGuildBossActing.value = false
+        }
+    }
+
+    fun resetBossRoom() {
+        val guildId = _selectedGuild.value?.id ?: return
+        viewModelScope.launch {
+            _isGuildBossActing.value = true
+            runCatching {
+                guildRaidRepository.resetBossRoom(guildId)
+            }.onFailure {
+                _message.value = it.message ?: "No se pudo reiniciar la sala"
+            }
+            _isGuildBossActing.value = false
+        }
+    }
+
+    // FIX: Permite al líder terminar la batalla manualmente.
+    fun forceEndBattle() {
+        val guildId = _selectedGuild.value?.id ?: return
+        viewModelScope.launch {
+            _isGuildBossActing.value = true
+            runCatching {
+                guildRaidRepository.forceEndBattle(guildId)
+            }.onFailure {
+                _message.value = it.message ?: "No se pudo terminar la batalla"
+            }
+            _isGuildBossActing.value = false
+        }
+    }
+
+    // FIX NAVEGACIÓN: Flag para que GuildDetailsScreen no vuelva a redirigir al
+    // usuario a la batalla cuando acaba de pulsar "Volver" intencionalmente.
+    private val _userExplicitlyLeftBattle = MutableStateFlow(false)
+    val userExplicitlyLeftBattle = _userExplicitlyLeftBattle.asStateFlow()
+
+    fun markUserLeftBattle() {
+        _userExplicitlyLeftBattle.value = true
+    }
+
+    fun clearUserLeftBattle() {
+        _userExplicitlyLeftBattle.value = false
+    }
+
     private fun stopGuildChatListener() {
         guildChatListener?.remove()
         guildChatListener = null
@@ -424,6 +683,13 @@ class SocialViewModel : ViewModel() {
         _isGuildMembersLoading.value = false
         _isGuildChatLoading.value = false
         _isSendingGuildMessage.value = false
+        stopGuildBossListeners()
+        _guildBossRoom.value = null
+        _guildBossParticipants.value = emptyList()
+        _guildBossCharacters.value = emptyList()
+        _isGuildBossLoading.value = false
+        _isGuildBossActing.value = false
+        _guildBossConsumables.value = emptyList()
     }
 
     fun canLeaveGuild(guild: Guild): Boolean {
@@ -480,5 +746,6 @@ class SocialViewModel : ViewModel() {
         stopGuildsListener()
         stopGuildChatListener()
         super.onCleared()
+        stopGuildBossListeners()
     }
 }

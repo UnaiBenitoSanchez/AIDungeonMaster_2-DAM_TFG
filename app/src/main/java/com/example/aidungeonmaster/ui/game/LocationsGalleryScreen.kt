@@ -176,7 +176,7 @@ fun LocationsGalleryScreen(
                                 }
                             }
                             Text(
-                                currentLoc.type.replaceFirstChar { it.uppercase() },
+                                resolveLocationVisualType(currentLoc).replaceFirstChar { it.uppercase() },
                                 color = Color(0xFF888877),
                                 fontSize = 11.sp
                             )
@@ -263,6 +263,59 @@ private fun LocationChip(
                 lineHeight = 13.sp
             )
         }
+    }
+}
+
+private fun normalizeText(value: String): String =
+    Normalizer.normalize(value.lowercase().trim(), Normalizer.Form.NFD)
+        .replace(Regex("\\p{InCombiningDiacriticalMarks}+"), "")
+
+private fun containsAny(text: String, options: List<String>): Boolean =
+    options.any { text.contains(it) }
+
+private fun resolveLocationVisualType(location: WorldLocation): String {
+    val context = normalizeText("${location.type} ${location.name} ${location.description}")
+
+    return when {
+        containsAny(
+            context,
+            listOf("cascada", "catarata", "salto de agua")
+        ) -> "cascada"
+
+        containsAny(
+            context,
+            listOf("rio", "arroyo", "quebrada", "ribera", "afluente")
+        ) -> "rio"
+
+        containsAny(
+            context,
+            listOf("oceano", "alta mar", "mar abierto")
+        ) -> "océano"
+
+        containsAny(
+            context,
+            listOf("mar", "playa", "costa", "litoral", "bahia", "muelle", "puerto")
+        ) -> "mar"
+
+        containsAny(
+            context,
+            listOf("lago", "laguna", "estanque")
+        ) -> "lago"
+
+        containsAny(
+            context,
+            listOf(
+                "tienda", "mercado", "puesto", "comercio",
+                "almacen", "provisiones", "comida", "shop", "store"
+            )
+        ) -> "tienda"
+
+        containsAny(
+            context,
+            listOf("cabana", "choza", "refugio", "casita", "cottage", "hut")
+        ) -> "cabana"
+
+        else -> normalizeLocationType(location.type)
     }
 }
 
@@ -491,9 +544,11 @@ private fun normalizeLocationType(rawType: String): String {
         .replace(Regex("\\p{InCombiningDiacriticalMarks}+"), "")
 
     return when {
+        listOf("cascada", "catarata", "salto de agua").any { it in normalized } -> "cascada"
+        listOf("rio", "arroyo", "quebrada", "afluente", "ribera").any { it in normalized } -> "rio"
         listOf("oceano", "alta mar", "mar abierto").any { it in normalized } -> "océano"
         listOf("puerto", "mar", "playa", "costa", "litoral", "bahia", "muelle").any { it in normalized } -> "mar"
-        listOf("lago", "rio", "laguna", "arroyo", "estanque").any { it in normalized } -> "lago"
+        listOf("lago", "laguna", "estanque").any { it in normalized } -> "lago"
         listOf("cueva", "gruta", "caverna").any { it in normalized } -> "cueva"
         listOf("montana", "pico", "cordillera").any { it in normalized } -> "montaña"
         else -> normalized
@@ -502,16 +557,14 @@ private fun normalizeLocationType(rawType: String): String {
 
 // ── GENERADOR DE HTML Three.js ────────────────────────────────────────────────
 
-/**
- * Genera un documento HTML autocontenido con Three.js que muestra un modelo 3D
- * procedural del tipo de ubicación, enriquecido con extras de la descripción.
- *
- * IMPORTANTE: Todos los literales negativos en el JS usan el guión ASCII (U+002D, '-'),
- * NO el signo menos Unicode (U+2212, '-'). Confundirlos rompe silenciosamente el parser JS.
- */
 private fun buildLocationHtml(location: WorldLocation): String {
-    val type         = normalizeLocationType(location.type)
-    val tags         = parseDescriptionTags(location.description)
+    val type         = resolveLocationVisualType(location)
+    val rawTags = parseDescriptionTags(location.description)
+    val tags = if (type in setOf("lago", "mar", "océano", "oceano", "rio", "cascada")) {
+        rawTags - "agua_fondo"
+    } else {
+        rawTags
+    }
     val modelCode    = getModelCode(type)
     val extraCode    = getDescriptionExtras(tags)
     val bgColor      = getBackgroundColor(type)
@@ -584,13 +637,15 @@ ground.receiveShadow = true;
 scene.add(ground);
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
-function makeMat(color, rough, metal, emissive, emissiveInt) {
+function makeMat(color, rough, metal, emissive, emissiveInt, opacity, transparent) {
     return new THREE.MeshStandardMaterial({
         color: color,
         roughness: rough !== undefined ? rough : 0.8,
         metalness: metal !== undefined ? metal : 0.0,
         emissive: emissive !== undefined ? emissive : 0x000000,
-        emissiveIntensity: emissiveInt !== undefined ? emissiveInt : 0.0
+        emissiveIntensity: emissiveInt !== undefined ? emissiveInt : 0.0,
+        opacity: opacity !== undefined ? opacity : 1.0,
+        transparent: transparent !== undefined ? transparent : (opacity !== undefined && opacity < 1.0)
     });
 }
 function addMesh(geo, mat, x, y, z, rx, ry, rz, sx, sy, sz) {
@@ -602,6 +657,53 @@ function addMesh(geo, mat, x, y, z, rx, ry, rz, sx, sy, sz) {
     m.receiveShadow = true;
     scene.add(m);
     return m;
+}
+
+function addRibbonXZ(points, width, mat, y) {
+    var left = [];
+    var right = [];
+
+    for (var i = 0; i < points.length; i++) {
+        var p0 = points[Math.max(0, i - 1)];
+        var p1 = points[Math.min(points.length - 1, i + 1)];
+
+        var dx = p1[0] - p0[0];
+        var dz = p1[1] - p0[1];
+        var len = Math.sqrt(dx * dx + dz * dz);
+        if (len < 0.0001) len = 1.0;
+
+        var nx = -dz / len;
+        var nz =  dx / len;
+
+        left.push(new THREE.Vector2(
+            points[i][0] + nx * width * 0.5,
+            points[i][1] + nz * width * 0.5
+        ));
+        right.push(new THREE.Vector2(
+            points[i][0] - nx * width * 0.5,
+            points[i][1] - nz * width * 0.5
+        ));
+    }
+
+    var shape = new THREE.Shape();
+    shape.moveTo(left[0].x, left[0].y);
+
+    for (var li = 1; li < left.length; li++) {
+        shape.lineTo(left[li].x, left[li].y);
+    }
+    for (var ri = right.length - 1; ri >= 0; ri--) {
+        shape.lineTo(right[ri].x, right[ri].y);
+    }
+    shape.closePath();
+
+    var geo = new THREE.ShapeGeometry(shape);
+    var mesh = new THREE.Mesh(geo, mat);
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.y = y || 0.0;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    scene.add(mesh);
+    return mesh;
 }
 
 // ── MODELO BASE ───────────────────────────────────────────────────────────────
@@ -682,10 +784,14 @@ private fun getBackgroundColor(type: String) = when (type) {
     "templo"             -> "0x0D0D10"
     "torre"              -> "0x080810"
     "lago"               -> "0x0A1624"
-    "mar", "playa", "costa", "litoral", "bahía", "bahia" -> "0x74C0D8"
-    "océano", "oceano"  -> "0x061630"
+    "rio"                -> "0x0A1B22"
+    "cascada"            -> "0x09161D"
+    "mar", "playa", "costa", "litoral", "bahía", "bahia" -> "0x69B6D1"
+    "océano", "oceano"   -> "0x061630"
     "desierto"           -> "0x150C05"
     "taberna"            -> "0x0D0905"
+    "tienda"             -> "0x140C05"
+    "cabana"             -> "0x0B1208"
     "ruina"              -> "0x0C0C0A"
     else                 -> "0x0D0700"
 }
@@ -694,10 +800,14 @@ private fun getAmbientColor(type: String) = when (type) {
     "bosque"             -> "0x0D2205"
     "cueva", "mazmorra"  -> "0x140F1A"
     "lago"               -> "0x0A2038"
-    "mar", "playa", "costa", "litoral", "bahía", "bahia" -> "0x5FA8C8"
-    "océano", "oceano"  -> "0x0B2545"
+    "rio"                -> "0x123247"
+    "cascada"            -> "0x16394A"
+    "mar", "playa", "costa", "litoral", "bahía", "bahia" -> "0x5CA8C5"
+    "océano", "oceano"   -> "0x0B2545"
     "desierto"           -> "0x201505"
     "taberna"            -> "0x201005"
+    "tienda"             -> "0x261305"
+    "cabana"             -> "0x14240C"
     else                 -> "0x111118"
 }
 
@@ -705,11 +815,15 @@ private fun getSunColor(type: String) = when (type) {
     "bosque"             -> "0xAAFF88"
     "cueva", "mazmorra"  -> "0xFF7722"
     "lago"               -> "0x9FDBFF"
+    "rio"                -> "0xB9ECFF"
+    "cascada"            -> "0xD9F7FF"
     "mar", "playa", "costa", "litoral", "bahía", "bahia" -> "0xFFF1D0"
-    "océano", "oceano"  -> "0x7FC8FF"
+    "océano", "oceano"   -> "0x7FC8FF"
     "desierto"           -> "0xFFDD88"
     "templo"             -> "0xFFEECC"
     "taberna"            -> "0xFF9944"
+    "tienda"             -> "0xFFD089"
+    "cabana"             -> "0xFFE4B0"
     else                 -> "0xFFDDAA"
 }
 
@@ -722,10 +836,14 @@ private fun getGroundColor(type: String) = when (type) {
     "montaña", "montana" -> "0x303030"
     "templo"             -> "0xD4C8A0"
     "lago"               -> "0x123A58"
-    "mar", "playa", "costa", "litoral", "bahía", "bahia" -> "0xD2B07C"
-    "océano", "oceano"  -> "0x0A2746"
+    "rio"                -> "0x314B36"
+    "cascada"            -> "0x39454E"
+    "mar", "playa", "costa", "litoral", "bahía", "bahia" -> "0xD6BA8C"
+    "océano", "oceano"   -> "0x0A2746"
     "desierto"           -> "0x8B6914"
     "taberna"            -> "0x2A1A08"
+    "tienda"             -> "0x3A260F"
+    "cabana"             -> "0x253018"
     "ruina"              -> "0x282820"
     else                 -> "0x1A1505"
 }
@@ -734,8 +852,12 @@ private fun getFogDensity(type: String) = when (type) {
     "bosque"            -> "0.06"
     "cueva", "mazmorra" -> "0.06"
     "lago"              -> "0.045"
-    "mar", "playa", "costa", "litoral", "bahía", "bahia" -> "0.022"
-    "océano", "oceano" -> "0.055"
+    "rio"               -> "0.04"
+    "cascada"           -> "0.055"
+    "mar", "playa", "costa", "litoral", "bahía", "bahia" -> "0.02"
+    "océano", "oceano"  -> "0.055"
+    "tienda"            -> "0.03"
+    "cabana"            -> "0.04"
     else                -> "0.03"
 }
 
@@ -745,44 +867,97 @@ private fun getAnimationCode(type: String) = when (type) {
             l.position.y += Math.sin(t*1.2+i)*0.0008;
             l.rotation.y += 0.005;
         });"""
+
     "lago" ->
         """if(window._waves) window._waves.forEach(function(w,i){
-            w.position.y = 0.04 + Math.sin(t*0.8+i*1.1)*0.018;
-            w.material.opacity = 0.18+Math.sin(t*0.6+i)*0.08;
+            w.position.y = (w.userData.baseY || 0.04) + Math.sin(t*0.8+i*1.1)*0.018;
+            if(w.material) w.material.emissiveIntensity = 0.03 + (Math.sin(t*0.9+i)+1)*0.02;
         });"""
+
+    "rio" ->
+        """if(window._riverSegments) window._riverSegments.forEach(function(seg,i){
+            seg.position.y = seg.userData.baseY + Math.sin(t*1.2 + i*0.8) * 0.004;
+        });
+        if(window._riverCurrents) window._riverCurrents.forEach(function(c,i){
+            c.position.x = c.userData.baseX + Math.sin(t*1.5 + i*0.7) * 0.025;
+            c.position.z = c.userData.baseZ + Math.cos(t*1.1 + i*0.6) * 0.015;
+            c.material.emissiveIntensity = 0.05 + (Math.sin(t*1.9 + i) + 1.0) * 0.02;
+        });"""
+
+    "cascada" ->
+        """if(window._fallStrands) window._fallStrands.forEach(function(s,i){
+            s.position.x = (s.userData.baseX || 0) + Math.sin(t*2.6+i)*0.02;
+            if(s.material) s.material.emissiveIntensity = 0.08 + (Math.sin(t*3.2+i)+1)*0.04;
+        });
+        if(window._fallDrops) window._fallDrops.forEach(function(d){
+            d.position.y -= d.userData.speed;
+            if(d.position.y < d.userData.minY){
+                d.position.y = d.userData.maxY;
+                d.position.x = d.userData.baseX + (Math.random()-0.5)*0.5;
+                d.position.z = d.userData.baseZ + (Math.random()-0.5)*0.08;
+            }
+        });
+        if(window._spray) window._spray.forEach(function(s,i){
+            s.position.y = s.userData.baseY + Math.sin(t*3.0+i)*0.05;
+            s.position.x = s.userData.baseX + Math.sin(t*1.6+i)*0.04;
+        });
+        if(window._poolWaves) window._poolWaves.forEach(function(w,i){
+            w.position.y = (w.userData.baseY || 0.055) + Math.sin(t*1.3+i)*0.012;
+        });"""
+
     "mar", "playa", "costa", "litoral", "bahía", "bahia" ->
         """if(window._waves) window._waves.forEach(function(w,i){
-            w.position.y = 0.06 + Math.sin(t*1.15+i*1.3)*0.04;
-            w.material.opacity = 0.24+Math.sin(t*0.9+i)*0.11;
+            w.position.y = w.userData.baseY + Math.sin(t*1.05 + i*0.7) * 0.008;
+            w.position.z = w.userData.baseZ + Math.cos(t*0.8 + i*0.6) * 0.025;
+        });
+        if(window._shoreFoam) window._shoreFoam.forEach(function(f,i){
+            f.position.z = f.userData.baseZ + Math.sin(t*1.5 + i*0.8) * 0.03;
+            f.material.emissiveIntensity = 0.08 + (Math.sin(t*1.8 + i) + 1.0) * 0.03;
         });"""
+
     "océano", "oceano" ->
         """if(window._waves) window._waves.forEach(function(w,i){
             w.position.y = 0.08 + Math.sin(t*1.7+i*1.5)*0.07;
-            w.material.opacity = 0.28+Math.sin(t*1.2+i)*0.14;
+            if(w.material) w.material.opacity = 0.70 + (Math.sin(t*1.2+i)+1)*0.08;
         });"""
+
     "templo" ->
         """if(window._torches) window._torches.forEach(function(tp,i){
             tp.intensity = 1.2 + Math.sin(t*4+i*2)*0.4;
         });"""
+
     "taberna" ->
         """if(window._fire) {
             window._fire.intensity = 1.5 + Math.sin(t*5)*0.6;
             window._fireM.emissiveIntensity = 0.6 + Math.sin(t*3)*0.2;
         }"""
+
+    "tienda" ->
+        """if(window._shopLanterns) window._shopLanterns.forEach(function(l,i){
+            l.intensity = 0.95 + Math.sin(t*5 + i*1.6)*0.18;
+        });
+        if(window._shopSign){
+            window._shopSign.rotation.z = Math.sin(t*1.6)*0.08;
+        }"""
+
+    "cabana" ->
+        """if(window._cabinFire){
+            window._cabinFire.intensity = 1.15 + Math.sin(t*4.2)*0.22;
+        }
+        if(window._smoke) window._smoke.forEach(function(s,i){
+            s.position.y = 2.45 + ((t*0.45 + i*0.28) % 1.0);
+            s.position.x = 0.82 + Math.sin(t*1.3 + i)*0.04;
+            s.position.z = -0.20 + Math.cos(t*1.1 + i)*0.03;
+        });"""
+
     "mazmorra" ->
         """if(window._torches) window._torches.forEach(function(tp,i){
             tp.intensity = 0.8 + Math.sin(t*4+i*1.5)*0.3;
         });"""
+
     else -> "// no animation"
 }
 
-/**
- * Genera el código JavaScript de Three.js que construye el modelo 3D
- * característico de cada tipo de ubicación.
- *
- * TODOS los literales negativos usan el guión ASCII '-' (U+002D).
- * El signo menos Unicode '-' (U+2212) rompe el parser de JavaScript en WebView.
- */
 private fun getModelCode(type: String): String = when (type) {
 
     // ── BOSQUE ────────────────────────────────────────────────────────────────
@@ -816,6 +991,376 @@ window._leaves = leaves;
 var ptLight = new THREE.PointLight(0x44FF22, 0.4, 8);
 ptLight.position.set(0, 3, 0);
 scene.add(ptLight);
+""".trimIndent()
+
+    // ── CASCADA ────────────────────────────────────────────────────────────────
+
+    "cascada" -> """
+var cliffMat      = makeMat(0x58636B,0.96,0.02);
+var darkCliffMat  = makeMat(0x424C54,0.97,0.02);
+var mossMat       = makeMat(0x456A3D,0.92,0.0);
+var fallMat       = makeMat(0x7FD8FF,0.10,0.06,0xBEEFFF,0.08,0.72,true);
+var fallCoreMat   = makeMat(0xDFF8FF,0.06,0.04,0xD8F4FF,0.10,0.58,true);
+var poolMat       = makeMat(0x3BA7CF,0.10,0.06,0x12374C,0.05,0.92,true);
+var poolDeepMat   = makeMat(0x236B8E,0.12,0.08,0x0A2230,0.05,0.96,true);
+var foamMat       = makeMat(0xF2FBFF,0.16,0.03,0xD6F4FF,0.10,0.82,true);
+
+// Pared rocosa
+addMesh(new THREE.BoxGeometry(4.2,2.8,1.6), cliffMat, 0,1.4,-0.9);
+addMesh(new THREE.BoxGeometry(2.2,0.28,1.0), darkCliffMat, 0,2.15,0.05);
+addMesh(new THREE.BoxGeometry(1.2,0.18,0.7), darkCliffMat, 0,2.00,0.55);
+
+// Salientes laterales
+[[-1.8,1.0,0.0,0.9],[1.7,0.8,-0.1,0.8],[-1.2,2.0,-0.2,0.6]].forEach(function(r){
+    addMesh(new THREE.SphereGeometry(r[3],8,6), darkCliffMat, r[0],r[1],r[2], 0,Math.random()*Math.PI,0, 1.2,0.55,1.0);
+});
+
+// Musgo
+[[-1.35,1.45,0.1],[1.2,1.25,0.0],[-0.6,2.0,-0.15]].forEach(function(p){
+    addMesh(new THREE.SphereGeometry(0.24,7,5), mossMat, p[0],p[1],p[2], 0,0,0, 1.2,0.35,0.8);
+});
+
+// Láminas de agua
+var fallStrands = [];
+for(var i=0;i<7;i++){
+    var x = -0.72 + i*0.24;
+    var strand = addMesh(
+        new THREE.BoxGeometry(0.18 + Math.random()*0.03, 2.15, 0.09),
+        i % 2 === 0 ? fallMat : fallCoreMat,
+        x, 1.02, 0.55,
+        0,0,(i%2===0 ? 0.01 : -0.01)
+    );
+    strand.userData.baseX = x;
+    fallStrands.push(strand);
+}
+window._fallStrands = fallStrands;
+
+// Poza
+addMesh(new THREE.CircleGeometry(1.85,32), poolMat, 0,0.03,1.55, -Math.PI/2);
+addMesh(new THREE.CircleGeometry(1.05,28), poolDeepMat, 0,0.036,1.55, -Math.PI/2);
+
+// Ondas de la poza
+var poolWaves = [];
+[0.45,0.78,1.10].forEach(function(r, i){
+    var ring = addMesh(
+        new THREE.TorusGeometry(r,0.03,6,32),
+        foamMat,
+        0,0.055 + i*0.004,1.55,
+        Math.PI/2,0,0
+    );
+    ring.userData.baseY = 0.055 + i*0.004;
+    poolWaves.push(ring);
+});
+window._poolWaves = poolWaves;
+
+// Gotas cayendo
+var fallDrops = [];
+for(var di=0; di<16; di++){
+    var d = addMesh(
+        new THREE.SphereGeometry(0.05 + Math.random()*0.03,5,4),
+        foamMat,
+        (Math.random()-0.5)*0.6,
+        1.8 - Math.random()*1.4,
+        0.58 + (Math.random()-0.5)*0.06
+    );
+    d.userData.baseX = 0;
+    d.userData.baseZ = 0.58;
+    d.userData.minY = 0.18;
+    d.userData.maxY = 2.05;
+    d.userData.speed = 0.035 + Math.random()*0.025;
+    fallDrops.push(d);
+}
+window._fallDrops = fallDrops;
+
+// Neblina/spray
+var spray = [];
+for(var si=0; si<14; si++){
+    var s = addMesh(
+        new THREE.SphereGeometry(0.07 + Math.random()*0.05,5,4),
+        makeMat(0xF4FCFF,0.10,0.02,0xD7F4FF,0.08,0.55,true),
+        (Math.random()-0.5)*1.0,
+        0.22 + Math.random()*0.25,
+        1.15 + Math.random()*0.55
+    );
+    s.userData.baseX = s.position.x;
+    s.userData.baseY = s.position.y;
+    spray.push(s);
+}
+window._spray = spray;
+
+// Rocas de base
+[[-1.1,0.14,1.0],[1.05,0.16,1.15],[-0.55,0.10,2.0],[0.75,0.12,2.1]].forEach(function(p){
+    addMesh(new THREE.SphereGeometry(p[1],7,5), darkCliffMat, p[0],p[1]*0.45,p[2], 0,Math.random()*Math.PI,0, 1.5,0.55,1.0);
+});
+
+// Luz
+var fallGlow = new THREE.PointLight(0xA9EFFF, 1.0, 8);
+fallGlow.position.set(0,1.7,1.0);
+scene.add(fallGlow);
+
+ambient.color.setHex(0x16394A);
+ambient.intensity = 0.90;
+scene.fog = new THREE.FogExp2(0x09161D, 0.055);
+""".trimIndent()
+
+    // ── RÍO ────────────────────────────────────────────────────────────────
+
+    "rio" -> """
+var grassMat      = makeMat(0x476E49,0.97,0.0);
+var bankMat       = makeMat(0x7E9860,0.95,0.0);
+var riverMat      = makeMat(0x59CBEA,0.12,0.03,0x113B56,0.03,0.94,true);
+var riverCoreMat  = makeMat(0x2E99C5,0.10,0.05,0x0B2433,0.04,0.97,true);
+var currentMat    = makeMat(0xF0FCFF,0.18,0.02,0xD7F3FF,0.08,0.72,true);
+var stoneMat      = makeMat(0x737974,0.96,0.02);
+var reedMat       = makeMat(0x6C8B3D,0.88,0.0);
+
+// Terreno
+addMesh(new THREE.CircleGeometry(6.8,40), grassMat, 0,-0.02,0, -Math.PI/2);
+
+// Orillas suaves
+[[-2.8,2.2,0.50,1.7],[-1.7,1.1,0.42,1.4],[-0.2,-0.2,0.35,1.2],[1.6,-1.6,0.46,1.5],[2.5,-2.3,0.38,1.3],[-2.3,-1.9,0.50,1.5]].forEach(function(b){
+    addMesh(new THREE.SphereGeometry(b[2],9,6), bankMat, b[0],-b[2]*0.28,b[1], 0,0,0, b[3],0.45,1.1);
+});
+
+// Trazado principal del río
+var riverPath = [
+    [-2.35,  2.25],
+    [-1.65,  1.45],
+    [-0.88,  0.62],
+    [-0.08, -0.18],
+    [ 0.72, -1.02],
+    [ 1.52, -1.82],
+    [ 2.15, -2.48]
+];
+
+// Cuerpo del río
+var riverBody = addRibbonXZ(riverPath, 1.38, riverMat, 0.028);
+riverBody.userData.baseY = 0.028;
+
+var riverCore = addRibbonXZ(riverPath, 0.82, riverCoreMat, 0.034);
+riverCore.userData.baseY = 0.034;
+
+window._riverSegments = [riverBody, riverCore];
+
+// Corrientes suaves
+var currents = [];
+[
+    [-1.90,  1.72, 0.18, 0.42, 0.10],
+    [-1.12,  0.92, 0.10, 0.38, 0.09],
+    [-0.28,  0.08, 0.02, 0.36, 0.09],
+    [ 0.52, -0.72,-0.08, 0.40, 0.10],
+    [ 1.30, -1.52,-0.15, 0.34, 0.08]
+].forEach(function(c){
+    var streak = addMesh(
+        new THREE.CircleGeometry(1.0,20),
+        currentMat,
+        c[0], 0.048, c[1],
+        -Math.PI/2, 0, c[2],
+        c[3], c[4], 1.0
+    );
+    streak.userData = {
+        baseX: c[0],
+        baseZ: c[1]
+    };
+    currents.push(streak);
+});
+window._riverCurrents = currents;
+
+// Rocas
+[[-2.9,0.16,1.2],[-2.0,0.12,0.35],[-0.1,0.13,1.55],[1.1,0.12,-0.30],[2.3,0.15,-1.05]].forEach(function(p){
+    addMesh(new THREE.SphereGeometry(p[1],7,5), stoneMat, p[0],p[1]*0.45,p[2], 0,Math.random()*Math.PI,0, 1.3,0.55,1.0);
+});
+
+// Juncos
+[[-2.45,0.38,1.75],[-1.85,0.38,1.38],[-0.95,0.38,1.85],[1.55,0.38,-0.72],[2.18,0.38,-1.40]].forEach(function(p){
+    addMesh(new THREE.CylinderGeometry(0.02,0.025,0.55,5), reedMat, p[0],p[1],p[2]);
+    addMesh(new THREE.BoxGeometry(0.04,0.18,0.01), reedMat, p[0]+0.03,p[1]+0.15,p[2], 0,0,0.35);
+    addMesh(new THREE.BoxGeometry(0.04,0.18,0.01), reedMat, p[0]-0.03,p[1]+0.12,p[2], 0,0,-0.35);
+});
+
+var riverGlow = new THREE.PointLight(0x8BE7FF, 0.75, 7);
+riverGlow.position.set(-0.2,1.1,0);
+scene.add(riverGlow);
+
+ambient.color.setHex(0x143448);
+ambient.intensity = 0.78;
+scene.fog = new THREE.FogExp2(0x0A1B22, 0.038);
+""".trimIndent()
+
+    // ── CABAÑA ────────────────────────────────────────────────────────────────
+
+    "cabana" -> """
+var logMat      = makeMat(0x7A4A24,0.92,0.02);
+var darkLogMat  = makeMat(0x563116,0.95,0.02);
+var roofMat     = makeMat(0x4A2A18,0.96,0.02);
+var stoneMat    = makeMat(0x6E6A64,0.95,0.02);
+var windowGlow  = makeMat(0x000000,0.0,0.0,0xFFCC66,1.7);
+var leafMat     = makeMat(0x2A6B1B,0.90,0.0);
+
+// Suelo de la cabaña
+addMesh(new THREE.BoxGeometry(2.4,0.14,2.2), darkLogMat, 0,0.07,0);
+
+// Cuerpo principal
+addMesh(new THREE.BoxGeometry(2.0,1.35,1.7), logMat, 0,0.74,0);
+
+// Troncos frontales decorativos
+for(var ly=0; ly<6; ly++){
+    addMesh(new THREE.CylinderGeometry(0.055,0.055,2.02,8), darkLogMat, 0,0.16+ly*0.22,0.86, 0,0,Math.PI/2);
+    addMesh(new THREE.CylinderGeometry(0.055,0.055,2.02,8), darkLogMat, 0,0.16+ly*0.22,-0.86, 0,0,Math.PI/2);
+}
+
+// Tejado inclinado
+addMesh(new THREE.BoxGeometry(2.28,0.12,1.12), roofMat, 0,1.62,0.38, 0.55,0,0);
+addMesh(new THREE.BoxGeometry(2.28,0.12,1.12), roofMat, 0,1.62,-0.38, -0.55,0,0);
+addMesh(new THREE.BoxGeometry(1.9,0.07,0.10), darkLogMat, 0,1.87,0);
+
+// Porche
+addMesh(new THREE.BoxGeometry(1.50,0.12,0.72), darkLogMat, 0,0.12,1.18);
+[[-0.58,0.34,1.18],[0.58,0.34,1.18]].forEach(function(p){
+    addMesh(new THREE.BoxGeometry(0.09,0.68,0.09), darkLogMat, p[0],p[1],p[2]);
+});
+addMesh(new THREE.BoxGeometry(0.70,0.10,0.36), makeMat(0x6B4A2B,0.95,0.0), 0,0.05,1.56);
+
+// Puerta
+addMesh(new THREE.BoxGeometry(0.42,0.82,0.06), darkLogMat, 0,0.42,0.88);
+addMesh(new THREE.SphereGeometry(0.03,5,4), makeMat(0xCCAA55,0.4,0.5), 0.12,0.40,0.92);
+
+// Ventanas
+[[-0.62,0.92,0.87],[0.62,0.92,0.87]].forEach(function(p){
+    addMesh(new THREE.BoxGeometry(0.28,0.26,0.05), windowGlow, p[0],p[1],p[2]);
+    addMesh(new THREE.BoxGeometry(0.04,0.26,0.06), darkLogMat, p[0],p[1],p[2]+0.01);
+    addMesh(new THREE.BoxGeometry(0.28,0.04,0.06), darkLogMat, p[0],p[1],p[2]+0.01);
+});
+
+// Chimenea
+addMesh(new THREE.BoxGeometry(0.28,0.95,0.28), stoneMat, 0.80,2.00,-0.18);
+addMesh(new THREE.BoxGeometry(0.36,0.08,0.36), stoneMat, 0.80,2.50,-0.18);
+
+// Humo
+var smoke = [];
+[0,1,2].forEach(function(i){
+    var puff = addMesh(
+        new THREE.SphereGeometry(0.12 + i*0.03,6,5),
+        makeMat(0x7B7B7B,0.96,0.0),
+        0.82, 2.45 + i*0.25, -0.20
+    );
+    smoke.push(puff);
+});
+window._smoke = smoke;
+
+// Leña apilada
+[[-1.18,0.12,0.78],[-1.05,0.12,0.78],[-0.92,0.12,0.78]].forEach(function(p){
+    addMesh(new THREE.CylinderGeometry(0.06,0.06,0.42,8), makeMat(0x6A4324,0.94,0.0), p[0],p[1],p[2], Math.PI/2,0,0);
+});
+
+// Tocón
+addMesh(new THREE.CylinderGeometry(0.16,0.18,0.28,10), makeMat(0x7A4A24,0.92,0.02), 1.28,0.14,1.00);
+
+// Pino lateral
+addMesh(new THREE.CylinderGeometry(0.07,0.10,0.85,8), makeMat(0x5C3A1E,0.92,0.0), -1.55,0.42,-0.50);
+addMesh(new THREE.ConeGeometry(0.42,0.75,7), leafMat, -1.55,1.05,-0.50);
+addMesh(new THREE.ConeGeometry(0.30,0.55,7), makeMat(0x2F7A20,0.88,0.0), -1.55,1.40,-0.50);
+
+// Luz cálida interior
+var cabinFire = new THREE.PointLight(0xFF9933,1.15,4.5);
+cabinFire.position.set(0,1.00,0.55);
+scene.add(cabinFire);
+window._cabinFire = cabinFire;
+
+// Luz tenue exterior
+var porchGlow = new THREE.PointLight(0xFFCC88,0.5,3.0);
+porchGlow.position.set(0,1.2,1.2);
+scene.add(porchGlow);
+""".trimIndent()
+
+    // ── TIENDA ────────────────────────────────────────────────────────────────
+
+    "tienda" -> """
+var wallMat     = makeMat(0xC9B58A,0.92,0.02);
+var woodMat     = makeMat(0x8B5A2B,0.90,0.02);
+var darkWoodMat = makeMat(0x5C3416,0.94,0.02);
+var roofMat     = makeMat(0x6B2A1E,0.88,0.04);
+var clothRed    = makeMat(0x9E2F22,0.78,0.02);
+var clothGold   = makeMat(0xC9971A,0.76,0.02);
+var glowMat     = makeMat(0x000000,0.0,0.0,0xFFBB55,2.0);
+var fruitRed    = makeMat(0xC63B2D,0.72,0.0);
+var fruitGreen  = makeMat(0x6FAF2D,0.72,0.0);
+
+// Base
+addMesh(new THREE.BoxGeometry(2.6,0.18,2.0), darkWoodMat, 0,0.09,0);
+addMesh(new THREE.BoxGeometry(2.2,1.4,1.5), wallMat, 0,0.79,0);
+
+// Marcos laterales
+[[-1.0,0.8,0.0],[1.0,0.8,0.0]].forEach(function(p){
+    addMesh(new THREE.BoxGeometry(0.12,1.5,1.55), darkWoodMat, p[0],p[1],p[2]);
+});
+addMesh(new THREE.BoxGeometry(2.2,0.12,1.55), darkWoodMat, 0,1.50,0);
+
+// Tejado
+addMesh(new THREE.BoxGeometry(2.45,0.12,1.05), roofMat, 0,1.78,0.34, 0.42,0,0);
+addMesh(new THREE.BoxGeometry(2.45,0.12,1.05), roofMat, 0,1.78,-0.34, -0.42,0,0);
+addMesh(new THREE.BoxGeometry(2.0,0.08,0.12), darkWoodMat, 0,1.95,0);
+
+// Puerta
+addMesh(new THREE.BoxGeometry(0.42,0.82,0.06), darkWoodMat, -0.62,0.41,0.78);
+addMesh(new THREE.SphereGeometry(0.03,5,4), makeMat(0xCCAA55,0.4,0.5), -0.48,0.40,0.83);
+
+// Ventana
+addMesh(new THREE.BoxGeometry(0.34,0.34,0.05), glowMat, 0.65,0.95,0.79);
+addMesh(new THREE.BoxGeometry(0.04,0.34,0.06), darkWoodMat, 0.65,0.95,0.81);
+addMesh(new THREE.BoxGeometry(0.34,0.04,0.06), darkWoodMat, 0.65,0.95,0.81);
+
+// Toldo delantero
+addMesh(new THREE.BoxGeometry(2.0,0.06,0.82), clothRed, 0,1.12,1.06, -0.22,0,0);
+addMesh(new THREE.BoxGeometry(2.0,0.03,0.14), clothGold, 0,0.96,1.42);
+[[-0.92,0.58,1.10],[0.92,0.58,1.10]].forEach(function(p){
+    addMesh(new THREE.BoxGeometry(0.08,1.08,0.08), woodMat, p[0],p[1],p[2]);
+});
+
+// Mostrador
+addMesh(new THREE.BoxGeometry(1.75,0.46,0.42), woodMat, 0,0.38,1.08);
+addMesh(new THREE.BoxGeometry(1.84,0.06,0.48), darkWoodMat, 0,0.64,1.08);
+
+// Cajas con provisiones
+[[-0.62,0.18,1.36],[0.62,0.18,1.36]].forEach(function(p, idx){
+    addMesh(new THREE.BoxGeometry(0.42,0.22,0.34), darkWoodMat, p[0],p[1],p[2]);
+    addMesh(new THREE.SphereGeometry(0.08,6,5), idx===0 ? fruitRed : fruitGreen, p[0]-0.08,0.28,p[2]-0.04);
+    addMesh(new THREE.SphereGeometry(0.08,6,5), idx===0 ? fruitGreen : fruitRed, p[0]+0.08,0.28,p[2]+0.02);
+    addMesh(new THREE.SphereGeometry(0.07,6,5), fruitRed, p[0],0.30,p[2]+0.06);
+});
+
+// Barriles laterales
+[[1.28,0.20,0.72],[-1.28,0.20,0.58]].forEach(function(p){
+    addMesh(new THREE.CylinderGeometry(0.16,0.16,0.36,10), woodMat, p[0],p[1],p[2]);
+    addMesh(new THREE.TorusGeometry(0.16,0.015,6,18), makeMat(0x2C2C2C,0.7,0.4), p[0],p[1]+0.11,p[2], Math.PI/2);
+    addMesh(new THREE.TorusGeometry(0.16,0.015,6,18), makeMat(0x2C2C2C,0.7,0.4), p[0],p[1]-0.11,p[2], Math.PI/2);
+});
+
+// Letrero
+addMesh(new THREE.BoxGeometry(0.70,0.06,0.06), darkWoodMat, 0,1.57,1.12);
+var shopSign = addMesh(new THREE.BoxGeometry(0.78,0.24,0.05), makeMat(0xC49A3A,0.75,0.03), 0,1.40,1.16);
+window._shopSign = shopSign;
+addMesh(new THREE.BoxGeometry(0.50,0.05,0.03), woodMat, 0,1.40,1.19);
+
+// Faroles
+var shopLanterns = [];
+[[-0.92,1.17,1.06],[0.92,1.17,1.06]].forEach(function(p){
+    addMesh(new THREE.CylinderGeometry(0.015,0.015,0.16,6), darkWoodMat, p[0],p[1]+0.10,p[2]);
+    addMesh(new THREE.SphereGeometry(0.08,6,5), glowMat, p[0],p[1],p[2]);
+    var lt = new THREE.PointLight(0xFFBB55,1.0,3.2);
+    lt.position.set(p[0],p[1],p[2]);
+    scene.add(lt);
+    shopLanterns.push(lt);
+});
+window._shopLanterns = shopLanterns;
+
+// Camino
+addMesh(new THREE.BoxGeometry(1.4,0.01,2.2), makeMat(0x8A7350,0.97,0.0), 0,0.005,1.9);
+
+// Iluminación ambiente
+var shopGlow = new THREE.PointLight(0xFFB866,0.8,4.0);
+shopGlow.position.set(0,1.2,0.9);
+scene.add(shopGlow);
 """.trimIndent()
 
     // ── CUEVA ────────────────────────────────────────────────────────────────
@@ -1057,43 +1602,82 @@ scene.fog = new THREE.FogExp2(0x0A1624, 0.045);
 
     // ── MAR / COSTA ───────────────────────────────────────────────────────────
     "mar", "playa", "costa", "litoral", "bahía", "bahia" -> """
-var sandMat = makeMat(0xD2B07C,0.95,0.0);
-addMesh(new THREE.BoxGeometry(8.0,0.06,3.7), sandMat, 0,-0.03,1.5);
-addMesh(new THREE.BoxGeometry(8.0,0.04,0.7), makeMat(0xC6A16A,0.97), 0,-0.01,-0.25, 0.06,0,0);
-var seaMat  = makeMat(0x2C99C8,0.02,0.18);
-var sea2Mat = makeMat(0x1D7FB5,0.02,0.16);
-var sea3Mat = makeMat(0x125C96,0.04,0.14);
-addMesh(new THREE.BoxGeometry(8.0,0.04,5.0), seaMat,  0,0.02,-2.5);
-addMesh(new THREE.BoxGeometry(8.0,0.03,3.0), sea2Mat, 0,0.03,-5.0);
-addMesh(new THREE.BoxGeometry(8.0,0.02,6.0), sea3Mat, 0,0.01,-9.0);
+var sandMat      = makeMat(0xD0BA8E,0.97,0.0);
+var wetSandMat   = makeMat(0xB59668,0.98,0.0);
+var seaNearMat   = makeMat(0x4CC5E2,0.12,0.04,0x14384A,0.02,0.95,true);
+var seaMidMat    = makeMat(0x289EC7,0.14,0.06,0x102A3A,0.03,0.97,true);
+var seaFarMat    = makeMat(0x126E9C,0.16,0.08,0x0B2031,0.04,0.98,true);
+var crestMat     = makeMat(0xEAF9FF,0.18,0.02,0xD5F1FF,0.08,0.75,true);
+var foamMat      = makeMat(0xF7FCFF,0.18,0.01,0xDDF4FF,0.10,0.82,true);
+var rockMat      = makeMat(0x7B7972,0.96,0.02);
+var driftWoodMat = makeMat(0x8A6842,0.92,0.02);
+
+// Playa
+addMesh(new THREE.BoxGeometry(8.5,0.08,4.0), sandMat, 0,-0.04,1.95);
+
+// Dunas suaves
+[[-2.8,2.35,0.48,1.7],[-1.0,2.15,0.40,1.5],[1.35,2.40,0.45,1.7],[3.0,2.0,0.34,1.2]].forEach(function(d){
+    addMesh(new THREE.SphereGeometry(d[2],10,6), sandMat, d[0],-d[2]*0.28,d[1], 0,0,0, d[3],0.45,1.1);
+});
+
+// Orilla húmeda
+addMesh(new THREE.BoxGeometry(8.45,0.03,0.95), wetSandMat, 0,0.005,0.45, 0.03,0,0);
+
+// Mar en capas
+addMesh(new THREE.BoxGeometry(8.8,0.05,3.0), seaNearMat, 0,0.024,-1.10);
+addMesh(new THREE.BoxGeometry(8.8,0.04,3.8), seaMidMat, 0,0.021,-4.10);
+addMesh(new THREE.BoxGeometry(8.8,0.03,6.8), seaFarMat, 0,0.018,-8.70);
+
+// Crestas curvas cercanas a la orilla
 var waves = [];
-for(var w=0;w<4;w++){
-    var waveMat = makeMat(0xD9F6FF,0.15,0.3);
-    var wv = addMesh(new THREE.BoxGeometry(7.5,0.07,0.35), waveMat, 0, 0.06+w*0.015, -0.8-w*0.9);
-    waves.push(wv);
-}
+[
+    [[-3.8, 0.28],[-1.8, 0.08],[0.0, 0.15],[1.9,-0.02],[3.8, 0.18]],
+    [[-3.7,-0.35],[-1.7,-0.55],[0.1,-0.42],[1.9,-0.60],[3.7,-0.46]],
+    [[-3.5,-1.00],[-1.6,-1.18],[0.1,-1.08],[1.8,-1.22],[3.5,-1.12]],
+    [[-3.2,-1.75],[-1.4,-1.92],[0.2,-1.85],[1.6,-2.00],[3.2,-1.90]]
+].forEach(function(points, i){
+    var wave = addRibbonXZ(points, 0.14 - i*0.01, crestMat, 0.060 + i*0.008);
+    wave.userData = {
+        baseY: 0.060 + i*0.008,
+        baseZ: 0.0,
+        baseRz: 0.0
+    };
+    waves.push(wave);
+});
 window._waves = waves;
-for(var f=0;f<12;f++){
-    var fx=(Math.random()-0.5)*6.0;
-    addMesh(new THREE.SphereGeometry(0.12+Math.random()*0.1,6,4), makeMat(0xEEF6FF,0.25,0.1), fx, 0.04, -0.1+Math.random()*0.25, 0,0,0, 1,0.3,1);
-}
-[[1.8,0.15,0.6],[-1.5,0.18,0.4],[2.6,0.12,1.0],[-2.4,0.14,0.8],[0.4,0.1,1.4]].forEach(function(p){
-    addMesh(new THREE.SphereGeometry(p[1],7,5), makeMat(0x888070,0.95), p[0],p[1]*0.5,p[2], Math.random()*0.3,Math.random()*Math.PI,0, 1,0.7+Math.random()*0.3,1);
+
+// Espuma de la orilla
+var shoreFoam = [];
+[
+    [[-3.7, 0.48],[-2.0, 0.34],[-0.3, 0.40],[1.5, 0.20],[3.5, 0.28]],
+    [[-3.5, 0.72],[-1.7, 0.58],[0.0, 0.65],[1.8, 0.48],[3.3, 0.55]]
+].forEach(function(points, i){
+    var foam = addRibbonXZ(points, 0.12 - i*0.015, foamMat, 0.048 + i*0.004);
+    foam.userData = { baseZ: 0.0 };
+    shoreFoam.push(foam);
 });
-addMesh(new THREE.CylinderGeometry(0.055,0.08,1.5,7), makeMat(0x7B5E3A,0.9), -1.2,0.75,1.8, 0,0,0.07);
-addMesh(new THREE.SphereGeometry(0.38,7,6),  makeMat(0x2D7A1A,0.85), -1.27,1.6,1.8);
-[[0,0,0.5],[0.4,0,0.2],[-0.4,0,0.2],[0.25,0,-0.3],[-0.25,0,-0.3]].forEach(function(d){
-    addMesh(new THREE.BoxGeometry(0.06,0.025,0.55), makeMat(0x3A9A20,0.85), -1.27+d[0]*0.35, 1.65+d[1], 1.8+d[2]*0.4, 0.15,d[0]*1.2,0.1);
+window._shoreFoam = shoreFoam;
+
+// Rocas costeras
+[[2.45,0.18,0.95],[-1.8,0.14,0.75],[3.0,0.12,1.28],[-2.9,0.16,1.08]].forEach(function(p){
+    addMesh(new THREE.SphereGeometry(p[1],8,6), rockMat, p[0],p[1]*0.45,p[2], 0,Math.random()*Math.PI,0, 1.5,0.55,1.0);
 });
-var sunlight = new THREE.DirectionalLight(0xFFEECC, 1.8);
-sunlight.position.set(3,5,2);
-scene.add(sunlight);
-var waterGlow = new THREE.PointLight(0x66CCFF, 1.2, 8);
-waterGlow.position.set(0,1.5,-2);
+
+// Tronco
+addMesh(new THREE.CylinderGeometry(0.05,0.07,0.92,7), driftWoodMat, 1.4,0.07,1.72, 0.08,0,0.95);
+
+// Islotes lejanos
+[[-2.8,0.20,-6.8,1.7],[2.6,0.24,-7.7,2.0]].forEach(function(r){
+    addMesh(new THREE.SphereGeometry(r[1],8,6), makeMat(0x697078,0.95,0.02), r[0],r[1]*0.30,r[2], 0,Math.random()*Math.PI,0, r[3],0.55,1.0);
+});
+
+var waterGlow = new THREE.PointLight(0x86DEFF, 0.95, 8);
+waterGlow.position.set(0,1.25,-2.0);
 scene.add(waterGlow);
-ambient.color.setHex(0x5FA8C8);
-ambient.intensity = 0.9;
-scene.fog = new THREE.FogExp2(0x74C0D8, 0.022);
+
+ambient.color.setHex(0x5AA6C0);
+ambient.intensity = 0.84;
+scene.fog = new THREE.FogExp2(0x69B6D1, 0.019);
 """.trimIndent()
 
     // ── OCÉANO ────────────────────────────────────────────────────────────────

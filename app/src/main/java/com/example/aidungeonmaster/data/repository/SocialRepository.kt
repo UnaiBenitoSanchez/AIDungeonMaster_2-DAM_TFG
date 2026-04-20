@@ -525,6 +525,18 @@ class SocialRepository {
 
             val currentCount = (guildSnap.getLong("memberCount") ?: 0L).toInt()
 
+            // BUG FIX: El orden de operaciones en la transacción es crítico para las reglas de Firestore.
+            // La regla validGuildMemberCountUpdate usa getAfter() para verificar que el miembro
+            // y el userGuild se crean en la misma transacción. Por tanto el orden correcto es:
+            // 1) Actualizar el gremio (memberCount)
+            // 2) Crear memberRef
+            // 3) Crear userGuildRef
+            // 4) Actualizar userRef (currentGuildId)
+            tx.update(guildRef, mapOf(
+                "memberCount" to currentCount + 1,
+                "updatedAt" to now
+            ))
+
             tx.set(memberRef, mapOf(
                 "guildId" to guild.id,
                 "uid" to myUid,
@@ -541,11 +553,6 @@ class SocialRepository {
                 "bannerColor" to guild.bannerColor,
                 "joinedAt" to now,
                 "role" to "member"
-            ))
-
-            tx.update(guildRef, mapOf(
-                "memberCount" to currentCount + 1,
-                "updatedAt" to now
             ))
 
             tx.update(userRef, mapOf(
