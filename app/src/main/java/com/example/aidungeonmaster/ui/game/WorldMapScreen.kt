@@ -33,12 +33,10 @@ import com.example.aidungeonmaster.data.model.WorldLocation
 import com.example.aidungeonmaster.data.model.WorldMapState
 import com.example.aidungeonmaster.viewmodel.WorldMapViewModel
 
+import com.example.aidungeonmaster.data.model.LocationLifeState
+
 // ── BOTÓN FLOTANTE PARA ABRIR EL MAPA ────────────────────────────────────────
 
-/**
- * Botón flotante que muestra/oculta el mapa del mundo.
- * Úsalo dentro del Box de GamePlayScreen.
- */
 @Composable
 fun WorldMapFab(
     mapViewModel: WorldMapViewModel = viewModel(),
@@ -167,7 +165,10 @@ fun WorldMapDialog(
 
                     // ── DETALLE DEL LUGAR SELECCIONADO ───────────────────
                     selectedLocation?.let { loc ->
-                        LocationDetailCard(loc)
+                        LocationDetailCard(
+                            location = loc,
+                            worldState = mapState.locationStates[loc.id]
+                        )
                     }
 
                     Spacer(Modifier.height(8.dp))
@@ -382,7 +383,10 @@ fun LocationMarker(
 // ── DETALLE DEL LUGAR SELECCIONADO ───────────────────────────────────────────
 
 @Composable
-fun LocationDetailCard(location: WorldLocation) {
+fun LocationDetailCard(
+    location: WorldLocation,
+    worldState: LocationLifeState? = null
+) {
     Surface(
         color  = Color(0xFF2A1800),
         shape  = RoundedCornerShape(10.dp),
@@ -434,6 +438,57 @@ fun LocationDetailCard(location: WorldLocation) {
                     fontSize = 10.sp,
                     modifier = Modifier.padding(top = 2.dp)
                 )
+                worldState?.let { state ->
+                    Spacer(Modifier.height(8.dp))
+
+                    Surface(
+                        color = Color(0x1100FFAA),
+                        shape = RoundedCornerShape(8.dp),
+                        border = BorderStroke(1.dp, Color(0x3300FFAA))
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = "Estado del lugar",
+                                color = Color(0xFF9BE7C4),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp
+                            )
+
+                            Text(
+                                text = "Prosperidad ${state.prosperity} • Seguridad ${state.security}",
+                                color = Color(0xFFCCF5E5),
+                                fontSize = 10.sp
+                            )
+
+                            Text(
+                                text = "Peligro ${state.danger} • Corrupción ${state.corruption}",
+                                color = Color(0xFFFFC9C9),
+                                fontSize = 10.sp
+                            )
+
+                            Text(
+                                text = "Ánimo: ${state.mood.replaceFirstChar { it.uppercase() }}",
+                                color = Color(0xFFCCBBAA),
+                                fontSize = 10.sp
+                            )
+
+                            if (state.lastEventSummary.isNotBlank()) {
+                                Text(
+                                    text = state.lastEventSummary,
+                                    color = Color(0xFFAAAAAA),
+                                    fontSize = 10.sp,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
     }
