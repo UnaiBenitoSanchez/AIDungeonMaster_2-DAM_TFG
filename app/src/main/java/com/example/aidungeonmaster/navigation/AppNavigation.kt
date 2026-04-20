@@ -249,7 +249,12 @@ fun AppNavigation(navController: NavHostController) {
             }
             val mapState by worldMapViewModel.worldMapState.collectAsState()
 
-            LocationsGalleryScreen(mapState = mapState, characterName = characterName, onBack = { navController.popBackStack() })
+            LocationsGalleryScreen(
+                mapState = mapState,
+                charId = charId,
+                characterName = characterName,
+                onBack = { navController.popBackStack() }
+            )
         }
 
         composable("bestiary/{charId}") { backStackEntry ->

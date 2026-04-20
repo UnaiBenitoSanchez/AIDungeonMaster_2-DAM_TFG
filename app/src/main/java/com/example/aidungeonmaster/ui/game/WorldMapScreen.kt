@@ -109,7 +109,13 @@ fun WorldMapDialog(
     onDismiss: () -> Unit,
     onOpenAR: () -> Unit = {}
 ) {
-    var selectedLocation by remember { mutableStateOf<WorldLocation?>(null) }
+    var selectedLocation by remember(mapState.locations, mapState.currentLocationId) {
+        mutableStateOf(
+            mapState.locations.find { it.id == mapState.currentLocationId }
+                ?: mapState.locations.find { it.isCurrentLocation }
+                ?: mapState.locations.firstOrNull()
+        )
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -389,6 +395,7 @@ private fun String.normalizeBiome(): String {
     }
 }
 
+
 private fun DrawScope.drawMapBackground(scope: DrawScope, palette: MapBackdropPalette) {
     val vignette = Brush.radialGradient(
         colorStops = arrayOf(
@@ -399,6 +406,7 @@ private fun DrawScope.drawMapBackground(scope: DrawScope, palette: MapBackdropPa
     )
     scope.drawRect(brush = vignette)
 }
+
 
 private fun DrawScope.drawMapTerrainHints(scope: DrawScope, palette: MapBackdropPalette) {
     when (palette.terrainType) {

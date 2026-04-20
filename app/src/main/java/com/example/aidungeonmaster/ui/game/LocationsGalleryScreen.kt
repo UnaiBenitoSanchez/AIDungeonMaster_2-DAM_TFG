@@ -30,15 +30,45 @@ import com.example.aidungeonmaster.data.model.WorldMapState
 
 import com.example.aidungeonmaster.utils.AdventureMusicEngine
 
+import android.os.Handler
+import android.os.Looper
+import android.webkit.JavascriptInterface
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.aidungeonmaster.data.model.LocationLifeState
+import com.example.aidungeonmaster.viewmodel.InventoryViewModel
+
+private class GalleryModelBridge(
+    private val canOpenShop: () -> Boolean,
+    private val onOpenShop: () -> Unit
+) {
+    private val handler = Handler(Looper.getMainLooper())
+
+    @JavascriptInterface
+    fun onModelTap() {
+        if (canOpenShop()) {
+            handler.post { onOpenShop() }
+        }
+    }
+}
+
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun LocationsGalleryScreen(
     mapState: WorldMapState,
+    charId: String,
     characterName: String,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    inventoryViewModel: InventoryViewModel = viewModel()
 ) {
     var selectedLocation by remember(mapState.locations) {
         mutableStateOf(mapState.locations.firstOrNull())
+    }
+
+    val character by inventoryViewModel.character.collectAsState()
+    var showShop by remember { mutableStateOf(false) }
+
+    LaunchedEffect(charId) {
+        inventoryViewModel.loadInventory(charId)
     }
 
     DisposableEffect(Unit) {
@@ -107,7 +137,28 @@ fun LocationsGalleryScreen(
             ) {
                 // Re-genera el HTML cada vez que cambia la ubicación seleccionada
                 val currentLoc = selectedLocation ?: mapState.locations.first()
-                val html = remember(currentLoc.id) { buildLocationHtml(currentLoc) }
+                val currentLifeState = mapState.locationStates[currentLoc.id]
+
+                val baseVisualType = resolveBaseLocationVisualType(currentLoc)
+                val visualType = resolveLocationVisualType(currentLoc, currentLifeState)
+                val isInteractiveShop = currentLoc.isCurrentLocation && baseVisualType == "tienda"
+
+                val latestIsInteractiveShop by rememberUpdatedState(isInteractiveShop)
+                val latestOpenShopAction by rememberUpdatedState(newValue = { showShop = true })
+
+                val html = remember(
+                    currentLoc.id,
+                    currentLifeState?.danger,
+                    currentLifeState?.mood,
+                    currentLifeState?.corruption,
+                    isInteractiveShop
+                ) {
+                    buildLocationHtml(
+                        location = currentLoc,
+                        lifeState = currentLifeState,
+                        isShopInteractive = isInteractiveShop
+                    )
+                }
 
                 AndroidView(
                     factory = { ctx ->
@@ -117,6 +168,14 @@ fun LocationsGalleryScreen(
                             settings.allowFileAccess = false
                             webViewClient = WebViewClient()
                             setBackgroundColor(android.graphics.Color.parseColor("#0D0700"))
+
+                            addJavascriptInterface(
+                                GalleryModelBridge(
+                                    canOpenShop = { latestIsInteractiveShop },
+                                    onOpenShop = { latestOpenShopAction() }
+                                ),
+                                "AndroidGallery"
+                            )
                         }
                     },
                     update = { webView ->
@@ -176,7 +235,7 @@ fun LocationsGalleryScreen(
                                 }
                             }
                             Text(
-                                resolveLocationVisualType(currentLoc).replaceFirstChar { it.uppercase() },
+                                visualType.replaceFirstChar { it.uppercase() },
                                 color = Color(0xFF888877),
                                 fontSize = 11.sp
                             )
@@ -204,6 +263,17 @@ fun LocationsGalleryScreen(
                         .align(Alignment.BottomCenter)
                         .padding(bottom = 10.dp)
                 )
+
+                if (isInteractiveShop) {
+                    Text(
+                        "🛒 Toca el modelo para abrir la tienda",
+                        color = Color(0xAAFFD700),
+                        fontSize = 11.sp,
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = 28.dp)
+                    )
+                }
             }
 
             // ── SELECTOR HORIZONTAL DE UBICACIONES ───────────────────────
@@ -226,6 +296,19 @@ fun LocationsGalleryScreen(
             }
         }
     }
+
+    val shopLocation = selectedLocation ?: mapState.locations.firstOrNull()
+
+    if (showShop && shopLocation != null) {
+        SupermarketShopOverlay(
+            supermarketName = shopLocation.name,
+            gameId = charId,
+            currentCoins = character?.coins ?: 0,
+            inventoryViewModel = inventoryViewModel,
+            onDismiss = { showShop = false }
+        )
+    }
+
 }
 
 // ── CHIP DE SELECCIÓN ─────────────────────────────────────────────────────────
@@ -273,64 +356,41 @@ private fun normalizeText(value: String): String =
 private fun containsAny(text: String, options: List<String>): Boolean =
     options.any { text.contains(it) }
 
-private fun resolveLocationVisualType(location: WorldLocation): String {
+private fun resolveBaseLocationVisualType(location: WorldLocation): String {
     val context = normalizeText("${location.type} ${location.name} ${location.description}")
 
     return when {
+        containsAny(context, listOf("cascada", "catarata", "salto de agua")) -> "cascada"
+        containsAny(context, listOf("rio", "arroyo", "quebrada", "ribera", "afluente")) -> "rio"
+        containsAny(context, listOf("oceano", "alta mar", "mar abierto")) -> "océano"
+        containsAny(context, listOf("mar", "playa", "costa", "litoral", "bahia", "muelle", "puerto")) -> "mar"
+        containsAny(context, listOf("lago", "laguna", "estanque")) -> "lago"
         containsAny(
             context,
-            listOf("cascada", "catarata", "salto de agua")
-        ) -> "cascada"
-
-        containsAny(
-            context,
-            listOf("rio", "arroyo", "quebrada", "ribera", "afluente")
-        ) -> "rio"
-
-        containsAny(
-            context,
-            listOf("oceano", "alta mar", "mar abierto")
-        ) -> "océano"
-
-        containsAny(
-            context,
-            listOf("mar", "playa", "costa", "litoral", "bahia", "muelle", "puerto")
-        ) -> "mar"
-
-        containsAny(
-            context,
-            listOf("lago", "laguna", "estanque")
-        ) -> "lago"
-
-        containsAny(
-            context,
-            listOf(
-                "tienda", "mercado", "puesto", "comercio",
-                "almacen", "provisiones", "comida", "shop", "store"
-            )
+            listOf("tienda", "mercado", "puesto", "comercio", "almacen", "provisiones", "comida", "shop", "store")
         ) -> "tienda"
-
-        containsAny(
-            context,
-            listOf("cabana", "choza", "refugio", "casita", "cottage", "hut")
-        ) -> "cabana"
-
+        containsAny(context, listOf("cabana", "choza", "refugio", "casita", "cottage", "hut")) -> "cabana"
         else -> normalizeLocationType(location.type)
     }
 }
 
+private fun resolveLocationVisualType(
+    location: WorldLocation,
+    lifeState: LocationLifeState? = null
+): String {
+    val base = resolveBaseLocationVisualType(location)
+    val fullText = normalizeText("${location.name} ${location.description} ${location.type}")
+
+    val isBesiegedByName = containsAny(
+        fullText,
+        listOf("asediada", "asediado", "asedio")
+    )
+
+    return if (isBesiegedByName) "asediada" else base
+}
+
 // ── ANÁLISIS DE DESCRIPCIÓN ───────────────────────────────────────────────────
 
-/**
- * Extrae modificadores visuales de la descripción del lugar.
- * Devuelve un conjunto de tags que el generador de modelos usa para añadir
- * elementos 3D extra al escenario base.
- *
- * Ejemplos:
- *  "Pueblo pintoresco rodeado de montañas"  → setOf("montanas_fondo", "pintoresco")
- *  "Cueva húmeda y oscura junto a un lago"  → setOf("agua_fondo", "oscuro")
- *  "Taberna mágica en medio del bosque"     → setOf("magico", "arboles_fondo")
- */
 private fun parseDescriptionTags(description: String): Set<String> {
     val desc = description.lowercase()
     val tags = mutableSetOf<String>()
@@ -557,8 +617,12 @@ private fun normalizeLocationType(rawType: String): String {
 
 // ── GENERADOR DE HTML Three.js ────────────────────────────────────────────────
 
-private fun buildLocationHtml(location: WorldLocation): String {
-    val type         = resolveLocationVisualType(location)
+private fun buildLocationHtml(
+    location: WorldLocation,
+    lifeState: LocationLifeState? = null,
+    isShopInteractive: Boolean = false
+): String {
+    val type = resolveLocationVisualType(location, lifeState)
     val rawTags = parseDescriptionTags(location.description)
     val tags = if (type in setOf("lago", "mar", "océano", "oceano", "rio", "cascada")) {
         rawTags - "agua_fondo"
@@ -717,6 +781,34 @@ var theta = 0.3, phi = 0.35, radius = 5.5;
 var dragging = false, lastX = 0, lastY = 0;
 var autoRotate = true;
 
+var SHOP_INTERACTIVE = ${if (isShopInteractive) "true" else "false"};
+var tapMoved = false;
+var tapStartX = 0;
+var tapStartY = 0;
+
+function beginTap(x, y) {
+    tapMoved = false;
+    tapStartX = x || 0;
+    tapStartY = y || 0;
+}
+
+function updateTap(x, y) {
+    var dx = Math.abs((x || 0) - tapStartX);
+    var dy = Math.abs((y || 0) - tapStartY);
+    if (dx > 8 || dy > 8) tapMoved = true;
+}
+
+function maybeOpenShop() {
+    if (
+        SHOP_INTERACTIVE &&
+        !tapMoved &&
+        window.AndroidGallery &&
+        window.AndroidGallery.onModelTap
+    ) {
+        window.AndroidGallery.onModelTap();
+    }
+}
+
 function applyCamera() {
     camera.position.x = radius * Math.cos(phi) * Math.sin(theta);
     camera.position.y = radius * Math.sin(phi) + 0.5;
@@ -725,29 +817,58 @@ function applyCamera() {
 }
 
 document.addEventListener('touchstart', function(e) {
-    dragging = true; autoRotate = false;
-    lastX = e.touches[0].clientX; lastY = e.touches[0].clientY;
+    dragging = true;
+    autoRotate = false;
+    lastX = e.touches[0].clientX;
+    lastY = e.touches[0].clientY;
+    beginTap(lastX, lastY);
 }, {passive:true});
+
 document.addEventListener('touchmove', function(e) {
     if (!dragging) return;
-    theta -= (e.touches[0].clientX - lastX) * 0.012;
-    phi = Math.max(-0.5, Math.min(1.0, phi + (e.touches[0].clientY - lastY) * 0.006));
-    lastX = e.touches[0].clientX; lastY = e.touches[0].clientY;
+
+    var x = e.touches[0].clientX;
+    var y = e.touches[0].clientY;
+
+    updateTap(x, y);
+
+    theta -= (x - lastX) * 0.012;
+    phi = Math.max(-0.5, Math.min(1.0, phi + (y - lastY) * 0.006));
+    lastX = x;
+    lastY = y;
     applyCamera();
 }, {passive:true});
-document.addEventListener('touchend', function() { dragging = false; });
+
+document.addEventListener('touchend', function() {
+    dragging = false;
+    maybeOpenShop();
+}, {passive:true});
+
 document.addEventListener('mousedown', function(e) {
-    dragging = true; autoRotate = false;
-    lastX = e.clientX; lastY = e.clientY;
+    dragging = true;
+    autoRotate = false;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    beginTap(lastX, lastY);
 });
+
 document.addEventListener('mousemove', function(e) {
     if (!dragging) return;
+
+    updateTap(e.clientX, e.clientY);
+
     theta -= (e.clientX - lastX) * 0.009;
     phi = Math.max(-0.5, Math.min(1.0, phi + (e.clientY - lastY) * 0.005));
-    lastX = e.clientX; lastY = e.clientY;
+    lastX = e.clientX;
+    lastY = e.clientY;
     applyCamera();
 });
-document.addEventListener('mouseup', function() { dragging = false; });
+
+document.addEventListener('mouseup', function() {
+    dragging = false;
+    maybeOpenShop();
+});
+
 window.addEventListener('resize', function() {
     W = window.innerWidth; H = window.innerHeight;
     camera.aspect = W / H;
@@ -775,6 +896,7 @@ animate();
 // ── CONFIGURACIÓN POR TIPO ────────────────────────────────────────────────────
 
 private fun getBackgroundColor(type: String) = when (type) {
+    "asediada"           -> "0x2A120C"
     "bosque"             -> "0x0A1505"
     "cueva"              -> "0x0A0A0F"
     "mazmorra"           -> "0x080305"
@@ -797,6 +919,7 @@ private fun getBackgroundColor(type: String) = when (type) {
 }
 
 private fun getAmbientColor(type: String) = when (type) {
+    "asediada"           -> "0x34130C"
     "bosque"             -> "0x0D2205"
     "cueva", "mazmorra"  -> "0x140F1A"
     "lago"               -> "0x0A2038"
@@ -812,6 +935,7 @@ private fun getAmbientColor(type: String) = when (type) {
 }
 
 private fun getSunColor(type: String) = when (type) {
+    "asediada"           -> "0xFF8A4A"
     "bosque"             -> "0xAAFF88"
     "cueva", "mazmorra"  -> "0xFF7722"
     "lago"               -> "0x9FDBFF"
@@ -828,6 +952,7 @@ private fun getSunColor(type: String) = when (type) {
 }
 
 private fun getGroundColor(type: String) = when (type) {
+    "asediada"           -> "0x5A3A1E"
     "bosque"             -> "0x1A2E0A"
     "cueva"              -> "0x2A2830"
     "mazmorra"           -> "0x151212"
@@ -849,6 +974,7 @@ private fun getGroundColor(type: String) = when (type) {
 }
 
 private fun getFogDensity(type: String) = when (type) {
+    "asediada"          -> "0.05"
     "bosque"            -> "0.06"
     "cueva", "mazmorra" -> "0.06"
     "lago"              -> "0.045"
@@ -953,6 +1079,19 @@ private fun getAnimationCode(type: String) = when (type) {
     "mazmorra" ->
         """if(window._torches) window._torches.forEach(function(tp,i){
             tp.intensity = 0.8 + Math.sin(t*4+i*1.5)*0.3;
+        });"""
+
+    "asediada" ->
+        """if(window._siegeFires) window._siegeFires.forEach(function(f,i){
+            f.intensity = 0.95 + Math.sin(t*5.2 + i*1.4) * 0.35;
+        });
+        if(window._siegeFireMats) window._siegeFireMats.forEach(function(m,i){
+            m.emissiveIntensity = 1.1 + Math.sin(t*4.4 + i) * 0.25;
+        });
+        if(window._siegeSmoke) window._siegeSmoke.forEach(function(s,i){
+            s.position.y = s.userData.baseY + ((t*0.28 + i*0.17) % 1.15);
+            s.position.x = s.userData.baseX + Math.sin(t*1.1 + i) * 0.04;
+            s.position.z = s.userData.baseZ + Math.cos(t*0.9 + i) * 0.03;
         });"""
 
     else -> "// no animation"
@@ -1780,6 +1919,97 @@ addMesh(new THREE.CylinderGeometry(0.18,0.20,0.6,10), ruinMat, 1.3,0.3,0.3, 0,0,
     addMesh(new THREE.SphereGeometry(0.08,5,4), makeMat(0x1A4A0A,0.95), p[0],p[1],p[2]);
 });
 addMesh(new THREE.CircleGeometry(0.5,12), makeMat(0x1A1A20,0.1,0.4), -0.3,0.01,0.8,-Math.PI/2);
+""".trimIndent()
+
+    "asediada" -> """
+var timberMat    = makeMat(0x704321,0.92,0.02);
+var darkWoodMat  = makeMat(0x3A2415,0.96,0.02);
+var wallMat      = makeMat(0xB28A62,0.95,0.0);
+var roofMat      = makeMat(0x6A2A1E,0.90,0.02);
+var ashMat       = makeMat(0x2A2624,0.98,0.02);
+var deadCropMat  = makeMat(0x4B3816,0.97,0.0);
+var fieldMat     = makeMat(0x6A5522,0.96,0.0);
+var emberMatA    = makeMat(0x000000,0.0,0.0,0xFF5522,1.2,0.92,true);
+var emberMatB    = makeMat(0x000000,0.0,0.0,0xFFAA33,1.0,0.90,true);
+
+// Suelo castigado
+addMesh(new THREE.CircleGeometry(6.6,40), makeMat(0x5A3A1E,0.98,0.0), 0,0.01,0, -Math.PI/2);
+[[-2.2,0.0,1.0,1.8],[1.7,-0.8,0.8,1.4],[0.0,1.7,0.7,1.3],[-0.5,-1.7,0.6,1.1]].forEach(function(b){
+    addMesh(new THREE.SphereGeometry(b[2],10,6), ashMat, b[0],-b[2]*0.26,b[1], 0,0,0, b[3],0.35,1.0);
+});
+
+// Casa medio en pie
+addMesh(new THREE.BoxGeometry(1.45,0.92,1.12), wallMat, -1.45,0.47,-0.15);
+addMesh(new THREE.BoxGeometry(1.55,0.08,0.70), roofMat, -1.45,1.05,0.14, 0.36,0,0);
+addMesh(new THREE.BoxGeometry(0.86,0.08,0.55), roofMat, -1.10,1.02,-0.30, -0.52,0,0);
+addMesh(new THREE.BoxGeometry(0.26,0.48,0.06), darkWoodMat, -1.42,0.26,0.44);
+
+// Restos de segunda casa
+addMesh(new THREE.BoxGeometry(0.95,0.55,0.80), wallMat, 1.35,0.28,0.15);
+addMesh(new THREE.BoxGeometry(1.10,0.08,0.34), roofMat, 1.15,0.62,0.02, 0.18,0,0.22);
+addMesh(new THREE.BoxGeometry(0.55,0.08,0.28), darkWoodMat, 1.58,0.58,0.32, -0.35,0,-0.28);
+
+// Barricadas improvisadas
+[[-0.25,0.22,1.10],[0.15,0.22,1.22],[0.55,0.22,1.06]].forEach(function(p){
+    addMesh(new THREE.BoxGeometry(0.10,0.44,0.10), timberMat, p[0],p[1],p[2], 0,0,0.18);
+    addMesh(new THREE.BoxGeometry(0.52,0.08,0.10), darkWoodMat, p[0],p[1]+0.06,p[2], 0,0,-0.35);
+});
+
+// Campo arrasado
+for (var r=0; r<5; r++) {
+    var z = -1.85 + r*0.32;
+    addMesh(new THREE.BoxGeometry(2.2,0.03,0.08), fieldMat, 0.95,0.02,z);
+}
+[[-0.10,-1.80],[0.38,-1.55],[0.85,-1.35],[1.20,-1.05],[1.55,-0.82],[0.60,-0.95]].forEach(function(c){
+    addMesh(new THREE.BoxGeometry(0.06,0.18,0.02), deadCropMat, c[0]+1.0,0.10,c[1], 0,0,0.15);
+    addMesh(new THREE.BoxGeometry(0.06,0.14,0.02), deadCropMat, c[0]+1.06,0.08,c[1]+0.03, 0,0,-0.22);
+});
+
+// Carreta rota
+addMesh(new THREE.BoxGeometry(0.48,0.18,0.32), timberMat, 0.15,0.11,0.55, 0,0,0.18);
+addMesh(new THREE.TorusGeometry(0.10,0.018,6,14), darkWoodMat, -0.02,0.10,0.42, Math.PI/2,0,0.25);
+addMesh(new THREE.TorusGeometry(0.10,0.018,6,14), darkWoodMat, 0.30,0.07,0.66, Math.PI/2,0,1.0);
+
+// Brasas y fuego
+var siegeFires = [];
+var siegeFireMats = [];
+[
+    [-1.85,0.26,-0.05, emberMatA],
+    [ 1.05,0.22, 0.42, emberMatB],
+    [ 0.25,0.18, 1.05, emberMatA]
+].forEach(function(f){
+    addMesh(new THREE.SphereGeometry(0.10,6,5), f[3], f[0],f[1],f[2]);
+    var light = new THREE.PointLight(0xFF6A2A, 1.0, 3.6);
+    light.position.set(f[0], f[1]+0.10, f[2]);
+    scene.add(light);
+    siegeFires.push(light);
+    siegeFireMats.push(f[3]);
+});
+window._siegeFires = siegeFires;
+window._siegeFireMats = siegeFireMats;
+
+// Humo
+var siegeSmoke = [];
+[
+    [-1.85,1.10,-0.05],
+    [ 1.05,0.95, 0.42],
+    [ 0.25,0.78, 1.05]
+].forEach(function(p, i){
+    var puff = addMesh(
+        new THREE.SphereGeometry(0.16 + i*0.03,6,5),
+        makeMat(0x5A5A5A,0.98,0.0,0x000000,0.0,0.45,true),
+        p[0], p[1], p[2],
+        0,0,0, 1.0,0.75,1.0
+    );
+    puff.userData = { baseX: p[0], baseY: p[1], baseZ: p[2] };
+    siegeSmoke.push(puff);
+});
+window._siegeSmoke = siegeSmoke;
+
+// Resplandor de amenaza
+var siegeGlow = new THREE.PointLight(0xAA3311, 0.55, 6.0);
+siegeGlow.position.set(0,1.2,0.2);
+scene.add(siegeGlow);
 """.trimIndent()
 
     // ── DEFAULT (tipo no reconocido) ──────────────────────────────────────────
