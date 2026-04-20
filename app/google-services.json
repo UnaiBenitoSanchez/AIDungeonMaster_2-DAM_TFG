@@ -12,7 +12,12 @@
           "package_name": "com.example.aidungeonmaster"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "1011522491782-bk1von0o7ef2s06juascnemcregsarf0.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyAQpAstdhMcLHEEhkVfeUuPEMQ1fScrfNo"
@@ -20,7 +25,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1011522491782-bk1von0o7ef2s06juascnemcregsarf0.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

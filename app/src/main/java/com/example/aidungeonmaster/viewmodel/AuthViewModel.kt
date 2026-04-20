@@ -7,12 +7,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.aidungeonmaster.data.repository.AuthRepository
 import com.example.aidungeonmaster.data.repository.SocialRepository
-import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseAuthUserCollisionException
+import com.google.firebase.auth.FirebaseUser
+import com.google.firebase.auth.GoogleAuthProvider
 import kotlinx.coroutines.launch
 
 class AuthViewModel : ViewModel() {
 
-    private val auth = FirebaseAuth.getInstance()
     private val repository = AuthRepository()
     private val socialRepository = SocialRepository()
 
@@ -22,29 +23,57 @@ class AuthViewModel : ViewModel() {
     var errorMessage by mutableStateOf<String?>(null)
 
     fun isUserLoggedIn(): Boolean {
-        // BUG FIX: Solo se considera logueado si el email está verificado.
-        // Antes devolvía true aunque el usuario no hubiera verificado el correo,
-        // lo que provocaba que el registro metiera al usuario directamente en la app.
-        val user = auth.currentUser
-        return user != null && user.isEmailVerified
+        return canAccessApp(com.google.firebase.auth.FirebaseAuth.getInstance().currentUser)
     }
 
     fun login(email: String, pass: String, onSuccess: () -> Unit) {
-        auth.signInWithEmailAndPassword(email, pass)
-            .addOnCompleteListener { task ->
-                if (task.isSuccessful) {
-                    val user = auth.currentUser
-                    if (user?.isEmailVerified == true) {
-                        viewModelScope.launch { socialRepository.updatePresence(true) }
+        isLoading = true
+        errorMessage = null
+
+        repository.login(
+            email = email,
+            password = pass,
+            onSuccess = { user ->
+                if (canAccessApp(user)) {
+                    viewModelScope.launch {
+                        runCatching { socialRepository.updatePresence(true) }
+                        isLoading = false
                         onSuccess()
-                    } else {
-                        auth.signOut()
-                        errorMessage = "¡Alto ahí! Aún no has validado tu pergamino mágico (correo)."
                     }
                 } else {
-                    errorMessage = "Credenciales incorrectas."
+                    com.google.firebase.auth.FirebaseAuth.getInstance().signOut()
+                    isLoading = false
+                    errorMessage = "¡Alto ahí! Aún no has validado tu pergamino mágico (correo)."
+                }
+            },
+            onError = {
+                isLoading = false
+                errorMessage = "Credenciales incorrectas."
+            }
+        )
+    }
+
+    fun loginWithGoogle(idToken: String, onSuccess: () -> Unit) {
+        isLoading = true
+        errorMessage = null
+
+        viewModelScope.launch {
+            runCatching {
+                val user = repository.signInWithGoogle(idToken)
+                repository.upsertPublicUserProfile(user, provider = GoogleAuthProvider.PROVIDER_ID)
+                socialRepository.updatePresence(true)
+            }.onSuccess {
+                isLoading = false
+                onSuccess()
+            }.onFailure { throwable ->
+                isLoading = false
+                errorMessage = when (throwable) {
+                    is FirebaseAuthUserCollisionException ->
+                        "Ya existe una cuenta con este correo. Entra primero con correo y contraseña para enlazar Google más adelante."
+                    else -> throwable.message ?: "No se pudo iniciar sesión con Google."
                 }
             }
+        }
     }
 
     fun register(
@@ -54,19 +83,20 @@ class AuthViewModel : ViewModel() {
         username: String,
         onSuccess: () -> Unit
     ) {
+        isLoading = true
+        errorMessage = null
+
         repository.register(
             email = email,
             password = pass,
             displayName = displayName,
             username = username,
             onSuccess = {
-                // BUG FIX: Se elimina la llamada a updatePresence aquí.
-                // El usuario acaba de registrarse pero su email NO está verificado todavía,
-                // así que no debe establecerse como "online" ni entrar en la app.
-                // onSuccess solo muestra el Toast y hace popBackStack al Login.
+                isLoading = false
                 onSuccess()
             },
             onError = {
+                isLoading = false
                 errorMessage = it
             }
         )
@@ -74,5 +104,12 @@ class AuthViewModel : ViewModel() {
 
     fun clearError() {
         errorMessage = null
+    }
+
+    private fun canAccessApp(user: FirebaseUser?): Boolean {
+        if (user == null) return false
+
+        val hasGoogleProvider = user.providerData.any { it.providerId == GoogleAuthProvider.PROVIDER_ID }
+        return user.isEmailVerified || hasGoogleProvider
     }
 }
