@@ -22,7 +22,7 @@ android {
         minSdk = 24
         targetSdk = 36
         versionCode = 1
-        versionName = "3.2.0"
+        versionName = "3.2.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -40,6 +40,7 @@ android {
             "\"${localProps.getProperty("GEMINI_API_KEY", "")}\""
         )
 
+        // APIs de Cloudflare para la generación de imagenes
         buildConfigField(
             "String",
             "CLOUDFLARE_ACCOUNT_ID",
@@ -50,6 +51,13 @@ android {
             "String",
             "CLOUDFLARE_API_TOKEN",
             "\"${localProps.getProperty("CLOUDFLARE_API_TOKEN", "")}\""
+        )
+
+        // Inicio de sesión con Google
+        buildConfigField(
+            "String",
+            "GOOGLE_WEB_CLIENT_ID",
+            "\"${localProps.getProperty("GOOGLE_WEB_CLIENT_ID", "")}\""
         )
 
         ndk {
@@ -170,4 +178,9 @@ dependencies {
     implementation("com.google.ar:core:1.43.0")
     // SceneView: wrapper Compose sobre ARCore + Filament (renderer 3D)
     implementation("io.github.sceneview:arsceneview:2.2.1")
+
+    // Inicio de sesión con Google
+    implementation("androidx.credentials:credentials:1.3.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
 }

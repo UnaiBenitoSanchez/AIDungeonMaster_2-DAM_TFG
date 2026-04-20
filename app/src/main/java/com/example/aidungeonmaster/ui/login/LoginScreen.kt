@@ -1,5 +1,6 @@
 package com.example.aidungeonmaster.ui.login
 
+import android.app.Activity
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -10,6 +11,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -20,6 +23,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -31,9 +35,9 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.aidungeonmaster.R
+import com.example.aidungeonmaster.data.auth.GoogleAuthManager
 import com.example.aidungeonmaster.viewmodel.AuthViewModel
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,14 +48,15 @@ fun LoginScreen(
 ) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-
-    // NUEVO: Estado para controlar si se ve la contraseña o no
     var passwordVisible by remember { mutableStateOf(false) }
 
+    val context = LocalContext.current
+    val googleAuthManager = remember { GoogleAuthManager() }
+    val coroutineScope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
 
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxSize()
             .background(
                 brush = Brush.verticalGradient(
@@ -64,7 +69,6 @@ fun LoginScreen(
             )
             .imePadding()
     ) {
-        // Fondo decorativo
         Image(
             painter = painterResource(id = R.drawable.background_parchment),
             contentDescription = null,
@@ -73,7 +77,6 @@ fun LoginScreen(
             alpha = 0.1f
         )
 
-        // Columna principal con Scroll
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -82,8 +85,6 @@ fun LoginScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-
-            // --- HEADER ---
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.padding(bottom = 32.dp)
@@ -114,7 +115,6 @@ fun LoginScreen(
                 )
             }
 
-            // --- TARJETA DE LOGIN ---
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -141,7 +141,6 @@ fun LoginScreen(
                         color = MaterialTheme.colorScheme.onSurface
                     )
 
-                    // Campo Email
                     OutlinedTextField(
                         value = email,
                         onValueChange = { email = it },
@@ -156,10 +155,10 @@ fun LoginScreen(
                             focusedBorderColor = MaterialTheme.colorScheme.primary,
                             unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
                         ),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(12.dp),
+                        enabled = !viewModel.isLoading
                     )
 
-                    // Campo Password (MODIFICADO)
                     OutlinedTextField(
                         value = password,
                         onValueChange = { password = it },
@@ -167,13 +166,8 @@ fun LoginScreen(
                         leadingIcon = {
                             Icon(imageVector = Icons.Default.Lock, contentDescription = null)
                         },
-                        // NUEVO: Icono del ojo a la derecha
                         trailingIcon = {
-                            val image = if (passwordVisible)
-                                Icons.Default.Visibility
-                            else
-                                Icons.Default.VisibilityOff
-
+                            val image = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff
                             val description = if (passwordVisible) "Ocultar contraseña" else "Mostrar contraseña"
 
                             IconButton(onClick = { passwordVisible = !passwordVisible }) {
@@ -182,17 +176,16 @@ fun LoginScreen(
                         },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
-                        // NUEVO: Lógica para mostrar texto o puntos
                         visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = MaterialTheme.colorScheme.primary,
                             unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
                         ),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(12.dp),
+                        enabled = !viewModel.isLoading
                     )
 
-                    // --- MOSTRAR ERROR ---
                     viewModel.errorMessage?.let { errorMsg ->
                         Surface(
                             color = MaterialTheme.colorScheme.errorContainer,
@@ -233,22 +226,72 @@ fun LoginScreen(
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.primary
+                        ),
+                        enabled = !viewModel.isLoading
+                    ) {
+                        if (viewModel.isLoading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.onPrimary
+                            )
+                        } else {
+                            Text(
+                                text = "ENTRAR A LA AVENTURA",
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            val activity = context as? Activity
+                            if (activity == null) {
+                                viewModel.errorMessage = "No se pudo abrir Google Login en este contexto."
+                                return@OutlinedButton
+                            }
+
+                            coroutineScope.launch {
+                                viewModel.clearError()
+                                googleAuthManager.getGoogleIdToken(activity)
+                                    .onSuccess { idToken ->
+                                        viewModel.loginWithGoogle(idToken) {
+                                            navController.navigate("home") {
+                                                popUpTo("login") { inclusive = true }
+                                            }
+                                        }
+                                    }
+                                    .onFailure { throwable ->
+                                        viewModel.errorMessage = throwable.message
+                                            ?: "No se pudo iniciar sesión con Google."
+                                    }
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        enabled = !viewModel.isLoading,
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            MaterialTheme.colorScheme.outline.copy(alpha = 0.7f)
                         )
                     ) {
                         Text(
-                            text = "ENTRAR A LA AVENTURA",
+                            text = "CONTINUAR CON GOOGLE",
                             fontWeight = FontWeight.Bold
                         )
                     }
 
-                    Divider(
+                    HorizontalDivider(
                         color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
                         thickness = 1.dp
                     )
 
                     TextButton(
                         onClick = { navController.navigate("register") },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !viewModel.isLoading
                     ) {
                         Text(
                             text = "¿Nuevo aventurero? Crea tu cuenta",
@@ -257,19 +300,6 @@ fun LoginScreen(
                     }
                 }
             }
-
-            // Footer
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Text(
-                text = "AIDungeonMaster de Unai",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
-                modifier = Modifier.padding(horizontal = 16.dp),
-                textAlign = TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }
