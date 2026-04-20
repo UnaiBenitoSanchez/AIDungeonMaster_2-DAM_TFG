@@ -46,6 +46,8 @@ import androidx.compose.material.icons.filled.MenuBook
 
 import androidx.lifecycle.compose.LifecycleResumeEffect
 
+import kotlin.math.roundToInt
+
 @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -66,6 +68,8 @@ fun GamePlayScreen(
     val isLoading by viewModel.isLoading.collectAsState()
 
     val characterState by inventoryViewModel.character.collectAsState()
+    val mapState by mapViewModel.worldMapState.collectAsState()
+
     val hpCurrent = characterState?.hpCurrent ?: 20
     val hpMax     = characterState?.hpMax     ?: 20
 
@@ -209,16 +213,19 @@ fun GamePlayScreen(
             }
 
             if (step.coinsFound > 0) {
-                inventoryViewModel.addCoins(charId, step.coinsFound)
+                val currentLocationState = mapState.locationStates[mapState.currentLocationId]
+                val adjustedCoins = adjustCoinsFoundByWorld(step.coinsFound, currentLocationState)
+
+                inventoryViewModel.addCoins(charId, adjustedCoins)
 
                 journalViewModel.addEntry(
                     charId = charId,
                     title = "Has encontrado monedas",
-                    summary = "Has conseguido ${step.coinsFound} monedas de oro.",
-                    fullText = "$characterName encontró ${step.coinsFound} monedas de oro durante la aventura.",
+                    summary = "Has conseguido $adjustedCoins monedas de oro.",
+                    fullText = "$characterName encontró $adjustedCoins monedas de oro durante la aventura.",
                     type = "loot",
                     tags = listOf("oro", "monedas", "botin"),
-                    coinsChange = step.coinsFound
+                    coinsChange = adjustedCoins
                 )
             }
         }
@@ -554,4 +561,23 @@ fun PlayerStatsHeader(hpCurrent: Int, hpMax: Int) {
             )
         }
     }
+}
+
+private fun adjustCoinsFoundByWorld(
+    baseCoins: Int,
+    state: com.example.aidungeonmaster.data.model.LocationLifeState?
+): Int {
+    if (state == null) return baseCoins
+
+    var multiplier = 1f
+
+    if (state.prosperity >= 70) multiplier += 0.15f
+    if (state.prosperity <= 20) multiplier -= 0.10f
+
+    if (state.danger >= 70) multiplier += 0.20f
+    else if (state.danger >= 50) multiplier += 0.10f
+
+    if (state.corruption >= 60) multiplier += 0.10f
+
+    return (baseCoins * multiplier).roundToInt().coerceAtLeast(1)
 }

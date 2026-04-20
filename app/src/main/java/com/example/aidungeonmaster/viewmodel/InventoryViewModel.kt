@@ -17,7 +17,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import com.example.aidungeonmaster.data.model.ItemEnchantment
 import com.example.aidungeonmaster.data.model.normalizeEquipSlot
-
+import com.example.aidungeonmaster.data.model.LocationLifeState
 data class StatComparisonLine(
     val label: String,
     val current: Int,
@@ -429,6 +429,40 @@ class InventoryViewModel : ViewModel() {
         }
     }
 
+    suspend fun loadCurrentLocationLifeState(gameId: String): LocationLifeState? {
+        return try {
+            val doc = db.collection("partidas")
+                .document(gameId)
+                .collection("worldMap")
+                .document("state")
+                .get()
+                .await()
+
+            val currentLocationId = doc.getString("currentLocationId").orEmpty()
+            if (currentLocationId.isBlank()) return null
+
+            val rawStates = doc.get("locationStates") as? Map<*, *> ?: return null
+            val rawState = rawStates[currentLocationId] as? Map<String, Any> ?: return null
+
+            rawState.toLocationLifeState(currentLocationId)
+        } catch (e: Exception) {
+            Log.e("INVENTORY_ERROR", "loadCurrentLocationLifeState: ${e.message}", e)
+            null
+        }
+    }
+
+    private fun Map<String, Any>.toLocationLifeState(locationId: String): LocationLifeState =
+        LocationLifeState(
+            locationId = this["locationId"] as? String ?: locationId,
+            prosperity = (this["prosperity"] as? Number)?.toInt() ?: 50,
+            security = (this["security"] as? Number)?.toInt() ?: 50,
+            danger = (this["danger"] as? Number)?.toInt() ?: 20,
+            corruption = (this["corruption"] as? Number)?.toInt() ?: 0,
+            mood = this["mood"] as? String ?: "estable",
+            controllingFactionId = this["controllingFactionId"] as? String ?: "",
+            lastEventSummary = this["lastEventSummary"] as? String ?: "",
+            lastUpdatedAt = (this["lastUpdatedAt"] as? Number)?.toLong() ?: System.currentTimeMillis()
+        )
     suspend fun addShopReputation(gameId: String, shopKey: String, points: Int = 10): Int {
         return try {
             val snap = db.collection("partidas").document(gameId).get().await()

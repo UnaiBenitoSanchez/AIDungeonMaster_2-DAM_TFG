@@ -5,6 +5,7 @@ import androidx.compose.animation.core.*
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -29,6 +30,8 @@ import androidx.compose.ui.unit.sp
 import com.example.aidungeonmaster.data.model.Item
 import com.example.aidungeonmaster.viewmodel.InventoryViewModel
 import kotlinx.coroutines.launch
+import com.example.aidungeonmaster.data.model.LocationLifeState
+import kotlin.math.roundToInt
 
 // ══════════════════════════════════════════════════════════════════════════════
 // SISTEMA DE REPUTACIÓN
@@ -237,6 +240,96 @@ fun shopReputationKey(shopName: String): String =
 fun finalPrice(basePrice: Int, tier: ReputationTier): Int =
     (basePrice * (100 - tier.discountPct) / 100).coerceAtLeast(1)
 
+data class WorldShopModifiers(
+    val state: LocationLifeState? = null,
+    val priceMultiplier: Float = 1f,
+    val stockPenalty: Int = 0,
+    val flavorText: String = ""
+)
+
+fun buildWorldShopModifiers(state: LocationLifeState?): WorldShopModifiers {
+    if (state == null) {
+        return WorldShopModifiers(flavorText = "La economía local está en equilibrio.")
+    }
+
+    var multiplier = 1f
+    var stockPenalty = 0
+    val notes = mutableListOf<String>()
+
+    when {
+        state.prosperity >= 75 -> {
+            multiplier -= 0.10f
+            notes += "la prosperidad abarata los precios"
+        }
+        state.prosperity >= 60 -> {
+            multiplier -= 0.05f
+            notes += "el comercio local está fuerte"
+        }
+        state.prosperity <= 20 -> {
+            multiplier += 0.12f
+            stockPenalty += 1
+            notes += "la decadencia encarece los suministros"
+        }
+    }
+
+    when {
+        state.danger >= 70 -> {
+            multiplier += 0.12f
+            stockPenalty += 2
+            notes += "el peligro dificulta el abastecimiento"
+        }
+        state.danger >= 50 -> {
+            multiplier += 0.06f
+            stockPenalty += 1
+            notes += "las rutas comerciales son inestables"
+        }
+    }
+
+    when {
+        state.corruption >= 60 -> {
+            multiplier += 0.10f
+            stockPenalty += 1
+            notes += "la corrupción distorsiona el mercado"
+        }
+        state.corruption >= 35 -> {
+            multiplier += 0.05f
+            notes += "hay tensiones oscuras en la zona"
+        }
+    }
+
+    return WorldShopModifiers(
+        state = state,
+        priceMultiplier = multiplier.coerceIn(0.75f, 1.45f),
+        stockPenalty = stockPenalty.coerceIn(0, 3),
+        flavorText = notes.joinToString(" • ").ifBlank { "La economía local está en equilibrio." }
+    )
+}
+
+fun finalWorldPrice(
+    basePrice: Int,
+    tier: ReputationTier,
+    modifiers: WorldShopModifiers
+): Int {
+    val repAdjusted = finalPrice(basePrice, tier)
+    return (repAdjusted * modifiers.priceMultiplier).roundToInt().coerceAtLeast(1)
+}
+
+fun applyWorldStockRules(
+    catalog: List<ShopItem>,
+    modifiers: WorldShopModifiers
+): List<ShopItem> {
+    val state = modifiers.state ?: return catalog
+
+    return catalog.filter { item ->
+        when {
+            modifiers.stockPenalty >= 3 && item.basePrice >= 45 -> false
+            modifiers.stockPenalty >= 2 && item.minTier.ordinal >= ReputationTier.HONRADO.ordinal -> false
+            state.prosperity <= 20 && item.basePrice >= 35 -> false
+            else -> true
+        }
+    }
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // COMPOSABLE PRINCIPAL DE LA TIENDA
 // ══════════════════════════════════════════════════════════════════════════════
@@ -261,10 +354,17 @@ fun SupermarketShopOverlay(
     var repTier   by remember { mutableStateOf(ReputationTier.DESCONOCIDO) }
     var repLoaded by remember { mutableStateOf(false) }
 
+    var locationState by remember { mutableStateOf<LocationLifeState?>(null) }
+    var worldModifiers by remember { mutableStateOf(WorldShopModifiers()) }
+
     LaunchedEffect(gameId, supermarketName) {
         val rep = inventoryViewModel.loadShopReputation(gameId)
         repPoints = rep[repKey] ?: 0
-        repTier   = ReputationTier.fromPoints(repPoints)
+        repTier = ReputationTier.fromPoints(repPoints)
+
+        locationState = inventoryViewModel.loadCurrentLocationLifeState(gameId)
+        worldModifiers = buildWorldShopModifiers(locationState)
+
         repLoaded = true
     }
 
@@ -275,7 +375,10 @@ fun SupermarketShopOverlay(
         }
     }
 
-    val catalog = remember(supermarketName) { catalogForShop(supermarketName) }
+    val baseCatalog = remember(supermarketName) { catalogForShop(supermarketName) }
+    val catalog = remember(baseCatalog, worldModifiers) {
+        applyWorldStockRules(baseCatalog, worldModifiers)
+    }
 
     Box(
         modifier         = Modifier.fillMaxSize().background(Color(0xCC000000)),
@@ -319,6 +422,39 @@ fun SupermarketShopOverlay(
                     ReputationBanner(tier = repTier, points = repPoints, shopName = supermarketName)
                 }
 
+                if (repLoaded) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = Color(0x2211AA88)
+                        ),
+                        border = BorderStroke(1.dp, Color(0x339BE7C4))
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                text = "Estado del mercado local",
+                                color = Color(0xFF9BE7C4),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp
+                            )
+                            Text(
+                                text = worldModifiers.flavorText,
+                                color = Color(0xFFCCF5E5),
+                                fontSize = 11.sp
+                            )
+                            locationState?.let { state ->
+                                Text(
+                                    text = "Prosperidad ${state.prosperity} • Seguridad ${state.security} • Peligro ${state.danger}",
+                                    color = Color(0xFFCCBBAA),
+                                    fontSize = 10.sp
+                                )
+                            }
+                        }
+                    }
+                }
+
                 // ── Feedback ──────────────────────────────────────────────────
                 AnimatedVisibility(visible = feedback != null) {
                     feedback?.let { msg ->
@@ -346,7 +482,7 @@ fun SupermarketShopOverlay(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     items(catalog) { shopItem ->
-                        val price = finalPrice(shopItem.basePrice, repTier)
+                        val price = finalWorldPrice(shopItem.basePrice, repTier, worldModifiers)
                         val locked = repTier.ordinal < shopItem.minTier.ordinal
 
                         ShopItemCard(

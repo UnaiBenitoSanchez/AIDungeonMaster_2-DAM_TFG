@@ -34,6 +34,7 @@ import com.example.aidungeonmaster.data.model.WorldMapState
 import com.example.aidungeonmaster.viewmodel.WorldMapViewModel
 
 import com.example.aidungeonmaster.data.model.LocationLifeState
+import java.text.Normalizer
 
 // ── BOTÓN FLOTANTE PARA ABRIR EL MAPA ────────────────────────────────────────
 
@@ -199,6 +200,10 @@ fun WorldMapCanvas(
 ) {
     var canvasSize by remember { mutableStateOf(IntSize(1, 1)) }
 
+    val backdrop = remember(mapState.locations, mapState.currentLocationId) {
+        resolveMapBackdrop(mapState.locations)
+    }
+
     // Pulsación animada para la posición actual del jugador
     val infiniteTransition = rememberInfiniteTransition(label = "player_pulse")
     val playerPulseRadius by infiniteTransition.animateFloat(
@@ -218,15 +223,18 @@ fun WorldMapCanvas(
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
             .background(
-                Brush.radialGradient(
-                    listOf(Color(0xFF1B3A1B), Color(0xFF0D1F0D), Color(0xFF060E06))
+                Brush.verticalGradient(
+                    listOf(backdrop.top, backdrop.mid, backdrop.bottom)
                 )
             )
+
             .onSizeChanged { canvasSize = it }
             .drawBehind {
-                drawMapBackground(this)
+                drawMapBackground(this, backdrop)
+                drawMapTerrainHints(this, backdrop)
                 drawMapGrid(this)
             }
+
             .pointerInput(mapState.locations, canvasSize) {
                 detectTapGestures { tapOffset ->
                     // Detectar si el toque está cerca de alguna ubicación
@@ -287,16 +295,179 @@ fun WorldMapCanvas(
     }
 }
 
-private fun DrawScope.drawMapBackground(scope: DrawScope) {
-    // Viñeta oscura en los bordes
+private data class MapBackdropPalette(
+    val top: Color,
+    val mid: Color,
+    val bottom: Color,
+    val accent: Color,
+    val terrainType: String
+)
+
+private fun resolveMapBackdrop(locations: List<WorldLocation>): MapBackdropPalette {
+    val current = locations.find { it.isCurrentLocation }?.type?.normalizeBiome()
+    val dominant = current ?: locations
+        .groupingBy { it.type.normalizeBiome() }
+        .eachCount()
+        .maxByOrNull { it.value }
+        ?.key
+    ?: "lugar"
+
+    return when (dominant) {
+        "mar", "océano" -> MapBackdropPalette(
+            top = Color(0xFF8FD3FF),
+            mid = Color(0xFF3B82B8),
+            bottom = Color(0xFF0E355A),
+            accent = Color(0x66DFF6FF),
+            terrainType = "waves"
+        )
+        "lago" -> MapBackdropPalette(
+            top = Color(0xFFB9E7FF),
+            mid = Color(0xFF4A90B8),
+            bottom = Color(0xFF173D55),
+            accent = Color(0x556EE7FF),
+            terrainType = "lake"
+        )
+        "bosque" -> MapBackdropPalette(
+            top = Color(0xFF5A8F5A),
+            mid = Color(0xFF244B24),
+            bottom = Color(0xFF102110),
+            accent = Color(0x3346A35C),
+            terrainType = "forest"
+        )
+        "desierto" -> MapBackdropPalette(
+            top = Color(0xFFF1D08B),
+            mid = Color(0xFFC3923C),
+            bottom = Color(0xFF6B4518),
+            accent = Color(0x33FFF0B2),
+            terrainType = "dunes"
+        )
+        "montaña" -> MapBackdropPalette(
+            top = Color(0xFFC8D2DC),
+            mid = Color(0xFF5E6B78),
+            bottom = Color(0xFF222C35),
+            accent = Color(0x33E6EEF8),
+            terrainType = "mountains"
+        )
+        "cueva", "mazmorra", "ruina" -> MapBackdropPalette(
+            top = Color(0xFF4B4656),
+            mid = Color(0xFF1E1C28),
+            bottom = Color(0xFF08070F),
+            accent = Color(0x22B084FF),
+            terrainType = "cavern"
+        )
+        "ciudad", "pueblo", "taberna", "templo", "torre" -> MapBackdropPalette(
+            top = Color(0xFFD8BA8A),
+            mid = Color(0xFF8A5B2F),
+            bottom = Color(0xFF2C1808),
+            accent = Color(0x33FFD700),
+            terrainType = "settlement"
+        )
+        else -> MapBackdropPalette(
+            top = Color(0xFF7DAA72),
+            mid = Color(0xFF355F35),
+            bottom = Color(0xFF162516),
+            accent = Color(0x2244AA66),
+            terrainType = "plains"
+        )
+    }
+}
+
+private fun String.normalizeBiome(): String {
+    val normalized = Normalizer.normalize(lowercase().trim(), Normalizer.Form.NFD)
+        .replace(Regex("\\p{InCombiningDiacriticalMarks}+"), "")
+
+    return when {
+        listOf("oceano", "alta mar", "mar abierto").any { it in normalized } -> "océano"
+        listOf("mar", "playa", "costa", "litoral", "bahia", "puerto", "muelle").any { it in normalized } -> "mar"
+        listOf("lago", "rio", "laguna", "arroyo", "estanque").any { it in normalized } -> "lago"
+        listOf("bosque", "selva", "arboleda").any { it in normalized } -> "bosque"
+        listOf("desierto", "duna", "arena", "arido").any { it in normalized } -> "desierto"
+        listOf("montana", "pico", "cordillera").any { it in normalized } -> "montaña"
+        listOf("cueva", "gruta", "caverna", "mazmorra", "ruina").any { it in normalized } -> "cueva"
+        listOf("ciudad", "pueblo", "taberna", "templo", "torre").any { it in normalized } -> "ciudad"
+        else -> "lugar"
+    }
+}
+
+private fun DrawScope.drawMapBackground(scope: DrawScope, palette: MapBackdropPalette) {
     val vignette = Brush.radialGradient(
         colorStops = arrayOf(
             0.0f to Color.Transparent,
             0.7f to Color.Transparent,
-            1.0f to Color(0x99000000)
+            1.0f to Color(0x66000000)
         )
     )
     scope.drawRect(brush = vignette)
+}
+
+private fun DrawScope.drawMapTerrainHints(scope: DrawScope, palette: MapBackdropPalette) {
+    when (palette.terrainType) {
+        "waves", "lake" -> {
+            for (i in 0..5) {
+                val y = size.height * (0.18f + i * 0.12f)
+                scope.drawLine(
+                    color = palette.accent,
+                    start = Offset(size.width * 0.08f, y),
+                    end = Offset(size.width * 0.92f, y + if (i % 2 == 0) 8f else -8f),
+                    strokeWidth = 2f
+                )
+            }
+        }
+
+        "forest" -> {
+            for (i in 0..8) {
+                val x = size.width * (0.08f + i * 0.1f)
+                scope.drawCircle(
+                    color = palette.accent,
+                    radius = 18f + (i % 3) * 4f,
+                    center = Offset(x, size.height * 0.78f)
+                )
+            }
+        }
+
+        "dunes" -> {
+            for (i in 0..4) {
+                val y = size.height * (0.45f + i * 0.10f)
+                scope.drawLine(
+                    color = palette.accent,
+                    start = Offset(size.width * 0.10f, y),
+                    end = Offset(size.width * 0.90f, y - 18f),
+                    strokeWidth = 6f
+                )
+            }
+        }
+
+        "mountains" -> {
+            val peaks = listOf(
+                Offset(size.width * 0.20f, size.height * 0.65f),
+                Offset(size.width * 0.45f, size.height * 0.52f),
+                Offset(size.width * 0.70f, size.height * 0.68f)
+            )
+            peaks.forEach { peak ->
+                scope.drawLine(palette.accent, Offset(peak.x - 35f, size.height * 0.88f), peak, 5f)
+                scope.drawLine(palette.accent, peak, Offset(peak.x + 35f, size.height * 0.88f), 5f)
+            }
+        }
+
+        "cavern" -> {
+            scope.drawCircle(
+                color = palette.accent,
+                radius = size.minDimension * 0.28f,
+                center = Offset(size.width * 0.5f, size.height * 0.58f)
+            )
+        }
+
+        "settlement" -> {
+            for (i in 0..5) {
+                val x = size.width * (0.12f + i * 0.12f)
+                scope.drawRect(
+                    color = palette.accent,
+                    topLeft = Offset(x, size.height * 0.70f),
+                    size = androidx.compose.ui.geometry.Size(18f, 28f + (i % 3) * 8f)
+                )
+            }
+        }
+    }
 }
 
 private fun DrawScope.drawMapGrid(scope: DrawScope) {
