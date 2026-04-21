@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.ExitToApp
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Star
@@ -175,6 +176,12 @@ fun HomeScreen(
                                         )
                                     }
                                 },
+                                onOpenRoom = {
+                                    val partidaId = "${userId}_${character.name}"
+                                    navController.navigate(
+                                        Screen.PersonalRoom.createRoute(partidaId, character.name)
+                                    )
+                                },
                                 onDelete = { characterToDelete = character }
                             )
                         }
@@ -274,6 +281,7 @@ fun HomeScreen(
 fun CharacterCard(
     character: Character,
     onClick: () -> Unit,
+    onOpenRoom: () -> Unit,
     onDelete: () -> Unit
 ) {
     val imageModel = remember(character.portraitUrl) {
@@ -430,12 +438,22 @@ fun CharacterCard(
                 }
             }
 
-            IconButton(onClick = onDelete) {
-                Icon(
-                    Icons.Default.Delete,
-                    contentDescription = "Borrar",
-                    tint = MaterialTheme.colorScheme.outline
-                )
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                IconButton(onClick = onOpenRoom) {
+                    Icon(
+                        Icons.Default.Home,
+                        contentDescription = "Abrir fortaleza",
+                        tint = Color(0xFFFFD700)
+                    )
+                }
+
+                IconButton(onClick = onDelete) {
+                    Icon(
+                        Icons.Default.Delete,
+                        contentDescription = "Borrar",
+                        tint = MaterialTheme.colorScheme.outline
+                    )
+                }
             }
         }
     }
