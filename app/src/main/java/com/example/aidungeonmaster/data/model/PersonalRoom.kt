@@ -132,6 +132,102 @@ val PERSONAL_ROOM_CATALOG = listOf(
         price = 220,
         emoji = "🪑",
         allowedSlots = PERSONAL_ROOM_ALL_SLOT_IDS
+    ),
+    PersonalRoomDecoration(
+        id = "armor_stand",
+        name = "Armero ceremonial",
+        description = "Una armadura de exhibición para dar presencia militar a la sala.",
+        price = 160,
+        emoji = "🛡️",
+        allowedSlots = PERSONAL_ROOM_ALL_SLOT_IDS
+    ),
+    PersonalRoomDecoration(
+        id = "library_shelf",
+        name = "Estantería arcana",
+        description = "Una biblioteca compacta llena de grimorios y tomos antiguos.",
+        price = 140,
+        emoji = "📚",
+        allowedSlots = PERSONAL_ROOM_ALL_SLOT_IDS
+    ),
+    PersonalRoomDecoration(
+        id = "brazier_gold",
+        name = "Brasero dorado",
+        description = "Un brasero elegante que aporta luz cálida y ambiente noble.",
+        price = 110,
+        emoji = "🔥",
+        allowedSlots = PERSONAL_ROOM_ALL_SLOT_IDS
+    ),
+    PersonalRoomDecoration(
+        id = "war_banner_blue",
+        name = "Estandarte azur",
+        description = "Un gran estandarte azul para dar variedad heráldica a la fortaleza.",
+        price = 125,
+        emoji = "🔷",
+        allowedSlots = PERSONAL_ROOM_ALL_SLOT_IDS
+    ),
+    PersonalRoomDecoration(
+        id = "feast_table",
+        name = "Mesa de banquete",
+        description = "Una mesa preparada para celebrar victorias y recibir invitados.",
+        price = 180,
+        emoji = "🍖",
+        allowedSlots = PERSONAL_ROOM_ALL_SLOT_IDS
+    ),
+    PersonalRoomDecoration(
+        id = "training_dummy",
+        name = "Muñeco de entrenamiento",
+        description = "Ideal para practicar golpes sin salir de la fortaleza.",
+        price = 95,
+        emoji = "🥋",
+        allowedSlots = PERSONAL_ROOM_ALL_SLOT_IDS
+    ),
+    PersonalRoomDecoration(
+        id = "royal_window",
+        name = "Ventanal real",
+        description = "Un ventanal decorativo con cristal azul y marco noble.",
+        price = 150,
+        emoji = "🪟",
+        allowedSlots = PERSONAL_ROOM_ALL_SLOT_IDS
+    ),
+    PersonalRoomDecoration(
+        id = "small_fountain",
+        name = "Fuente interior",
+        description = "Una pequeña fuente ornamental para dar serenidad a la sala.",
+        price = 170,
+        emoji = "⛲",
+        allowedSlots = PERSONAL_ROOM_ALL_SLOT_IDS
+    ),
+    PersonalRoomDecoration(
+        id = "trophy_pedestal",
+        name = "Pedestal de trofeo",
+        description = "Un pedestal para lucir la gloria y el prestigio del héroe.",
+        price = 130,
+        emoji = "🏆",
+        allowedSlots = PERSONAL_ROOM_ALL_SLOT_IDS
+    ),
+    PersonalRoomDecoration(
+        id = "music_corner",
+        name = "Rincón musical",
+        description = "Un pequeño rincón con laúd y taburete para momentos de calma.",
+        price = 100,
+        emoji = "🎵",
+        allowedSlots = PERSONAL_ROOM_ALL_SLOT_IDS
+    ),
+    PersonalRoomDecoration(
+        id = "alchemy_set",
+        name = "Mesa de alquimia",
+        description = "Frascos, pociones y herramientas alquímicas de apariencia mística.",
+        price = 165,
+        emoji = "⚗️",
+        allowedSlots = PERSONAL_ROOM_ALL_SLOT_IDS
+    ),
+    PersonalRoomDecoration(
+        id = "crystal_cluster",
+        name = "Clúster de cristales",
+        description = "Un grupo de cristales flotantes que da un toque mágico a la sala.",
+        price = 155,
+        emoji = "💎",
+        allowedSlots = PERSONAL_ROOM_ALL_SLOT_IDS
     )
 )
 

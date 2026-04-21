@@ -3,10 +3,10 @@ package com.example.aidungeonmaster.viewmodel
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.aidungeonmaster.data.model.PERSONAL_ROOM_CATALOG
 import com.example.aidungeonmaster.data.model.PersonalRoomPlacedDecoration
 import com.example.aidungeonmaster.data.model.PersonalRoomState
 import com.example.aidungeonmaster.data.model.personalRoomDecorationById
+import com.example.aidungeonmaster.data.model.personalRoomSlotById
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -98,6 +98,7 @@ class PersonalRoomViewModel : ViewModel() {
                     ownedDecorationIds = newOwned,
                     updatedAt = System.currentTimeMillis()
                 )
+
                 saveRoom(charId)
                 onResult("✅ Has comprado ${decoration.emoji} ${decoration.name}.")
             } catch (e: Exception) {
@@ -107,11 +108,22 @@ class PersonalRoomViewModel : ViewModel() {
         }
     }
 
-    fun placeDecoration(decorationId: String, onResult: (String) -> Unit = {}) {
+    fun placeDecoration(
+        decorationId: String,
+        slotId: String,
+        onResult: (String) -> Unit = {}
+    ) {
         val state = _roomState.value
         val decoration = personalRoomDecorationById(decorationId)
+        val slot = personalRoomSlotById(slotId)
+
         if (decoration == null) {
             onResult("❌ Decoración no encontrada.")
+            return
+        }
+
+        if (slot == null) {
+            onResult("❌ Baldosa no válida.")
             return
         }
 
@@ -120,36 +132,56 @@ class PersonalRoomViewModel : ViewModel() {
             return
         }
 
-        if (state.placedDecorations.any { it.decorationId == decorationId }) {
-            onResult("✅ ${decoration.name} ya está colocada.")
+        if (slotId !in decoration.allowedSlots) {
+            onResult("❌ ${decoration.name} no se puede colocar en ${slot.label}.")
             return
         }
 
-        val occupiedSlots = state.placedDecorations.map { it.slotId }.toSet()
-        val freeSlot = decoration.allowedSlots.firstOrNull { it !in occupiedSlots }
-
-        if (freeSlot == null) {
-            onResult("❌ No hay huecos libres para ${decoration.name}.")
+        val occupied = state.placedDecorations.firstOrNull { it.slotId == slotId }
+        if (occupied != null && occupied.decorationId != decorationId) {
+            val occupiedName = personalRoomDecorationById(occupied.decorationId)?.name ?: "otra decoración"
+            onResult("❌ ${slot.label} ya está ocupada por $occupiedName.")
             return
         }
+
+        val currentPlacement = state.placedDecorations.firstOrNull { it.decorationId == decorationId }
+        if (currentPlacement?.slotId == slotId) {
+            onResult("✅ ${decoration.name} ya está en ${slot.label}.")
+            return
+        }
+
+        val updatedPlaced = state.placedDecorations
+            .filterNot { it.decorationId == decorationId }
+            .filterNot { it.slotId == slotId }
+            .plus(
+                PersonalRoomPlacedDecoration(
+                    decorationId = decorationId,
+                    slotId = slotId
+                )
+            )
 
         _roomState.value = state.copy(
-            placedDecorations = state.placedDecorations + PersonalRoomPlacedDecoration(
-                decorationId = decorationId,
-                slotId = freeSlot
-            ),
+            placedDecorations = updatedPlaced,
             updatedAt = System.currentTimeMillis()
         )
 
         persistCurrentRoom()
-        onResult("🏠 ${decoration.name} colocada.")
+
+        onResult(
+            if (currentPlacement == null) {
+                "🏠 ${decoration.name} colocada en ${slot.label}."
+            } else {
+                "🔁 ${decoration.name} movida a ${slot.label}."
+            }
+        )
     }
 
     fun removeDecoration(decorationId: String, onResult: (String) -> Unit = {}) {
         val state = _roomState.value
         val decoration = personalRoomDecorationById(decorationId)
+        val placement = state.placedDecorations.firstOrNull { it.decorationId == decorationId }
 
-        if (state.placedDecorations.none { it.decorationId == decorationId }) {
+        if (placement == null) {
             onResult("❌ Esa decoración no está puesta.")
             return
         }
@@ -160,7 +192,18 @@ class PersonalRoomViewModel : ViewModel() {
         )
 
         persistCurrentRoom()
-        onResult("📦 ${decoration?.name ?: "Decoración"} guardada.")
+
+        val slotName = personalRoomSlotById(placement.slotId)?.label ?: "esa baldosa"
+        onResult("↩️ ${decoration?.name ?: "Decoración"} retirada de $slotName.")
+    }
+
+    fun removeDecorationFromSlot(slotId: String, onResult: (String) -> Unit = {}) {
+        val placed = _roomState.value.placedDecorations.firstOrNull { it.slotId == slotId }
+        if (placed == null) {
+            onResult("❌ No hay decoración en esa baldosa.")
+            return
+        }
+        removeDecoration(placed.decorationId, onResult)
     }
 
     private fun persistCurrentRoom() {
@@ -171,31 +214,28 @@ class PersonalRoomViewModel : ViewModel() {
     }
 
     private suspend fun saveRoom(charId: String) {
-        val state = _roomState.value
-        val safeOwned = state.ownedDecorationIds.filter { id ->
-            PERSONAL_ROOM_CATALOG.any { it.id == id }
-        }
-        val safePlaced = state.placedDecorations.filter { placed ->
-            PERSONAL_ROOM_CATALOG.any { it.id == placed.decorationId }
-        }
+        try {
+            val state = _roomState.value
+            val data = mapOf(
+                "ownedDecorationIds" to state.ownedDecorationIds,
+                "placedDecorations" to state.placedDecorations.map {
+                    mapOf(
+                        "decorationId" to it.decorationId,
+                        "slotId" to it.slotId
+                    )
+                },
+                "roomTheme" to state.roomTheme,
+                "updatedAt" to state.updatedAt
+            )
 
-        val data = mapOf(
-            "ownedDecorationIds" to safeOwned,
-            "placedDecorations" to safePlaced.map {
-                mapOf(
-                    "decorationId" to it.decorationId,
-                    "slotId" to it.slotId
-                )
-            },
-            "roomTheme" to state.roomTheme,
-            "updatedAt" to System.currentTimeMillis()
-        )
-
-        db.collection("partidas")
-            .document(charId)
-            .collection("personalRoom")
-            .document("state")
-            .set(data, SetOptions.merge())
-            .await()
+            db.collection("partidas")
+                .document(charId)
+                .collection("personalRoom")
+                .document("state")
+                .set(data, SetOptions.merge())
+                .await()
+        } catch (e: Exception) {
+            Log.e("ROOM_VM", "saveRoom: ${e.message}", e)
+        }
     }
 }
