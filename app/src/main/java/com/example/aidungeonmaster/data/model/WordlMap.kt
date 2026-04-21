@@ -14,10 +14,10 @@ data class WorldLocation(
 
 data class LocationLifeState(
     val locationId: String = "",
-    val prosperity: Int = 50,      // 0..100
-    val security: Int = 50,        // 0..100
-    val danger: Int = 20,          // 0..100
-    val corruption: Int = 0,       // 0..100
+    val prosperity: Int = 50,
+    val security: Int = 50,
+    val danger: Int = 20,
+    val corruption: Int = 0,
     val mood: String = "estable",
     val controllingFactionId: String = "",
     val lastEventSummary: String = "",
@@ -28,5 +28,7 @@ data class WorldMapState(
     val locations: List<WorldLocation> = emptyList(),
     val currentLocationId: String = "",
     val mapName: String = "Mundo Desconocido",
-    val locationStates: Map<String, LocationLifeState> = emptyMap()
+    val locationStates: Map<String, LocationLifeState> = emptyMap(),
+    val recentWorldEvents: List<String> = emptyList(),
+    val lastWorldSimulationAt: Long = 0L
 )
