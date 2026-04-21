@@ -86,16 +86,28 @@ private fun FriendCard(
     onOpenProfile: () -> Unit,
     onOpenChat: () -> Unit
 ) {
+    val accent = friendsParseColor(friend.accentColor)
+
     Card(
         modifier = Modifier.fillMaxWidth().clickable { onOpenProfile() }
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                SocialUserAvatar(
+                    photoUrl = friend.photoUrl,
+                    displayName = friend.displayName,
+                    size = 56.dp,
+                    accent = accent
+                )
+
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
                     Text(friend.displayName, style = MaterialTheme.typography.titleMedium)
                     Text("@${friend.username}", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     PresenceIndicator(
@@ -120,3 +132,7 @@ private fun formatLastSeen(timestamp: Long): String {
     if (timestamp <= 0L) return "sin datos"
     return SimpleDateFormat("dd/MM HH:mm", Locale.getDefault()).format(Date(timestamp))
 }
+
+private fun friendsParseColor(hex: String): Color = runCatching {
+    Color(android.graphics.Color.parseColor(hex))
+}.getOrDefault(Color(0xFFD4AF37))

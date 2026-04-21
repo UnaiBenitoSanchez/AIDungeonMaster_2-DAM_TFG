@@ -1032,10 +1032,27 @@ private fun GuildDetailsChatBubble(
         MaterialTheme.colorScheme.onSurface
     }
 
+    val avatarAccent = if (isMine) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.tertiary
+    }
+
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = if (isMine) Arrangement.End else Arrangement.Start
+        horizontalArrangement = if (isMine) Arrangement.End else Arrangement.Start,
+        verticalAlignment = Alignment.Bottom
     ) {
+        if (!isMine) {
+            SocialUserAvatar(
+                photoUrl = message.senderPhotoUrl,
+                displayName = message.senderDisplayName.ifBlank { "Jugador" },
+                size = 38.dp,
+                accent = avatarAccent
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+        }
+
         Surface(
             shape = RoundedCornerShape(
                 topStart = 18.dp,
@@ -1070,6 +1087,16 @@ private fun GuildDetailsChatBubble(
                     color = textColor.copy(alpha = 0.7f)
                 )
             }
+        }
+
+        if (isMine) {
+            Spacer(modifier = Modifier.width(8.dp))
+            SocialUserAvatar(
+                photoUrl = message.senderPhotoUrl,
+                displayName = message.senderDisplayName.ifBlank { "Jugador" },
+                size = 38.dp,
+                accent = avatarAccent
+            )
         }
     }
 }
@@ -1182,60 +1209,12 @@ private fun GuildDetailsMemberAvatar(
     size: Dp,
     accent: Color
 ) {
-    val initial = displayName.trim().firstOrNull()?.uppercaseChar()?.toString() ?: "?"
-
-    Surface(
-        modifier = Modifier.size(size),
-        shape = CircleShape,
-        color = accent.copy(alpha = 0.18f),
-        border = BorderStroke(1.dp, accent.copy(alpha = 0.38f))
-    ) {
-        if (photoUrl.isNotBlank()) {
-            SubcomposeAsyncImage(
-                model = photoUrl,
-                contentDescription = displayName,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(CircleShape),
-                loading = {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(18.dp),
-                            strokeWidth = 2.dp
-                        )
-                    }
-                },
-                error = {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            initial,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = accent
-                        )
-                    }
-                }
-            )
-        } else {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    initial,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = accent
-                )
-            }
-        }
-    }
+    SocialUserAvatar(
+        photoUrl = photoUrl,
+        displayName = displayName,
+        size = size,
+        accent = accent
+    )
 }
 
 private fun guildDetailsFormatTimestamp(timestamp: Long): String {
