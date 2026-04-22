@@ -59,6 +59,8 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+private const val MAX_GUILD_MEMBERS = 15
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GuildsScreen(
@@ -183,6 +185,7 @@ private fun GuildCard(
 ) {
     val accent = parseColor(guild.accentColor)
     val banner = parseColor(guild.bannerColor)
+    val isFull = guild.memberCount >= MAX_GUILD_MEMBERS
 
     Card(
         modifier = Modifier
@@ -229,7 +232,7 @@ private fun GuildCard(
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     MiniBadge(
-                        text = "${guild.memberCount} miembros",
+                        text = "${guild.memberCount}/$MAX_GUILD_MEMBERS miembros",
                         background = Color.White.copy(alpha = 0.18f),
                         content = Color.White
                     )
@@ -240,6 +243,14 @@ private fun GuildCard(
                             content = Color.White
                         )
                     }
+
+                    if (isFull && !guild.joined) {
+                        MiniBadge(
+                            text = "Completo",
+                            background = Color.Black.copy(alpha = 0.24f),
+                            content = Color.White
+                        )
+                    }
                 }
 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -247,8 +258,11 @@ private fun GuildCard(
                         Text("Ver")
                     }
                     if (showJoinButton) {
-                        Button(onClick = onJoin) {
-                            Text("Unirme")
+                        Button(
+                            onClick = onJoin,
+                            enabled = !isFull
+                        ) {
+                            Text(if (isFull) "Completo" else "Unirme")
                         }
                     }
                 }
