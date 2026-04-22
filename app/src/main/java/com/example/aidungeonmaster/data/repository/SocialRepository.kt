@@ -17,6 +17,14 @@ import kotlinx.coroutines.tasks.await
 
 class SocialRepository {
 
+    companion object {
+        private const val MAX_GUILD_MEMBERS = 15
+
+        fun buildFriendshipId(uid1: String, uid2: String): String {
+            return if (uid1 < uid2) "${uid1}_${uid2}" else "${uid2}_${uid1}"
+        }
+    }
+
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
     private val friendProfileListeners = mutableListOf<ListenerRegistration>()
@@ -525,6 +533,10 @@ class SocialRepository {
 
             val currentCount = (guildSnap.getLong("memberCount") ?: 0L).toInt()
 
+            if (currentCount >= MAX_GUILD_MEMBERS) {
+                throw IllegalStateException("Este gremio ya está completo (15 miembros).")
+            }
+
             // BUG FIX: El orden de operaciones en la transacción es crítico para las reglas de Firestore.
             // La regla validGuildMemberCountUpdate usa getAfter() para verificar que el miembro
             // y el userGuild se crean en la misma transacción. Por tanto el orden correcto es:
@@ -765,9 +777,4 @@ class SocialRepository {
         )
     }
 
-    companion object {
-        fun buildFriendshipId(uid1: String, uid2: String): String {
-            return if (uid1 < uid2) "${uid1}_${uid2}" else "${uid2}_${uid1}"
-        }
-    }
 }

@@ -70,6 +70,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+private const val MAX_GUILD_MEMBERS = 15
 
 private enum class GuildDetailsScreenTab {
     RESUMEN, CHAT, MIEMBROS, JEFE_FINAL
@@ -140,6 +141,7 @@ fun GuildDetailsScreen(
     val currentUserUid = viewModel.currentUserUid()
     val canLeave = viewModel.canLeaveGuild(currentGuild)
     val isOwner = viewModel.isGuildOwner(currentGuild)
+    val isFull = currentGuild.memberCount >= MAX_GUILD_MEMBERS
 
     var selectedTab by remember(currentGuild.id) { mutableStateOf(GuildDetailsScreenTab.RESUMEN) }
     var messageText by remember(currentGuild.id) { mutableStateOf("") }
@@ -219,8 +221,11 @@ fun GuildDetailsScreen(
                 actions = {
                     when {
                         !currentGuild.joined -> {
-                            Button(onClick = { viewModel.joinGuild(currentGuild) }) {
-                                Text("Unirme")
+                            Button(
+                                onClick = { viewModel.joinGuild(currentGuild) },
+                                enabled = !isFull
+                            ) {
+                                Text(if (isFull) "Completo" else "Unirme")
                             }
                         }
                         canLeave -> {
@@ -271,7 +276,7 @@ fun GuildDetailsScreen(
 
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         GuildDetailsMiniBadge(
-                            text = "${currentGuild.memberCount} miembros",
+                            text = "${currentGuild.memberCount}/$MAX_GUILD_MEMBERS miembros",
                             background = Color.White.copy(alpha = 0.18f),
                             content = Color.White
                         )
@@ -281,7 +286,7 @@ fun GuildDetailsScreen(
                             content = Color.White
                         )
                         GuildDetailsMiniBadge(
-                            text = if (currentGuild.joined) "Mi gremio" else "Explorar",
+                            text = if (currentGuild.joined) "Mi gremio" else if (isFull) "Completo" else "Explorar",
                             background = Color.White.copy(alpha = 0.14f),
                             content = Color.White
                         )
@@ -291,12 +296,15 @@ fun GuildDetailsScreen(
                         if (!currentGuild.joined) {
                             Button(
                                 onClick = { viewModel.joinGuild(currentGuild) },
+                                enabled = !isFull,
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = Color.White,
-                                    contentColor = Color.Black
+                                    contentColor = Color.Black,
+                                    disabledContainerColor = Color.White.copy(alpha = 0.55f),
+                                    disabledContentColor = Color.Black.copy(alpha = 0.7f)
                                 )
                             ) {
-                                Text("Unirme al gremio")
+                                Text(if (isFull) "Gremio completo" else "Unirme al gremio")
                             }
                         } else {
                             OutlinedButton(onClick = { selectedTab = GuildDetailsScreenTab.CHAT }) {
@@ -362,7 +370,7 @@ fun GuildDetailsScreen(
                             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                                 GuildDetailsInfoPill(
                                     label = "Miembros",
-                                    value = currentGuild.memberCount.toString()
+                                    value = "${currentGuild.memberCount}/$MAX_GUILD_MEMBERS"
                                 )
                                 GuildDetailsInfoPill(
                                     label = "Líder",
