@@ -97,13 +97,13 @@ fun GamePlayScreen(
     // Se activa mientras el jugador está en la pantalla de juego y se detiene
     // automáticamente al salir (onDispose). El Worker del background sigue
     // funcionando cuando la app está cerrada.
-    val context = LocalContext.current
-
-    DisposableEffect(Unit) {
-        val proximityManager = SupermarketProximityManager(context)
-        proximityManager.start()
-        onDispose { proximityManager.stop() }
-    }
+//    val context = LocalContext.current
+//
+//    DisposableEffect(Unit) {
+//        val proximityManager = SupermarketProximityManager(context)
+//        proximityManager.start()
+//        onDispose { proximityManager.stop() }
+//    }
 
     // ── CARGA INICIAL ─────────────────────────────────────────────────────────
     LaunchedEffect(charId) {
