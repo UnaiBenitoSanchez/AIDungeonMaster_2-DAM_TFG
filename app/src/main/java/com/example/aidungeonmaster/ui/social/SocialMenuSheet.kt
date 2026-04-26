@@ -1,27 +1,23 @@
 package com.example.aidungeonmaster.ui.social
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.GroupAdd
-import androidx.compose.material.icons.filled.Groups
-import androidx.compose.material.icons.filled.Mail
-import androidx.compose.material.icons.filled.People
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.aidungeonmaster.ui.tutorial.tutorialAnchor
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -31,57 +27,60 @@ fun SocialMenuSheet(
     onSearchUsers: () -> Unit,
     onFriendRequests: () -> Unit,
     onFriendsList: () -> Unit,
-    onGuilds: () -> Unit
+    onGuilds: () -> Unit,
+    tutorialTargets: SnapshotStateMap<String, Rect>? = null,
+    lockForTutorial: Boolean = false
 ) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
     ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+        onDismissRequest = {
+            if (!lockForTutorial) {
+                onDismiss()
+            }
+        },
+        sheetState = sheetState
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .navigationBarsPadding()
-                .padding(bottom = 12.dp)
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Text(
-                text = "Social",
+                text = "Zona social",
                 style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.padding(bottom = 12.dp)
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(vertical = 8.dp)
             )
 
-            SocialActionCard(
-                title = "Mi perfil",
-                subtitle = "Personaliza colores, biografía y presencia",
-                icon = { Icon(Icons.Default.Person, contentDescription = null) },
+            SocialOptionItem(
+                text = "Mi perfil",
+                modifier = anchorOrPlain("social_my_profile", tutorialTargets),
                 onClick = onMyProfile
             )
 
-            SocialActionCard(
-                title = "Buscar aventureros",
-                subtitle = "Busca usuarios y envía solicitudes",
-                icon = { Icon(Icons.Default.GroupAdd, contentDescription = null) },
+            SocialOptionItem(
+                text = "Buscar usuarios",
+                modifier = anchorOrPlain("social_search_users", tutorialTargets),
                 onClick = onSearchUsers
             )
 
-            SocialActionCard(
-                title = "Solicitudes de amistad",
-                subtitle = "Acepta o rechaza solicitudes recibidas",
-                icon = { Icon(Icons.Default.Mail, contentDescription = null) },
+            SocialOptionItem(
+                text = "Solicitudes de amistad",
+                modifier = anchorOrPlain("social_friend_requests", tutorialTargets),
                 onClick = onFriendRequests
             )
 
-            SocialActionCard(
-                title = "Mis amigos",
-                subtitle = "Abre perfiles y chatea por separado",
-                icon = { Icon(Icons.Default.People, contentDescription = null) },
+            SocialOptionItem(
+                text = "Lista de amigos",
+                modifier = anchorOrPlain("social_friends_list", tutorialTargets),
                 onClick = onFriendsList
             )
 
-            SocialActionCard(
-                title = "Gremios",
-                subtitle = "Crea un gremio o únete a uno existente",
-                icon = { Icon(Icons.Default.Groups, contentDescription = null) },
+            SocialOptionItem(
+                text = "Gremios",
+                modifier = anchorOrPlain("social_guilds", tutorialTargets),
                 onClick = onGuilds
             )
         }
@@ -89,22 +88,34 @@ fun SocialMenuSheet(
 }
 
 @Composable
-private fun SocialActionCard(
-    title: String,
-    subtitle: String,
-    icon: @Composable () -> Unit,
+private fun SocialOptionItem(
+    text: String,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    Card(
-        modifier = Modifier
+    Surface(
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+        tonalElevation = 3.dp,
+        shadowElevation = 1.dp,
+        modifier = modifier
             .fillMaxWidth()
-            .padding(bottom = 10.dp)
             .clickable { onClick() }
     ) {
-        ListItem(
-            leadingContent = icon,
-            headlineContent = { Text(title) },
-            supportingContent = { Text(subtitle) }
+        Text(
+            text = text,
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 18.dp)
         )
+    }
+}
+
+private fun anchorOrPlain(
+    key: String,
+    tutorialTargets: SnapshotStateMap<String, Rect>?
+): Modifier {
+    return if (tutorialTargets != null) {
+        Modifier.tutorialAnchor(key, tutorialTargets)
+    } else {
+        Modifier
     }
 }

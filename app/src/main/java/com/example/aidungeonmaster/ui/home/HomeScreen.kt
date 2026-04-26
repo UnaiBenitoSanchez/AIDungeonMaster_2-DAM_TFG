@@ -1,5 +1,6 @@
 package com.example.aidungeonmaster.ui.home
 
+import android.content.Context
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -15,7 +16,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
@@ -43,14 +45,19 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -64,9 +71,13 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
+import com.example.aidungeonmaster.R
 import com.example.aidungeonmaster.data.model.Character
 import com.example.aidungeonmaster.navigation.Screen
 import com.example.aidungeonmaster.ui.social.SocialMenuSheet
+import com.example.aidungeonmaster.ui.tutorial.DragonTutorialOverlay
+import com.example.aidungeonmaster.ui.tutorial.TutorialStep
+import com.example.aidungeonmaster.ui.tutorial.tutorialAnchor
 import com.example.aidungeonmaster.viewmodel.HomeViewModel
 import com.google.firebase.auth.FirebaseAuth
 import java.text.SimpleDateFormat
@@ -80,12 +91,184 @@ fun HomeScreen(
     navController: NavHostController,
     viewModel: HomeViewModel = viewModel()
 ) {
+    val context = LocalContext.current
+    val tutorialPrefs = remember {
+        context.getSharedPreferences("dragon_tutorial_prefs", Context.MODE_PRIVATE)
+    }
+
+    var showTutorial by rememberSaveable {
+        mutableStateOf(!tutorialPrefs.getBoolean("home_tutorial_completed", false))
+    }
+
+    var tutorialStepIndex by rememberSaveable { mutableIntStateOf(0) }
+
+    val tutorialTargets = remember {
+        mutableStateMapOf<String, Rect>()
+    }
+
     val characters by viewModel.characters.collectAsState()
     var showDialog by remember { mutableStateOf(false) }
     var characterToDelete by remember { mutableStateOf<Character?>(null) }
     var showSocialSheet by remember { mutableStateOf(false) }
+    var showTutorialSocialPanel by remember { mutableStateOf(false) }
 
     val userId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
+    val listState = rememberLazyListState()
+
+    val tutorialSteps = remember(characters.isNotEmpty()) {
+        buildList {
+            add(
+                TutorialStep(
+                    targetKey = "btn_characters_title",
+                    title = "Tus personajes",
+                    description = "Esta es la pantalla principal. Aquí aparecen todos tus héroes creados y puedes continuar sus aventuras.",
+                    mascotRes = R.drawable.dragon_waving
+                )
+            )
+            add(
+                TutorialStep(
+                    targetKey = "btn_ranking",
+                    title = "Ranking mundial",
+                    description = "Aquí puedes ver la clasificación global y comparar tu progreso con otros jugadores.",
+                    mascotRes = R.drawable.dragon_pointing
+                )
+            )
+            add(
+                TutorialStep(
+                    targetKey = "btn_achievements",
+                    title = "Logros",
+                    description = "Este botón abre tus logros y recompensas especiales desbloqueadas.",
+                    mascotRes = R.drawable.dragon_idle
+                )
+            )
+            add(
+                TutorialStep(
+                    targetKey = "btn_logout",
+                    title = "Cerrar sesión",
+                    description = "Usa este botón para salir de tu cuenta actual de forma segura.",
+                    mascotRes = R.drawable.dragon_waving
+                )
+            )
+
+            if (characters.isNotEmpty()) {
+                add(
+                    TutorialStep(
+                        targetKey = "first_character_card",
+                        title = "Tarjeta del personaje",
+                        description = "Pulsa en una tarjeta para entrar en la aventura de ese personaje o continuar su partida.",
+                        mascotRes = R.drawable.dragon_pointing
+                    )
+                )
+                add(
+                    TutorialStep(
+                        targetKey = "first_character_room",
+                        title = "Sala personal",
+                        description = "Este botón abre la fortaleza o sala personal del personaje.",
+                        mascotRes = R.drawable.dragon_idle
+                    )
+                )
+                add(
+                    TutorialStep(
+                        targetKey = "first_character_delete",
+                        title = "Eliminar personaje",
+                        description = "Este botón borra el personaje. La app te pedirá confirmación antes de eliminarlo.",
+                        mascotRes = R.drawable.dragon_pointing
+                    )
+                )
+            }
+
+            add(
+                TutorialStep(
+                    targetKey = "btn_social",
+                    title = "Social",
+                    description = "Este botón abre la zona social de la app.",
+                    mascotRes = R.drawable.dragon_waving
+                )
+            )
+            add(
+                TutorialStep(
+                    targetKey = "social_my_profile",
+                    title = "Mi perfil",
+                    description = "Desde aquí puedes ver y editar tu perfil de jugador.",
+                    mascotRes = R.drawable.dragon_idle
+                )
+            )
+            add(
+                TutorialStep(
+                    targetKey = "social_search_users",
+                    title = "Buscar usuarios",
+                    description = "Te permite buscar otros jugadores dentro de la aplicación.",
+                    mascotRes = R.drawable.dragon_pointing
+                )
+            )
+            add(
+                TutorialStep(
+                    targetKey = "social_friend_requests",
+                    title = "Solicitudes de amistad",
+                    description = "Aquí puedes revisar las solicitudes de amistad recibidas.",
+                    mascotRes = R.drawable.dragon_waving
+                )
+            )
+            add(
+                TutorialStep(
+                    targetKey = "social_friends_list",
+                    title = "Lista de amigos",
+                    description = "Abre tu lista de amigos para ver tus contactos y acceder a opciones sociales.",
+                    mascotRes = R.drawable.dragon_idle
+                )
+            )
+            add(
+                TutorialStep(
+                    targetKey = "social_guilds",
+                    title = "Gremios",
+                    description = "Aquí puedes entrar en gremios, unirte a otros jugadores y participar en contenido cooperativo.",
+                    mascotRes = R.drawable.dragon_pointing
+                )
+            )
+            add(
+                TutorialStep(
+                    targetKey = "btn_create_character",
+                    title = "Crear personaje",
+                    description = "Pulsa aquí para crear un nuevo héroe y comenzar una nueva aventura.",
+                    mascotRes = R.drawable.dragon_waving
+                )
+            )
+        }
+    }
+
+    val currentStep = tutorialSteps.getOrNull(tutorialStepIndex)
+    val currentTargetKey = currentStep?.targetKey.orEmpty()
+
+    fun finishTutorial() {
+        tutorialPrefs.edit()
+            .putBoolean("home_tutorial_completed", true)
+            .apply()
+
+        showTutorial = false
+        tutorialStepIndex = 0
+        showSocialSheet = false
+        showTutorialSocialPanel = false
+    }
+
+    LaunchedEffect(showTutorial, tutorialStepIndex, characters.size) {
+        if (!showTutorial || tutorialSteps.isEmpty()) return@LaunchedEffect
+
+        when (currentTargetKey) {
+            "first_character_card",
+            "first_character_room",
+            "first_character_delete" -> {
+                if (characters.isNotEmpty()) {
+                    listState.animateScrollToItem(0)
+                }
+            }
+        }
+
+        showTutorialSocialPanel = currentTargetKey.startsWith("social_")
+
+        if (showTutorialSocialPanel) {
+            showSocialSheet = false
+        }
+    }
 
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
@@ -98,123 +281,192 @@ fun HomeScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Tus Personajes", fontWeight = FontWeight.Bold) },
-                actions = {
-                    IconButton(onClick = { navController.navigate("ranking") }) {
-                        Icon(
-                            Icons.Default.EmojiEvents,
-                            contentDescription = "Ranking Mundial",
-                            tint = Color(0xFFFFD700)
-                        )
-                    }
-
-                    IconButton(onClick = { navController.navigate(Screen.Achievements.route) }) {
-                        Icon(
-                            Icons.Default.Star,
-                            contentDescription = "Logros",
-                            tint = Color(0xFFFFD700)
-                        )
-                    }
-
-                    IconButton(onClick = {
-                        viewModel.logout {
-                            navController.navigate(Screen.Login.route) {
-                                popUpTo(0) { inclusive = true }
-                            }
-                        }
-                    }) {
-                        Icon(
-                            Icons.Default.ExitToApp,
-                            contentDescription = "Cerrar Sesión",
-                            tint = MaterialTheme.colorScheme.error
-                        )
-                    }
-                }
-            )
-        }
-    ) { padding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp)
-            ) {
-                if (characters.isEmpty()) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = {
                         Text(
-                            "No hay aventureros todavía.",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            text = "Tus Personajes",
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.tutorialAnchor("btn_characters_title", tutorialTargets)
                         )
-                    }
-                } else {
-                    LazyColumn {
-                        items(characters) { character ->
-                            CharacterCard(
-                                character = character,
-                                onClick = {
-                                    if (character.gameTheme.isNullOrEmpty()) {
-                                        navController.navigate(
-                                            Screen.GameSetup.createRoute(userId, character.name)
-                                        )
-                                    } else {
-                                        navController.navigate(
-                                            Screen.GamePlay.createRoute(
-                                                userId,
-                                                character.name,
-                                                character.gameTheme
-                                            )
-                                        )
+                    },
+                    actions = {
+                        IconButton(
+                            onClick = { navController.navigate("ranking") },
+                            modifier = Modifier.tutorialAnchor("btn_ranking", tutorialTargets)
+                        ) {
+                            Icon(
+                                Icons.Default.EmojiEvents,
+                                contentDescription = "Ranking Mundial",
+                                tint = Color(0xFFFFD700)
+                            )
+                        }
+
+                        IconButton(
+                            onClick = { navController.navigate(Screen.Achievements.route) },
+                            modifier = Modifier.tutorialAnchor("btn_achievements", tutorialTargets)
+                        ) {
+                            Icon(
+                                Icons.Default.Star,
+                                contentDescription = "Logros",
+                                tint = Color(0xFFFFD700)
+                            )
+                        }
+
+                        IconButton(
+                            onClick = {
+                                viewModel.logout {
+                                    navController.navigate(Screen.Login.route) {
+                                        popUpTo(0) { inclusive = true }
                                     }
-                                },
-                                onOpenRoom = {
-                                    val partidaId = "${userId}_${character.name}"
-                                    navController.navigate(
-                                        Screen.PersonalRoom.createRoute(partidaId, character.name)
-                                    )
-                                },
-                                onDelete = { characterToDelete = character }
+                                }
+                            },
+                            modifier = Modifier.tutorialAnchor("btn_logout", tutorialTargets)
+                        ) {
+                            Icon(
+                                Icons.Default.ExitToApp,
+                                contentDescription = "Cerrar Sesión",
+                                tint = MaterialTheme.colorScheme.error
                             )
                         }
                     }
-                }
-            }
-
-            FloatingActionButton(
-                onClick = { showSocialSheet = true },
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(16.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.People,
-                    contentDescription = "Social"
                 )
             }
-
-            FloatingActionButton(
-                onClick = { showDialog = true },
+        ) { padding ->
+            Box(
                 modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(16.dp)
+                    .fillMaxSize()
+                    .padding(padding)
             ) {
-                Text("+", style = MaterialTheme.typography.headlineSmall)
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp)
+                ) {
+                    if (characters.isEmpty()) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                "No hay aventureros todavía.",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    } else {
+                        LazyColumn(state = listState) {
+                            itemsIndexed(
+                                items = characters,
+                                key = { _, character -> character.id.ifBlank { character.name } }
+                            ) { index, character ->
+                                CharacterCard(
+                                    character = character,
+                                    modifier = if (index == 0) {
+                                        Modifier.tutorialAnchor("first_character_card", tutorialTargets)
+                                    } else {
+                                        Modifier
+                                    },
+                                    roomButtonModifier = if (index == 0) {
+                                        Modifier.tutorialAnchor("first_character_room", tutorialTargets)
+                                    } else {
+                                        Modifier
+                                    },
+                                    deleteButtonModifier = if (index == 0) {
+                                        Modifier.tutorialAnchor("first_character_delete", tutorialTargets)
+                                    } else {
+                                        Modifier
+                                    },
+                                    onClick = {
+                                        if (character.gameTheme.isNullOrEmpty()) {
+                                            navController.navigate(
+                                                Screen.GameSetup.createRoute(userId, character.name)
+                                            )
+                                        } else {
+                                            navController.navigate(
+                                                Screen.GamePlay.createRoute(
+                                                    userId,
+                                                    character.name,
+                                                    character.gameTheme
+                                                )
+                                            )
+                                        }
+                                    },
+                                    onOpenRoom = {
+                                        val partidaId = "${userId}_${character.name}"
+                                        navController.navigate(
+                                            Screen.PersonalRoom.createRoute(partidaId, character.name)
+                                        )
+                                    },
+                                    onDelete = { characterToDelete = character }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                FloatingActionButton(
+                    onClick = { showSocialSheet = true },
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(16.dp)
+                        .tutorialAnchor("btn_social", tutorialTargets)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.People,
+                        contentDescription = "Social"
+                    )
+                }
+
+                FloatingActionButton(
+                    onClick = { showDialog = true },
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(16.dp)
+                        .tutorialAnchor("btn_create_character", tutorialTargets)
+                ) {
+                    Text("+", style = MaterialTheme.typography.headlineSmall)
+                }
             }
         }
+
+        if (showTutorialSocialPanel) {
+            TutorialSocialPanel(
+                modifier = Modifier.align(Alignment.BottomCenter),
+                tutorialTargets = tutorialTargets
+            )
+        }
+
+        DragonTutorialOverlay(
+            visible = showTutorial,
+            steps = tutorialSteps,
+            currentStepIndex = tutorialStepIndex,
+            targets = tutorialTargets,
+            onNext = {
+                if (tutorialStepIndex < tutorialSteps.lastIndex) {
+                    tutorialStepIndex++
+                } else {
+                    finishTutorial()
+                }
+            },
+            onBack = {
+                if (tutorialStepIndex > 0) {
+                    tutorialStepIndex--
+                }
+            },
+            onFinish = { finishTutorial() },
+            onSkip = { finishTutorial() }
+        )
     }
 
-    if (showSocialSheet) {
+    if (showSocialSheet && !showTutorialSocialPanel) {
         SocialMenuSheet(
-            onDismiss = { showSocialSheet = false },
+            onDismiss = {
+                if (!showTutorial || !currentTargetKey.startsWith("social_")) {
+                    showSocialSheet = false
+                }
+            },
             onMyProfile = {
                 showSocialSheet = false
                 navController.navigate(Screen.MyProfile.route)
@@ -234,9 +486,32 @@ fun HomeScreen(
             onGuilds = {
                 showSocialSheet = false
                 navController.navigate(Screen.Guilds.route)
-            }
+            },
+            tutorialTargets = tutorialTargets,
+            lockForTutorial = showTutorial && currentTargetKey.startsWith("social_")
         )
     }
+
+    DragonTutorialOverlay(
+        visible = showTutorial,
+        steps = tutorialSteps,
+        currentStepIndex = tutorialStepIndex,
+        targets = tutorialTargets,
+        onNext = {
+            if (tutorialStepIndex < tutorialSteps.lastIndex) {
+                tutorialStepIndex++
+            } else {
+                finishTutorial()
+            }
+        },
+        onBack = {
+            if (tutorialStepIndex > 0) {
+                tutorialStepIndex--
+            }
+        },
+        onFinish = { finishTutorial() },
+        onSkip = { finishTutorial() }
+    )
 
     if (showDialog) {
         CreateCharacterDialog(
@@ -280,6 +555,9 @@ fun HomeScreen(
 @Composable
 fun CharacterCard(
     character: Character,
+    modifier: Modifier = Modifier,
+    roomButtonModifier: Modifier = Modifier,
+    deleteButtonModifier: Modifier = Modifier,
     onClick: () -> Unit,
     onOpenRoom: () -> Unit,
     onDelete: () -> Unit
@@ -300,7 +578,7 @@ fun CharacterCard(
     }
 
     Card(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(vertical = 8.dp)
             .clickable { onClick() },
@@ -439,7 +717,10 @@ fun CharacterCard(
             }
 
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                IconButton(onClick = onOpenRoom) {
+                IconButton(
+                    onClick = onOpenRoom,
+                    modifier = roomButtonModifier
+                ) {
                     Icon(
                         Icons.Default.Home,
                         contentDescription = "Abrir fortaleza",
@@ -447,7 +728,10 @@ fun CharacterCard(
                     )
                 }
 
-                IconButton(onClick = onDelete) {
+                IconButton(
+                    onClick = onDelete,
+                    modifier = deleteButtonModifier
+                ) {
                     Icon(
                         Icons.Default.Delete,
                         contentDescription = "Borrar",
@@ -456,6 +740,92 @@ fun CharacterCard(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun TutorialSocialPanel(
+    modifier: Modifier = Modifier,
+    tutorialTargets: androidx.compose.runtime.snapshots.SnapshotStateMap<String, Rect>
+) {
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 12.dp),
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        color = Color(0xFF1E1E22),
+        shadowElevation = 12.dp
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterHorizontally)
+                    .width(36.dp)
+                    .height(4.dp)
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(Color.LightGray.copy(alpha = 0.85f))
+            )
+
+            Spacer(Modifier.height(8.dp))
+
+            Text(
+                text = "Zona social",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFFFFF1C2)
+            )
+
+            TutorialSocialOption(
+                text = "Mi perfil",
+                modifier = Modifier.tutorialAnchor("social_my_profile", tutorialTargets)
+            )
+
+            TutorialSocialOption(
+                text = "Buscar usuarios",
+                modifier = Modifier.tutorialAnchor("social_search_users", tutorialTargets)
+            )
+
+            TutorialSocialOption(
+                text = "Solicitudes de amistad",
+                modifier = Modifier.tutorialAnchor("social_friend_requests", tutorialTargets)
+            )
+
+            TutorialSocialOption(
+                text = "Lista de amigos",
+                modifier = Modifier.tutorialAnchor("social_friends_list", tutorialTargets)
+            )
+
+            TutorialSocialOption(
+                text = "Gremios",
+                modifier = Modifier.tutorialAnchor("social_guilds", tutorialTargets)
+            )
+        }
+    }
+}
+
+@Composable
+private fun TutorialSocialOption(
+    text: String,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = Color(0xFF2D281B),
+        shadowElevation = 2.dp
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 18.dp),
+            style = MaterialTheme.typography.titleMedium,
+            color = Color(0xFFFFF1C2),
+            fontWeight = FontWeight.Bold
+        )
     }
 }
 

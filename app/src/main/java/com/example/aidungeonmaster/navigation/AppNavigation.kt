@@ -53,6 +53,15 @@ import com.example.aidungeonmaster.viewmodel.WorldMapViewModel
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.launch
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import com.example.aidungeonmaster.ui.tutorial.DragonTutorialOverlay
+
 sealed class Screen(val route: String) {
     object Login : Screen("login")
     object Register : Screen("register")
@@ -152,385 +161,389 @@ fun AppNavigation(navController: NavHostController) {
         }
     }
 
-    NavHost(navController = navController, startDestination = startRoute) {
-        composable(Screen.Login.route) {
-            LoginScreen(navController)
-        }
+    Box(modifier = Modifier.fillMaxSize()) {
 
-        composable(Screen.Register.route) {
-            RegisterScreen(navController)
-        }
+        NavHost(navController = navController, startDestination = startRoute) {
+            composable(Screen.Login.route) {
+                LoginScreen(navController)
+            }
 
-        composable(Screen.Home.route) {
-            HomeScreen(navController)
-        }
+            composable(Screen.Register.route) {
+                RegisterScreen(navController)
+            }
 
-        composable(Screen.MyProfile.route) {
-            val myUid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+            composable(Screen.Home.route) {
+                HomeScreen(navController)
+            }
 
-            SocialProfileScreen(
-                userUid = myUid,
-                isMe = true,
-                onBack = { navController.popBackStack() }
-            )
-        }
+            composable(Screen.MyProfile.route) {
+                val myUid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
 
-        composable(Screen.Ranking.route) {
-            val rankingViewModel: RankingViewModel = viewModel()
+                SocialProfileScreen(
+                    userUid = myUid,
+                    isMe = true,
+                    onBack = { navController.popBackStack() }
+                )
+            }
 
-            RankingScreen(
-                onBack = { navController.popBackStack() },
-                viewModel = rankingViewModel
-            )
-        }
+            composable(Screen.Ranking.route) {
+                val rankingViewModel: RankingViewModel = viewModel()
 
-        composable(Screen.Achievements.route) {
-            AchievementsScreen(
-                viewModel = achievementViewModel,
-                onBack = { navController.popBackStack() }
-            )
-        }
+                RankingScreen(
+                    onBack = { navController.popBackStack() },
+                    viewModel = rankingViewModel
+                )
+            }
 
-        composable(Screen.GameSetup.route) { backStackEntryArg ->
-            val userId = Uri.decode(
-                backStackEntryArg.arguments?.getString("userId").orEmpty()
-            )
-            val characterName = Uri.decode(
-                backStackEntryArg.arguments?.getString("characterName").orEmpty()
-            )
+            composable(Screen.Achievements.route) {
+                AchievementsScreen(
+                    viewModel = achievementViewModel,
+                    onBack = { navController.popBackStack() }
+                )
+            }
 
-            GameSetupScreen(navController, userId, characterName)
-        }
+            composable(Screen.GameSetup.route) { backStackEntryArg ->
+                val userId = Uri.decode(
+                    backStackEntryArg.arguments?.getString("userId").orEmpty()
+                )
+                val characterName = Uri.decode(
+                    backStackEntryArg.arguments?.getString("characterName").orEmpty()
+                )
 
-        composable(Screen.GamePlay.route) { backStackEntryArg ->
-            val userId = Uri.decode(
-                backStackEntryArg.arguments?.getString("userId").orEmpty()
-            )
-            val characterName = Uri.decode(
-                backStackEntryArg.arguments?.getString("characterName").orEmpty()
-            )
-            val theme = Uri.decode(
-                backStackEntryArg.arguments?.getString("theme").orEmpty()
-            )
+                GameSetupScreen(navController, userId, characterName)
+            }
 
-            GamePlayScreen(
-                navController = navController,
-                userId = userId,
-                characterName = characterName,
-                theme = theme,
-                viewModel = gameViewModel,
-                inventoryViewModel = inventoryViewModel,
-                mapViewModel = worldMapViewModel,
-                achievementViewModel = achievementViewModel
-            )
-        }
+            composable(Screen.GamePlay.route) { backStackEntryArg ->
+                val userId = Uri.decode(
+                    backStackEntryArg.arguments?.getString("userId").orEmpty()
+                )
+                val characterName = Uri.decode(
+                    backStackEntryArg.arguments?.getString("characterName").orEmpty()
+                )
+                val theme = Uri.decode(
+                    backStackEntryArg.arguments?.getString("theme").orEmpty()
+                )
 
-        composable("qr_scanner/{gameId}") { backStackEntryArg ->
-            val gameId = Uri.decode(
-                backStackEntryArg.arguments?.getString("gameId").orEmpty()
-            )
+                GamePlayScreen(
+                    navController = navController,
+                    userId = userId,
+                    characterName = characterName,
+                    theme = theme,
+                    viewModel = gameViewModel,
+                    inventoryViewModel = inventoryViewModel,
+                    mapViewModel = worldMapViewModel,
+                    achievementViewModel = achievementViewModel
+                )
+            }
 
-            QRScannerScreen(
-                gameId = gameId,
-                onBack = { navController.popBackStack() }
-            )
-        }
+            composable("qr_scanner/{gameId}") { backStackEntryArg ->
+                val gameId = Uri.decode(
+                    backStackEntryArg.arguments?.getString("gameId").orEmpty()
+                )
 
-        composable(Screen.Inventory.route) { backStackEntryArg ->
-            val idParaElInventario = Uri.decode(
-                backStackEntryArg.arguments?.getString("userId").orEmpty()
-            )
+                QRScannerScreen(
+                    gameId = gameId,
+                    onBack = { navController.popBackStack() }
+                )
+            }
 
-            InventoryScreen(
-                gameId = idParaElInventario,
-                onBack = { navController.popBackStack() }
-            )
-        }
+            composable(Screen.Inventory.route) { backStackEntryArg ->
+                val idParaElInventario = Uri.decode(
+                    backStackEntryArg.arguments?.getString("userId").orEmpty()
+                )
 
-        composable("combat/{gameId}") { backStackEntryArg ->
-            val gameId = Uri.decode(
-                backStackEntryArg.arguments?.getString("gameId").orEmpty()
-            )
+                InventoryScreen(
+                    gameId = idParaElInventario,
+                    onBack = { navController.popBackStack() }
+                )
+            }
 
-            CombatScreen(
-                gameViewModel = gameViewModel,
-                inventoryViewModel = inventoryViewModel,
-                gameId = gameId,
-                achievementViewModel = achievementViewModel,
-                onCombatEnd = { victory, xpGained ->
-                    if (victory && xpGained > 0) {
-                        gameViewModel.addPendingXp(xpGained)
-                    }
+            composable("combat/{gameId}") { backStackEntryArg ->
+                val gameId = Uri.decode(
+                    backStackEntryArg.arguments?.getString("gameId").orEmpty()
+                )
 
-                    val enemyName =
-                        gameViewModel.currentAdventureStep.value?.enemy?.name ?: "el enemigo"
+                CombatScreen(
+                    gameViewModel = gameViewModel,
+                    inventoryViewModel = inventoryViewModel,
+                    gameId = gameId,
+                    achievementViewModel = achievementViewModel,
+                    onCombatEnd = { victory, xpGained ->
+                        if (victory && xpGained > 0) {
+                            gameViewModel.addPendingXp(xpGained)
+                        }
 
-                    if (victory) {
-                        gameViewModel.notifyCombatEnd(true, enemyName)
-                        navController.popBackStack()
-                    } else {
-                        val currentUserId = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
-                        val characterName = gameId.removePrefix("${currentUserId}_")
+                        val enemyName =
+                            gameViewModel.currentAdventureStep.value?.enemy?.name ?: "el enemigo"
 
-                        scope.launch {
-                            try {
-                                deletionRepository.deleteEverywhere(
-                                    userId = currentUserId,
-                                    characterName = characterName
-                                )
-                            } catch (e: Exception) {
-                                Log.e(
-                                    "APP_NAV",
-                                    "Error borrando personaje al morir: ${e.message}",
-                                    e
-                                )
-                            } finally {
-                                navController.navigate(Screen.Home.route) {
-                                    popUpTo(Screen.Home.route) { inclusive = false }
-                                    launchSingleTop = true
+                        if (victory) {
+                            gameViewModel.notifyCombatEnd(true, enemyName)
+                            navController.popBackStack()
+                        } else {
+                            val currentUserId = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+                            val characterName = gameId.removePrefix("${currentUserId}_")
+
+                            scope.launch {
+                                try {
+                                    deletionRepository.deleteEverywhere(
+                                        userId = currentUserId,
+                                        characterName = characterName
+                                    )
+                                } catch (e: Exception) {
+                                    Log.e(
+                                        "APP_NAV",
+                                        "Error borrando personaje al morir: ${e.message}",
+                                        e
+                                    )
+                                } finally {
+                                    navController.navigate(Screen.Home.route) {
+                                        popUpTo(Screen.Home.route) { inclusive = false }
+                                        launchSingleTop = true
+                                    }
                                 }
                             }
                         }
                     }
-                }
-            )
-        }
-
-        composable(Screen.ARMap.route) { backStackEntryArg ->
-            val charId = Uri.decode(
-                backStackEntryArg.arguments?.getString("charId").orEmpty()
-            )
-
-            LaunchedEffect(charId) {
-                if (charId.isNotBlank()) {
-                    worldMapViewModel.loadMap(charId)
-                }
+                )
             }
 
-            val mapState by worldMapViewModel.worldMapState.collectAsState()
-            val characterName = charId.substringAfter("_")
+            composable(Screen.ARMap.route) { backStackEntryArg ->
+                val charId = Uri.decode(
+                    backStackEntryArg.arguments?.getString("charId").orEmpty()
+                )
 
-            ARMapScreen(
-                mapState = mapState,
-                onBack = { navController.popBackStack() },
-                onOpen3DGallery = {
-                    navController.navigate(
-                        Screen.LocationsGallery.createRoute(charId, characterName)
-                    )
-                }
-            )
-        }
-
-        composable(Screen.LocationsGallery.route) { backStackEntryArg ->
-            val charId = Uri.decode(
-                backStackEntryArg.arguments?.getString("charId").orEmpty()
-            )
-            val characterName = Uri.decode(
-                backStackEntryArg.arguments?.getString("characterName").orEmpty()
-            )
-
-            LaunchedEffect(charId) {
-                if (charId.isNotBlank()) {
-                    worldMapViewModel.loadMap(charId)
-                }
-            }
-
-            val mapState by worldMapViewModel.worldMapState.collectAsState()
-
-            LocationsGalleryScreen(
-                mapState = mapState,
-                charId = charId,
-                characterName = characterName,
-                onBack = { navController.popBackStack() }
-            )
-        }
-
-        composable(Screen.PersonalRoom.route) { backStackEntryArg ->
-            val charId = Uri.decode(
-                backStackEntryArg.arguments?.getString("charId").orEmpty()
-            )
-            val characterName = Uri.decode(
-                backStackEntryArg.arguments?.getString("characterName").orEmpty()
-            )
-
-            PersonalRoomScreen(
-                charId = charId,
-                characterName = characterName,
-                onBack = { navController.popBackStack() },
-                readOnly = false,
-                roomViewModel = personalRoomViewModel,
-                inventoryViewModel = inventoryViewModel
-            )
-        }
-
-        composable("bestiary/{charId}") { backStackEntryArg ->
-            val charId = Uri.decode(
-                backStackEntryArg.arguments?.getString("charId").orEmpty()
-            )
-
-            BestiaryScreen(
-                gameId = charId,
-                onBack = { navController.popBackStack() }
-            )
-        }
-
-        composable(Screen.Journal.route) { backStackEntryArg ->
-            val charId = Uri.decode(
-                backStackEntryArg.arguments?.getString("charId").orEmpty()
-            )
-
-            JournalScreen(
-                charId = charId,
-                onBack = { navController.popBackStack() }
-            )
-        }
-
-        composable(Screen.UserSearch.route) {
-            UserSearchScreen(
-                onBack = { navController.popBackStack() }
-            )
-        }
-
-        composable(Screen.FriendRequests.route) {
-            FriendRequestsScreen(
-                onBack = { navController.popBackStack() }
-            )
-        }
-
-        composable(Screen.FriendsList.route) {
-            FriendsListScreen(
-                onBack = { navController.popBackStack() },
-                onOpenProfile = { friendUid ->
-                    navController.navigate(Screen.FriendProfile.createRoute(friendUid))
-                },
-                onOpenChat = { friendUid, friendName ->
-                    navController.navigate(Screen.PrivateChat.createRoute(friendUid, friendName))
-                }
-            )
-        }
-
-        composable(Screen.FriendProfile.route) { backStackEntryArg ->
-            val friendUid = Uri.decode(
-                backStackEntryArg.arguments?.getString("friendUid").orEmpty()
-            )
-
-            SocialProfileScreen(
-                userUid = friendUid,
-                isMe = false,
-                onBack = { navController.popBackStack() },
-                onOpenChat = { uid, name ->
-                    navController.navigate(Screen.PrivateChat.createRoute(uid, name))
-                },
-                onOpenPersonalRoom = { friendUidForRoom, characterId, characterName ->
-                    navController.navigate(
-                        Screen.FriendPersonalRoom.createRoute(
-                            friendUid = friendUidForRoom,
-                            characterId = characterId,
-                            characterName = characterName
-                        )
-                    )
-                }
-            )
-        }
-
-        composable(
-            route = Screen.FriendPersonalRoom.route,
-            arguments = listOf(
-                navArgument("friendUid") { type = NavType.StringType },
-                navArgument("characterId") { type = NavType.StringType },
-                navArgument("characterName") { type = NavType.StringType }
-            )
-        ) { backStackEntryArg ->
-            val friendUid = Uri.decode(
-                backStackEntryArg.arguments?.getString("friendUid").orEmpty()
-            )
-
-            val characterId = Uri.decode(
-                backStackEntryArg.arguments?.getString("characterId").orEmpty()
-            )
-
-            val characterName = Uri.decode(
-                backStackEntryArg.arguments?.getString("characterName").orEmpty()
-            )
-
-            val charId = when {
-                characterId.isNotBlank() && characterId.contains("_") -> characterId
-                characterName.isNotBlank() -> "${friendUid}_${characterName}"
-                else -> characterId
-            }
-
-            PersonalRoomScreen(
-                charId = charId,
-                characterName = characterName,
-                onBack = { navController.popBackStack() },
-                readOnly = true,
-                roomViewModel = personalRoomViewModel,
-                inventoryViewModel = inventoryViewModel
-            )
-        }
-
-        composable(Screen.Guilds.route) {
-            GuildsScreen(
-                onBack = { navController.popBackStack() },
-                onOpenGuildDetails = { guildId ->
-                    navController.navigate("guild_details/${Uri.encode(guildId)}")
-                },
-                viewModel = socialViewModel
-            )
-        }
-
-        composable("guild_details/{guildId}") { backStackEntryArg ->
-            val guildId = Uri.decode(
-                backStackEntryArg.arguments?.getString("guildId").orEmpty()
-            )
-
-            GuildDetailsScreen(
-                guildId = guildId,
-                onBack = { navController.popBackStack() },
-                onOpenMemberChat = { memberUid, memberName, _ ->
-                    navController.navigate(Screen.PrivateChat.createRoute(memberUid, memberName))
-                },
-                onOpenBossBattle = { battleGuildId ->
-                    navController.navigate(Screen.GuildBossBattle.createRoute(battleGuildId)) {
-                        launchSingleTop = true
+                LaunchedEffect(charId) {
+                    if (charId.isNotBlank()) {
+                        worldMapViewModel.loadMap(charId)
                     }
-                },
-                viewModel = socialViewModel
-            )
+                }
+
+                val mapState by worldMapViewModel.worldMapState.collectAsState()
+                val characterName = charId.substringAfter("_")
+
+                ARMapScreen(
+                    mapState = mapState,
+                    onBack = { navController.popBackStack() },
+                    onOpen3DGallery = {
+                        navController.navigate(
+                            Screen.LocationsGallery.createRoute(charId, characterName)
+                        )
+                    }
+                )
+            }
+
+            composable(Screen.LocationsGallery.route) { backStackEntryArg ->
+                val charId = Uri.decode(
+                    backStackEntryArg.arguments?.getString("charId").orEmpty()
+                )
+                val characterName = Uri.decode(
+                    backStackEntryArg.arguments?.getString("characterName").orEmpty()
+                )
+
+                LaunchedEffect(charId) {
+                    if (charId.isNotBlank()) {
+                        worldMapViewModel.loadMap(charId)
+                    }
+                }
+
+                val mapState by worldMapViewModel.worldMapState.collectAsState()
+
+                LocationsGalleryScreen(
+                    mapState = mapState,
+                    charId = charId,
+                    characterName = characterName,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(Screen.PersonalRoom.route) { backStackEntryArg ->
+                val charId = Uri.decode(
+                    backStackEntryArg.arguments?.getString("charId").orEmpty()
+                )
+                val characterName = Uri.decode(
+                    backStackEntryArg.arguments?.getString("characterName").orEmpty()
+                )
+
+                PersonalRoomScreen(
+                    charId = charId,
+                    characterName = characterName,
+                    onBack = { navController.popBackStack() },
+                    readOnly = false,
+                    roomViewModel = personalRoomViewModel,
+                    inventoryViewModel = inventoryViewModel
+                )
+            }
+
+            composable("bestiary/{charId}") { backStackEntryArg ->
+                val charId = Uri.decode(
+                    backStackEntryArg.arguments?.getString("charId").orEmpty()
+                )
+
+                BestiaryScreen(
+                    gameId = charId,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(Screen.Journal.route) { backStackEntryArg ->
+                val charId = Uri.decode(
+                    backStackEntryArg.arguments?.getString("charId").orEmpty()
+                )
+
+                JournalScreen(
+                    charId = charId,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(Screen.UserSearch.route) {
+                UserSearchScreen(
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(Screen.FriendRequests.route) {
+                FriendRequestsScreen(
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(Screen.FriendsList.route) {
+                FriendsListScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenProfile = { friendUid ->
+                        navController.navigate(Screen.FriendProfile.createRoute(friendUid))
+                    },
+                    onOpenChat = { friendUid, friendName ->
+                        navController.navigate(Screen.PrivateChat.createRoute(friendUid, friendName))
+                    }
+                )
+            }
+
+            composable(Screen.FriendProfile.route) { backStackEntryArg ->
+                val friendUid = Uri.decode(
+                    backStackEntryArg.arguments?.getString("friendUid").orEmpty()
+                )
+
+                SocialProfileScreen(
+                    userUid = friendUid,
+                    isMe = false,
+                    onBack = { navController.popBackStack() },
+                    onOpenChat = { uid, name ->
+                        navController.navigate(Screen.PrivateChat.createRoute(uid, name))
+                    },
+                    onOpenPersonalRoom = { friendUidForRoom, characterId, characterName ->
+                        navController.navigate(
+                            Screen.FriendPersonalRoom.createRoute(
+                                friendUid = friendUidForRoom,
+                                characterId = characterId,
+                                characterName = characterName
+                            )
+                        )
+                    }
+                )
+            }
+
+            composable(
+                route = Screen.FriendPersonalRoom.route,
+                arguments = listOf(
+                    navArgument("friendUid") { type = NavType.StringType },
+                    navArgument("characterId") { type = NavType.StringType },
+                    navArgument("characterName") { type = NavType.StringType }
+                )
+            ) { backStackEntryArg ->
+                val friendUid = Uri.decode(
+                    backStackEntryArg.arguments?.getString("friendUid").orEmpty()
+                )
+
+                val characterId = Uri.decode(
+                    backStackEntryArg.arguments?.getString("characterId").orEmpty()
+                )
+
+                val characterName = Uri.decode(
+                    backStackEntryArg.arguments?.getString("characterName").orEmpty()
+                )
+
+                val charId = when {
+                    characterId.isNotBlank() && characterId.contains("_") -> characterId
+                    characterName.isNotBlank() -> "${friendUid}_${characterName}"
+                    else -> characterId
+                }
+
+                PersonalRoomScreen(
+                    charId = charId,
+                    characterName = characterName,
+                    onBack = { navController.popBackStack() },
+                    readOnly = true,
+                    roomViewModel = personalRoomViewModel,
+                    inventoryViewModel = inventoryViewModel
+                )
+            }
+
+            composable(Screen.Guilds.route) {
+                GuildsScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenGuildDetails = { guildId ->
+                        navController.navigate("guild_details/${Uri.encode(guildId)}")
+                    },
+                    viewModel = socialViewModel
+                )
+            }
+
+            composable("guild_details/{guildId}") { backStackEntryArg ->
+                val guildId = Uri.decode(
+                    backStackEntryArg.arguments?.getString("guildId").orEmpty()
+                )
+
+                GuildDetailsScreen(
+                    guildId = guildId,
+                    onBack = { navController.popBackStack() },
+                    onOpenMemberChat = { memberUid, memberName, _ ->
+                        navController.navigate(Screen.PrivateChat.createRoute(memberUid, memberName))
+                    },
+                    onOpenBossBattle = { battleGuildId ->
+                        navController.navigate(Screen.GuildBossBattle.createRoute(battleGuildId)) {
+                            launchSingleTop = true
+                        }
+                    },
+                    viewModel = socialViewModel
+                )
+            }
+
+            composable(
+                route = Screen.PrivateChat.route,
+                arguments = listOf(
+                    navArgument("friendUid") { type = NavType.StringType },
+                    navArgument("friendName") { type = NavType.StringType }
+                )
+            ) { backStackEntryArg ->
+                val friendUid = Uri.decode(
+                    backStackEntryArg.arguments?.getString("friendUid").orEmpty()
+                )
+                val friendName = Uri.decode(
+                    backStackEntryArg.arguments?.getString("friendName").orEmpty()
+                )
+
+                PrivateChatScreen(
+                    friendUid = friendUid,
+                    friendName = friendName,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(Screen.GuildBossBattle.route) { backStackEntryArg ->
+                val guildId = Uri.decode(
+                    backStackEntryArg.arguments?.getString("guildId").orEmpty()
+                )
+
+                GuildBossBattleScreen(
+                    guildId = guildId,
+                    onBack = { navController.popBackStack() },
+                    viewModel = socialViewModel
+                )
+            }
         }
 
-        composable(
-            route = Screen.PrivateChat.route,
-            arguments = listOf(
-                navArgument("friendUid") { type = NavType.StringType },
-                navArgument("friendName") { type = NavType.StringType }
-            )
-        ) { backStackEntryArg ->
-            val friendUid = Uri.decode(
-                backStackEntryArg.arguments?.getString("friendUid").orEmpty()
-            )
-            val friendName = Uri.decode(
-                backStackEntryArg.arguments?.getString("friendName").orEmpty()
-            )
-
-            PrivateChatScreen(
-                friendUid = friendUid,
-                friendName = friendName,
-                onBack = { navController.popBackStack() }
-            )
-        }
-
-        composable(Screen.GuildBossBattle.route) { backStackEntryArg ->
-            val guildId = Uri.decode(
-                backStackEntryArg.arguments?.getString("guildId").orEmpty()
-            )
-
-            GuildBossBattleScreen(
-                guildId = guildId,
-                onBack = { navController.popBackStack() },
-                viewModel = socialViewModel
-            )
-        }
     }
 }
 
