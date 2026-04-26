@@ -98,6 +98,15 @@ fun GuildDetailsScreen(
     val isGuildBossLoading by viewModel.isGuildBossLoading.collectAsState()
     val isGuildBossActing by viewModel.isGuildBossActing.collectAsState()
 
+    val guildLeaveCompleted by viewModel.guildLeaveCompleted.collectAsState()
+
+    LaunchedEffect(guildLeaveCompleted) {
+        if (guildLeaveCompleted) {
+            viewModel.consumeGuildLeaveCompleted()
+            onBack()
+        }
+    }
+
     LaunchedEffect(guildId) {
         viewModel.startGuildsListener()
         viewModel.openGuildDetailsById(guildId)

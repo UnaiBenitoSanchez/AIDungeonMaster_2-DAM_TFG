@@ -105,10 +105,11 @@ class SocialViewModel : ViewModel() {
     private val _guildBossConsumables = MutableStateFlow<List<Item>>(emptyList())
     val guildBossConsumables = _guildBossConsumables.asStateFlow()
 
-    // FIX NAVEGACIÓN: Flag para que GuildDetailsScreen no vuelva a redirigir al
-    // usuario a la batalla cuando acaba de pulsar "Volver" intencionalmente.
     private val _userExplicitlyLeftBattle = MutableStateFlow(false)
     val userExplicitlyLeftBattle = _userExplicitlyLeftBattle.asStateFlow()
+
+    private val _guildLeaveCompleted = MutableStateFlow(false)
+    val guildLeaveCompleted = _guildLeaveCompleted.asStateFlow()
 
     fun refreshBossConsumables() {
         val guildId = _selectedGuild.value?.id ?: return
@@ -316,21 +317,28 @@ class SocialViewModel : ViewModel() {
     }
 
     fun searchGuilds(query: String) {
+        val cleanQuery = query.trim()
         _lastGuildQuery.value = query
 
-        if (query.trim().length < 2) {
+        if (cleanQuery.length < 2) {
             _guildSearchResults.value = emptyList()
+            _isSearching.value = false
             return
         }
 
         viewModelScope.launch {
+            _isSearching.value = true
+
             runCatching {
-                repository.searchGuilds(query)
-            }.onSuccess {
-                _guildSearchResults.value = it
+                repository.searchGuilds(cleanQuery)
+            }.onSuccess { results ->
+                _guildSearchResults.value = results
             }.onFailure {
+                _guildSearchResults.value = emptyList()
                 _message.value = it.message ?: "No se pudieron buscar gremios"
             }
+
+            _isSearching.value = false
         }
     }
 
@@ -395,9 +403,12 @@ class SocialViewModel : ViewModel() {
                 repository.leaveGuild(guild)
             }.onSuccess {
                 _message.value = "Has abandonado el gremio"
+
                 closeGuildDetails()
+                clearGuildSearch()
                 startGuildsListener()
-                loadGuildSearchResults(_lastGuildQuery.value)
+
+                _guildLeaveCompleted.value = true
             }.onFailure {
                 _message.value = it.message ?: "No se pudo abandonar el gremio"
             }
@@ -763,6 +774,10 @@ class SocialViewModel : ViewModel() {
 
     fun clearMessage() {
         _message.value = null
+    }
+
+    fun consumeGuildLeaveCompleted() {
+        _guildLeaveCompleted.value = false
     }
 
     override fun onCleared() {

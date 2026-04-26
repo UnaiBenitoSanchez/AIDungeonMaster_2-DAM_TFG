@@ -73,15 +73,23 @@ fun GuildsScreen(
     val message by viewModel.message.collectAsState()
 
     val snackbarHostState = remember { SnackbarHostState() }
+
     var query by remember { mutableStateOf("") }
     var showCreateDialog by remember { mutableStateOf(false) }
 
+    val shouldShowSearchResults = query.trim().length >= 2
+
     LaunchedEffect(Unit) {
+        query = ""
+        viewModel.clearGuildSearch()
         viewModel.startGuildsListener()
     }
 
     DisposableEffect(Unit) {
-        onDispose { viewModel.stopGuildsListener() }
+        onDispose {
+            viewModel.clearGuildSearch()
+            viewModel.stopGuildsListener()
+        }
     }
 
     LaunchedEffect(message) {
@@ -140,9 +148,14 @@ fun GuildsScreen(
 
             OutlinedTextField(
                 value = query,
-                onValueChange = {
-                    query = it
-                    viewModel.searchGuilds(it)
+                onValueChange = { newQuery ->
+                    query = newQuery
+
+                    if (newQuery.trim().length >= 2) {
+                        viewModel.searchGuilds(newQuery)
+                    } else {
+                        viewModel.clearGuildSearch()
+                    }
                 },
                 modifier = Modifier.fillMaxWidth(),
                 label = { Text("Buscar gremios") },
@@ -153,13 +166,19 @@ fun GuildsScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier.weight(1f)
             ) {
-                items(searchResults, key = { it.id }) { guild ->
-                    GuildCard(
-                        guild = guild,
-                        showJoinButton = !guild.joined,
-                        onJoin = { viewModel.joinGuild(guild) },
-                        onOpenDetails = { onOpenGuildDetails(guild.id) }
-                    )
+                if (shouldShowSearchResults) {
+                    items(searchResults, key = { it.id }) { guild ->
+                        GuildCard(
+                            guild = guild,
+                            showJoinButton = !guild.joined,
+                            onJoin = { viewModel.joinGuild(guild) },
+                            onOpenDetails = {
+                                query = ""
+                                viewModel.clearGuildSearch()
+                                onOpenGuildDetails(guild.id)
+                            }
+                        )
+                    }
                 }
             }
         }
