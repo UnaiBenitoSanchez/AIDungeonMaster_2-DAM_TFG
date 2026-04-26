@@ -3,14 +3,13 @@ package com.example.aidungeonmaster.data.repository
 import android.content.Context
 import android.net.Uri
 import com.example.aidungeonmaster.data.model.AppUser
+import com.example.aidungeonmaster.data.model.Character
 import com.example.aidungeonmaster.data.model.FriendRequest
 import com.example.aidungeonmaster.data.model.FriendWithProfile
 import com.example.aidungeonmaster.data.model.Guild
-import com.example.aidungeonmaster.data.model.GuildMemberSummary
 import com.example.aidungeonmaster.data.model.GuildMembership
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentSnapshot
-import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.tasks.await
@@ -124,7 +123,9 @@ class SocialRepository {
                 }
 
                 val requests = snapshot?.documents.orEmpty()
-                    .mapNotNull { doc -> doc.toObject(FriendRequest::class.java)?.copy(id = doc.id) }
+                    .mapNotNull { doc ->
+                        doc.toObject(FriendRequest::class.java)?.copy(id = doc.id)
+                    }
                     .sortedByDescending { it.createdAt }
 
                 onChange(requests)
@@ -146,10 +147,18 @@ class SocialRepository {
             "createdBy" to myUid
         )
 
-        val requesterProfile = db.collection("users").document(request.fromUid).get().await().toAppUser()
+        val requesterProfile = db.collection("users")
+            .document(request.fromUid)
+            .get()
+            .await()
+            .toAppUser()
             ?: throw IllegalStateException("No se encontró el perfil del remitente.")
 
-        val myProfile = db.collection("users").document(myUid).get().await().toAppUser()
+        val myProfile = db.collection("users")
+            .document(myUid)
+            .get()
+            .await()
+            .toAppUser()
             ?: throw IllegalStateException("No se encontró tu perfil.")
 
         val myFriendMirror = mapOf(
@@ -293,6 +302,21 @@ class SocialRepository {
             ?: throw IllegalStateException("No se pudo cargar el perfil.")
     }
 
+    suspend fun getUserCharacters(userUid: String): List<Character> {
+        if (userUid.isBlank()) return emptyList()
+
+        return db.collection("users")
+            .document(userUid)
+            .collection("characters")
+            .get()
+            .await()
+            .documents
+            .mapNotNull { doc ->
+                doc.toObject(Character::class.java)?.copy(id = doc.id)
+            }
+            .sortedBy { it.name.lowercase() }
+    }
+
     suspend fun updateMyProfile(
         displayName: String,
         bio: String,
@@ -367,7 +391,11 @@ class SocialRepository {
 
         do {
             val outputStream = java.io.ByteArrayOutputStream()
-            scaledBitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, quality, outputStream)
+            scaledBitmap.compress(
+                android.graphics.Bitmap.CompressFormat.JPEG,
+                quality,
+                outputStream
+            )
             finalBytes = outputStream.toByteArray()
             quality -= 10
         } while (finalBytes.size > 350_000 && quality >= 25)
@@ -386,7 +414,12 @@ class SocialRepository {
             .await()
     }
 
-    suspend fun createGuild(name: String, description: String, accentColor: String, bannerColor: String) {
+    suspend fun createGuild(
+        name: String,
+        description: String,
+        accentColor: String,
+        bannerColor: String
+    ) {
         val myUid = currentUid() ?: throw IllegalStateException("Usuario no autenticado")
         val me = getUserProfile(myUid)
 
@@ -428,7 +461,8 @@ class SocialRepository {
             batch.set(guildRef, guild)
             batch.set(guildRef.collection("members").document(myUid), membership)
             batch.set(
-                db.collection("users").document(myUid).collection("guilds").document(guildRef.id),
+                db.collection("users").document(myUid)
+                    .collection("guilds").document(guildRef.id),
                 mapOf(
                     "guildId" to guildRef.id,
                     "name" to guildName,
@@ -513,7 +547,8 @@ class SocialRepository {
         val now = System.currentTimeMillis()
         val guildRef = db.collection("guilds").document(guild.id)
         val memberRef = guildRef.collection("members").document(myUid)
-        val userGuildRef = db.collection("users").document(myUid).collection("guilds").document(guild.id)
+        val userGuildRef = db.collection("users").document(myUid)
+            .collection("guilds").document(guild.id)
         val userRef = db.collection("users").document(myUid)
 
         db.runTransaction { tx ->
@@ -544,33 +579,45 @@ class SocialRepository {
             // 2) Crear memberRef
             // 3) Crear userGuildRef
             // 4) Actualizar userRef (currentGuildId)
-            tx.update(guildRef, mapOf(
-                "memberCount" to currentCount + 1,
-                "updatedAt" to now
-            ))
+            tx.update(
+                guildRef,
+                mapOf(
+                    "memberCount" to currentCount + 1,
+                    "updatedAt" to now
+                )
+            )
 
-            tx.set(memberRef, mapOf(
-                "guildId" to guild.id,
-                "uid" to myUid,
-                "role" to "member",
-                "joinedAt" to now,
-                "displayName" to me.displayName,
-                "username" to me.username
-            ))
+            tx.set(
+                memberRef,
+                mapOf(
+                    "guildId" to guild.id,
+                    "uid" to myUid,
+                    "role" to "member",
+                    "joinedAt" to now,
+                    "displayName" to me.displayName,
+                    "username" to me.username
+                )
+            )
 
-            tx.set(userGuildRef, mapOf(
-                "guildId" to guild.id,
-                "name" to guild.name,
-                "accentColor" to guild.accentColor,
-                "bannerColor" to guild.bannerColor,
-                "joinedAt" to now,
-                "role" to "member"
-            ))
+            tx.set(
+                userGuildRef,
+                mapOf(
+                    "guildId" to guild.id,
+                    "name" to guild.name,
+                    "accentColor" to guild.accentColor,
+                    "bannerColor" to guild.bannerColor,
+                    "joinedAt" to now,
+                    "role" to "member"
+                )
+            )
 
-            tx.update(userRef, mapOf(
-                "currentGuildId" to guild.id,
-                "updatedAt" to now
-            ))
+            tx.update(
+                userRef,
+                mapOf(
+                    "currentGuildId" to guild.id,
+                    "updatedAt" to now
+                )
+            )
         }.await()
     }
 
@@ -583,7 +630,8 @@ class SocialRepository {
 
         val guildRef = db.collection("guilds").document(guild.id)
         val memberRef = guildRef.collection("members").document(myUid)
-        val userGuildRef = db.collection("users").document(myUid).collection("guilds").document(guild.id)
+        val userGuildRef = db.collection("users").document(myUid)
+            .collection("guilds").document(guild.id)
         val userRef = db.collection("users").document(myUid)
 
         db.runTransaction { tx ->
@@ -592,22 +640,30 @@ class SocialRepository {
             val userGuildSnap = tx.get(userGuildRef)
 
             if (!guildSnap.exists()) throw IllegalStateException("El gremio ya no existe.")
-            if (!memberSnap.exists() || !userGuildSnap.exists()) throw IllegalStateException("No formas parte de este gremio.")
+            if (!memberSnap.exists() || !userGuildSnap.exists()) {
+                throw IllegalStateException("No formas parte de este gremio.")
+            }
 
             val now = System.currentTimeMillis()
             val currentCount = (guildSnap.getLong("memberCount") ?: 1L).toInt()
 
             // ✅ Primero actualizar el gremio (mientras memberRef aún "existe")
-            tx.update(guildRef, mapOf(
-                "memberCount" to maxOf(0, currentCount - 1),
-                "updatedAt" to now
-            ))
+            tx.update(
+                guildRef,
+                mapOf(
+                    "memberCount" to maxOf(0, currentCount - 1),
+                    "updatedAt" to now
+                )
+            )
 
             // ✅ Luego actualizar el usuario
-            tx.update(userRef, mapOf(
-                "currentGuildId" to "",
-                "updatedAt" to now
-            ))
+            tx.update(
+                userRef,
+                mapOf(
+                    "currentGuildId" to "",
+                    "updatedAt" to now
+                )
+            )
 
             // ✅ Los deletes al final
             tx.delete(memberRef)
@@ -776,5 +832,4 @@ class SocialRepository {
             currentGuildId = getString("currentGuildId").orEmpty()
         )
     }
-
 }

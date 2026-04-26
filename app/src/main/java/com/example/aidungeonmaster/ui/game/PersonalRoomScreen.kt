@@ -8,7 +8,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,17 +23,18 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -62,11 +63,6 @@ import com.example.aidungeonmaster.data.model.personalRoomSlotById
 import com.example.aidungeonmaster.viewmodel.InventoryViewModel
 import com.example.aidungeonmaster.viewmodel.PersonalRoomViewModel
 
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
-
 private class PersonalRoomBridge(
     private val onSlotFocus: (slotId: String?) -> Unit
 ) {
@@ -94,21 +90,34 @@ fun PersonalRoomScreen(
     charId: String,
     characterName: String,
     onBack: () -> Unit,
+    readOnly: Boolean = false,
     roomViewModel: PersonalRoomViewModel = viewModel(),
     inventoryViewModel: InventoryViewModel = viewModel()
 ) {
     val roomState by roomViewModel.roomState.collectAsState()
     val character by inventoryViewModel.character.collectAsState()
 
-    var feedback by remember { mutableStateOf("Usa el joystick para caminar por la sala y pisa una baldosa para decorarla.") }
+    var feedback by remember(readOnly) {
+        mutableStateOf(
+            if (readOnly) {
+                "Modo visita: puedes recorrer la sala, pero no modificar la decoración."
+            } else {
+                "Usa el joystick para caminar por la sala y pisa una baldosa para decorarla."
+            }
+        )
+    }
+
     var activeSlotId by remember { mutableStateOf<String?>(null) }
     var activeSlotLabel by remember { mutableStateOf<String?>(null) }
     var activeSlotDecorationId by remember { mutableStateOf<String?>(null) }
     var showDecorationPanel by remember { mutableStateOf(false) }
     var showPlacementSheet by remember { mutableStateOf(false) }
 
-    LaunchedEffect(charId) {
-        inventoryViewModel.loadInventory(charId)
+    LaunchedEffect(charId, readOnly) {
+        if (!readOnly) {
+            inventoryViewModel.loadInventory(charId)
+        }
+
         roomViewModel.loadRoom(charId)
     }
 
@@ -151,7 +160,11 @@ fun PersonalRoomScreen(
                         fontFamily = FontFamily.Serif
                     )
                     Text(
-                        text = "🪙 ${character?.coins ?: 0} • ${roomState.placedDecorations.size}/${PERSONAL_ROOM_SLOTS.size} baldosas ocupadas",
+                        text = if (readOnly) {
+                            "👁️ Solo visita • ${roomState.placedDecorations.size}/${PERSONAL_ROOM_SLOTS.size} baldosas decoradas"
+                        } else {
+                            "🪙 ${character?.coins ?: 0} • ${roomState.placedDecorations.size}/${PERSONAL_ROOM_SLOTS.size} baldosas ocupadas"
+                        },
                         color = Color(0xFFBBAE9C),
                         fontSize = 11.sp
                     )
@@ -223,20 +236,22 @@ fun PersonalRoomScreen(
                 }
             }
 
-            Button(
-                onClick = { showDecorationPanel = !showDecorationPanel },
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(14.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xCC2A180F)
-                )
-            ) {
-                Text(
-                    if (showDecorationPanel) "Ocultar decoración" else "🧰 Decorar",
-                    color = Color(0xFFFFD700)
-                )
+            if (!readOnly) {
+                Button(
+                    onClick = { showDecorationPanel = !showDecorationPanel },
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(14.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xCC2A180F)
+                    )
+                ) {
+                    Text(
+                        if (showDecorationPanel) "Ocultar decoración" else "🧰 Decorar",
+                        color = Color(0xFFFFD700)
+                    )
+                }
             }
         }
 
@@ -259,6 +274,16 @@ fun PersonalRoomScreen(
                 Spacer(modifier = Modifier.height(4.dp))
 
                 when {
+                    readOnly -> {
+                        Text(
+                            text = occupiedDecoration?.let {
+                                "Decoración: ${it.emoji} ${it.name}"
+                            } ?: "Solo estás visitando esta sala.",
+                            color = Color(0xFFD7C8B6),
+                            fontSize = 11.sp
+                        )
+                    }
+
                     !isOnSlot -> {
                         Text(
                             text = "No estás sobre ninguna baldosa.",
@@ -331,7 +356,7 @@ fun PersonalRoomScreen(
             }
         }
 
-        if (showDecorationPanel) {
+        if (!readOnly && showDecorationPanel) {
             Surface(color = Color(0xEE1B120D)) {
                 Column(modifier = Modifier.fillMaxWidth()) {
                     HorizontalDivider(
@@ -417,7 +442,7 @@ fun PersonalRoomScreen(
         }
     }
 
-    if (showPlacementSheet && activeSlotId != null) {
+    if (!readOnly && showPlacementSheet && activeSlotId != null) {
         val availableDecorations = PERSONAL_ROOM_CATALOG
 
         ModalBottomSheet(

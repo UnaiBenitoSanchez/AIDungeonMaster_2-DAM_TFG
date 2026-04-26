@@ -61,13 +61,14 @@ sealed class Screen(val route: String) {
     object Guilds : Screen("guilds")
 
     object Inventory : Screen("inventory/{userId}") {
-        fun createRoute(userId: String) = "inventory/$userId"
+        fun createRoute(userId: String) = "inventory/${Uri.encode(userId)}"
     }
 
     object QRScanner : Screen("qr_scanner")
 
     object GameSetup : Screen("game_setup/{userId}/{characterName}") {
-        fun createRoute(userId: String, characterName: String) = "game_setup/$userId/$characterName"
+        fun createRoute(userId: String, characterName: String) =
+            "game_setup/${Uri.encode(userId)}/${Uri.encode(characterName)}"
     }
 
     object Ranking : Screen("ranking")
@@ -75,25 +76,25 @@ sealed class Screen(val route: String) {
 
     object GamePlay : Screen("game_play/{userId}/{characterName}/{theme}") {
         fun createRoute(userId: String, characterName: String, theme: String) =
-            "game_play/$userId/$characterName/$theme"
+            "game_play/${Uri.encode(userId)}/${Uri.encode(characterName)}/${Uri.encode(theme)}"
     }
 
     object ARMap : Screen("ar_map/{charId}") {
-        fun createRoute(charId: String) = "ar_map/$charId"
+        fun createRoute(charId: String) = "ar_map/${Uri.encode(charId)}"
     }
 
     object LocationsGallery : Screen("locations_gallery/{charId}/{characterName}") {
         fun createRoute(charId: String, characterName: String) =
-            "locations_gallery/$charId/${characterName.replace(" ", "_")}"
+            "locations_gallery/${Uri.encode(charId)}/${Uri.encode(characterName)}"
     }
 
     object Journal : Screen("journal/{charId}") {
-        fun createRoute(charId: String) = "journal/$charId"
+        fun createRoute(charId: String) = "journal/${Uri.encode(charId)}"
     }
 
     object PersonalRoom : Screen("personal_room/{charId}/{characterName}") {
         fun createRoute(charId: String, characterName: String) =
-            "personal_room/$charId/${characterName.replace(" ", "_")}"
+            "personal_room/${Uri.encode(charId)}/${Uri.encode(characterName)}"
     }
 
     object UserSearch : Screen("user_search")
@@ -101,18 +102,27 @@ sealed class Screen(val route: String) {
     object FriendsList : Screen("friends_list")
 
     object FriendProfile : Screen("friend_profile/{friendUid}") {
-        fun createRoute(friendUid: String): String = "friend_profile/$friendUid"
+        fun createRoute(friendUid: String): String =
+            "friend_profile/${Uri.encode(friendUid)}"
+    }
+
+    object FriendPersonalRoom : Screen("friend_personal_room/{friendUid}/{characterId}/{characterName}") {
+        fun createRoute(friendUid: String, characterId: String, characterName: String): String {
+            return "friend_personal_room/${Uri.encode(friendUid)}/${Uri.encode(characterId)}/${Uri.encode(characterName)}"
+        }
     }
 
     object PrivateChat : Screen("private_chat/{friendUid}/{friendName}") {
         fun createRoute(friendUid: String, friendName: String): String {
+            val encodedUid = Uri.encode(friendUid)
             val encodedName = Uri.encode(friendName)
-            return "private_chat/$friendUid/$encodedName"
+            return "private_chat/$encodedUid/$encodedName"
         }
     }
 
     object GuildBossBattle : Screen("guild_boss_battle/{guildId}") {
-        fun createRoute(guildId: String): String = "guild_boss_battle/$guildId"
+        fun createRoute(guildId: String): String =
+            "guild_boss_battle/${Uri.encode(guildId)}"
     }
 }
 
@@ -143,12 +153,21 @@ fun AppNavigation(navController: NavHostController) {
     }
 
     NavHost(navController = navController, startDestination = startRoute) {
-        composable(Screen.Login.route) { LoginScreen(navController) }
-        composable(Screen.Register.route) { RegisterScreen(navController) }
-        composable(Screen.Home.route) { HomeScreen(navController) }
+        composable(Screen.Login.route) {
+            LoginScreen(navController)
+        }
+
+        composable(Screen.Register.route) {
+            RegisterScreen(navController)
+        }
+
+        composable(Screen.Home.route) {
+            HomeScreen(navController)
+        }
 
         composable(Screen.MyProfile.route) {
             val myUid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+
             SocialProfileScreen(
                 userUid = myUid,
                 isMe = true,
@@ -158,7 +177,11 @@ fun AppNavigation(navController: NavHostController) {
 
         composable(Screen.Ranking.route) {
             val rankingViewModel: RankingViewModel = viewModel()
-            RankingScreen(onBack = { navController.popBackStack() }, viewModel = rankingViewModel)
+
+            RankingScreen(
+                onBack = { navController.popBackStack() },
+                viewModel = rankingViewModel
+            )
         }
 
         composable(Screen.Achievements.route) {
@@ -169,15 +192,26 @@ fun AppNavigation(navController: NavHostController) {
         }
 
         composable(Screen.GameSetup.route) { backStackEntryArg ->
-            val userId = backStackEntryArg.arguments?.getString("userId") ?: ""
-            val characterName = backStackEntryArg.arguments?.getString("characterName") ?: ""
+            val userId = Uri.decode(
+                backStackEntryArg.arguments?.getString("userId").orEmpty()
+            )
+            val characterName = Uri.decode(
+                backStackEntryArg.arguments?.getString("characterName").orEmpty()
+            )
+
             GameSetupScreen(navController, userId, characterName)
         }
 
         composable(Screen.GamePlay.route) { backStackEntryArg ->
-            val userId = backStackEntryArg.arguments?.getString("userId") ?: ""
-            val characterName = backStackEntryArg.arguments?.getString("characterName") ?: ""
-            val theme = backStackEntryArg.arguments?.getString("theme") ?: ""
+            val userId = Uri.decode(
+                backStackEntryArg.arguments?.getString("userId").orEmpty()
+            )
+            val characterName = Uri.decode(
+                backStackEntryArg.arguments?.getString("characterName").orEmpty()
+            )
+            val theme = Uri.decode(
+                backStackEntryArg.arguments?.getString("theme").orEmpty()
+            )
 
             GamePlayScreen(
                 navController = navController,
@@ -192,17 +226,32 @@ fun AppNavigation(navController: NavHostController) {
         }
 
         composable("qr_scanner/{gameId}") { backStackEntryArg ->
-            val gameId = backStackEntryArg.arguments?.getString("gameId") ?: ""
-            QRScannerScreen(gameId = gameId, onBack = { navController.popBackStack() })
+            val gameId = Uri.decode(
+                backStackEntryArg.arguments?.getString("gameId").orEmpty()
+            )
+
+            QRScannerScreen(
+                gameId = gameId,
+                onBack = { navController.popBackStack() }
+            )
         }
 
         composable(Screen.Inventory.route) { backStackEntryArg ->
-            val idParaElInventario = backStackEntryArg.arguments?.getString("userId") ?: ""
-            InventoryScreen(gameId = idParaElInventario, onBack = { navController.popBackStack() })
+            val idParaElInventario = Uri.decode(
+                backStackEntryArg.arguments?.getString("userId").orEmpty()
+            )
+
+            InventoryScreen(
+                gameId = idParaElInventario,
+                onBack = { navController.popBackStack() }
+            )
         }
 
         composable("combat/{gameId}") { backStackEntryArg ->
-            val gameId = backStackEntryArg.arguments?.getString("gameId") ?: ""
+            val gameId = Uri.decode(
+                backStackEntryArg.arguments?.getString("gameId").orEmpty()
+            )
+
             CombatScreen(
                 gameViewModel = gameViewModel,
                 inventoryViewModel = inventoryViewModel,
@@ -213,7 +262,8 @@ fun AppNavigation(navController: NavHostController) {
                         gameViewModel.addPendingXp(xpGained)
                     }
 
-                    val enemyName = gameViewModel.currentAdventureStep.value?.enemy?.name ?: "el enemigo"
+                    val enemyName =
+                        gameViewModel.currentAdventureStep.value?.enemy?.name ?: "el enemigo"
 
                     if (victory) {
                         gameViewModel.notifyCombatEnd(true, enemyName)
@@ -229,7 +279,11 @@ fun AppNavigation(navController: NavHostController) {
                                     characterName = characterName
                                 )
                             } catch (e: Exception) {
-                                Log.e("APP_NAV", "Error borrando personaje al morir: ${e.message}", e)
+                                Log.e(
+                                    "APP_NAV",
+                                    "Error borrando personaje al morir: ${e.message}",
+                                    e
+                                )
                             } finally {
                                 navController.navigate(Screen.Home.route) {
                                     popUpTo(Screen.Home.route) { inclusive = false }
@@ -243,10 +297,16 @@ fun AppNavigation(navController: NavHostController) {
         }
 
         composable(Screen.ARMap.route) { backStackEntryArg ->
-            val charId = backStackEntryArg.arguments?.getString("charId") ?: ""
+            val charId = Uri.decode(
+                backStackEntryArg.arguments?.getString("charId").orEmpty()
+            )
+
             LaunchedEffect(charId) {
-                if (charId.isNotBlank()) worldMapViewModel.loadMap(charId)
+                if (charId.isNotBlank()) {
+                    worldMapViewModel.loadMap(charId)
+                }
             }
+
             val mapState by worldMapViewModel.worldMapState.collectAsState()
             val characterName = charId.substringAfter("_")
 
@@ -254,21 +314,27 @@ fun AppNavigation(navController: NavHostController) {
                 mapState = mapState,
                 onBack = { navController.popBackStack() },
                 onOpen3DGallery = {
-                    navController.navigate(Screen.LocationsGallery.createRoute(charId, characterName))
+                    navController.navigate(
+                        Screen.LocationsGallery.createRoute(charId, characterName)
+                    )
                 }
             )
         }
 
         composable(Screen.LocationsGallery.route) { backStackEntryArg ->
-            val charId = backStackEntryArg.arguments?.getString("charId") ?: ""
-            val characterName = backStackEntryArg.arguments
-                ?.getString("characterName")
-                ?.replace("_", " ")
-                ?: ""
+            val charId = Uri.decode(
+                backStackEntryArg.arguments?.getString("charId").orEmpty()
+            )
+            val characterName = Uri.decode(
+                backStackEntryArg.arguments?.getString("characterName").orEmpty()
+            )
 
             LaunchedEffect(charId) {
-                if (charId.isNotBlank()) worldMapViewModel.loadMap(charId)
+                if (charId.isNotBlank()) {
+                    worldMapViewModel.loadMap(charId)
+                }
             }
+
             val mapState by worldMapViewModel.worldMapState.collectAsState()
 
             LocationsGalleryScreen(
@@ -280,37 +346,55 @@ fun AppNavigation(navController: NavHostController) {
         }
 
         composable(Screen.PersonalRoom.route) { backStackEntryArg ->
-            val charId = backStackEntryArg.arguments?.getString("charId") ?: ""
-            val characterName = backStackEntryArg.arguments
-                ?.getString("characterName")
-                ?.replace("_", " ")
-                ?: ""
+            val charId = Uri.decode(
+                backStackEntryArg.arguments?.getString("charId").orEmpty()
+            )
+            val characterName = Uri.decode(
+                backStackEntryArg.arguments?.getString("characterName").orEmpty()
+            )
 
             PersonalRoomScreen(
                 charId = charId,
                 characterName = characterName,
                 onBack = { navController.popBackStack() },
+                readOnly = false,
                 roomViewModel = personalRoomViewModel,
                 inventoryViewModel = inventoryViewModel
             )
         }
 
         composable("bestiary/{charId}") { backStackEntryArg ->
-            val charId = backStackEntryArg.arguments?.getString("charId").orEmpty()
-            BestiaryScreen(gameId = charId, onBack = { navController.popBackStack() })
+            val charId = Uri.decode(
+                backStackEntryArg.arguments?.getString("charId").orEmpty()
+            )
+
+            BestiaryScreen(
+                gameId = charId,
+                onBack = { navController.popBackStack() }
+            )
         }
 
         composable(Screen.Journal.route) { backStackEntryArg ->
-            val charId = backStackEntryArg.arguments?.getString("charId") ?: ""
-            JournalScreen(charId = charId, onBack = { navController.popBackStack() })
+            val charId = Uri.decode(
+                backStackEntryArg.arguments?.getString("charId").orEmpty()
+            )
+
+            JournalScreen(
+                charId = charId,
+                onBack = { navController.popBackStack() }
+            )
         }
 
         composable(Screen.UserSearch.route) {
-            UserSearchScreen(onBack = { navController.popBackStack() })
+            UserSearchScreen(
+                onBack = { navController.popBackStack() }
+            )
         }
 
         composable(Screen.FriendRequests.route) {
-            FriendRequestsScreen(onBack = { navController.popBackStack() })
+            FriendRequestsScreen(
+                onBack = { navController.popBackStack() }
+            )
         }
 
         composable(Screen.FriendsList.route) {
@@ -326,14 +410,62 @@ fun AppNavigation(navController: NavHostController) {
         }
 
         composable(Screen.FriendProfile.route) { backStackEntryArg ->
-            val friendUid = backStackEntryArg.arguments?.getString("friendUid").orEmpty()
+            val friendUid = Uri.decode(
+                backStackEntryArg.arguments?.getString("friendUid").orEmpty()
+            )
+
             SocialProfileScreen(
                 userUid = friendUid,
                 isMe = false,
                 onBack = { navController.popBackStack() },
                 onOpenChat = { uid, name ->
                     navController.navigate(Screen.PrivateChat.createRoute(uid, name))
+                },
+                onOpenPersonalRoom = { friendUidForRoom, characterId, characterName ->
+                    navController.navigate(
+                        Screen.FriendPersonalRoom.createRoute(
+                            friendUid = friendUidForRoom,
+                            characterId = characterId,
+                            characterName = characterName
+                        )
+                    )
                 }
+            )
+        }
+
+        composable(
+            route = Screen.FriendPersonalRoom.route,
+            arguments = listOf(
+                navArgument("friendUid") { type = NavType.StringType },
+                navArgument("characterId") { type = NavType.StringType },
+                navArgument("characterName") { type = NavType.StringType }
+            )
+        ) { backStackEntryArg ->
+            val friendUid = Uri.decode(
+                backStackEntryArg.arguments?.getString("friendUid").orEmpty()
+            )
+
+            val characterId = Uri.decode(
+                backStackEntryArg.arguments?.getString("characterId").orEmpty()
+            )
+
+            val characterName = Uri.decode(
+                backStackEntryArg.arguments?.getString("characterName").orEmpty()
+            )
+
+            val charId = when {
+                characterId.isNotBlank() && characterId.contains("_") -> characterId
+                characterName.isNotBlank() -> "${friendUid}_${characterName}"
+                else -> characterId
+            }
+
+            PersonalRoomScreen(
+                charId = charId,
+                characterName = characterName,
+                onBack = { navController.popBackStack() },
+                readOnly = true,
+                roomViewModel = personalRoomViewModel,
+                inventoryViewModel = inventoryViewModel
             )
         }
 
@@ -341,14 +473,16 @@ fun AppNavigation(navController: NavHostController) {
             GuildsScreen(
                 onBack = { navController.popBackStack() },
                 onOpenGuildDetails = { guildId ->
-                    navController.navigate("guild_details/$guildId")
+                    navController.navigate("guild_details/${Uri.encode(guildId)}")
                 },
                 viewModel = socialViewModel
             )
         }
 
         composable("guild_details/{guildId}") { backStackEntryArg ->
-            val guildId = backStackEntryArg.arguments?.getString("guildId").orEmpty()
+            val guildId = Uri.decode(
+                backStackEntryArg.arguments?.getString("guildId").orEmpty()
+            )
 
             GuildDetailsScreen(
                 guildId = guildId,
@@ -372,9 +506,12 @@ fun AppNavigation(navController: NavHostController) {
                 navArgument("friendName") { type = NavType.StringType }
             )
         ) { backStackEntryArg ->
-            val friendUid = backStackEntryArg.arguments?.getString("friendUid").orEmpty()
-            val friendNameEncoded = backStackEntryArg.arguments?.getString("friendName").orEmpty()
-            val friendName = Uri.decode(friendNameEncoded)
+            val friendUid = Uri.decode(
+                backStackEntryArg.arguments?.getString("friendUid").orEmpty()
+            )
+            val friendName = Uri.decode(
+                backStackEntryArg.arguments?.getString("friendName").orEmpty()
+            )
 
             PrivateChatScreen(
                 friendUid = friendUid,
@@ -384,7 +521,9 @@ fun AppNavigation(navController: NavHostController) {
         }
 
         composable(Screen.GuildBossBattle.route) { backStackEntryArg ->
-            val guildId = backStackEntryArg.arguments?.getString("guildId").orEmpty()
+            val guildId = Uri.decode(
+                backStackEntryArg.arguments?.getString("guildId").orEmpty()
+            )
 
             GuildBossBattleScreen(
                 guildId = guildId,

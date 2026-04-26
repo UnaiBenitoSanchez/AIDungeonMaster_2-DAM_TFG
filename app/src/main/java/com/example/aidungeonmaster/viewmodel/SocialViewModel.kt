@@ -5,37 +5,35 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.aidungeonmaster.data.model.AppUser
+import com.example.aidungeonmaster.data.model.Character
 import com.example.aidungeonmaster.data.model.FriendRequest
 import com.example.aidungeonmaster.data.model.FriendWithProfile
 import com.example.aidungeonmaster.data.model.Guild
+import com.example.aidungeonmaster.data.model.GuildBossAbility
+import com.example.aidungeonmaster.data.model.GuildBossParticipant
+import com.example.aidungeonmaster.data.model.GuildBossRoom
 import com.example.aidungeonmaster.data.model.GuildChatMessage
 import com.example.aidungeonmaster.data.model.GuildMemberSummary
+import com.example.aidungeonmaster.data.model.Item
 import com.example.aidungeonmaster.data.repository.GuildDetailsRepository
+import com.example.aidungeonmaster.data.repository.GuildRaidRepository
 import com.example.aidungeonmaster.data.repository.SocialRepository
 import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import com.example.aidungeonmaster.data.model.Character
-import com.example.aidungeonmaster.data.model.GuildBossParticipant
-import com.example.aidungeonmaster.data.model.GuildBossRoom
-import com.example.aidungeonmaster.data.repository.GuildRaidRepository
-
-import com.example.aidungeonmaster.data.model.GuildBossAbility
-import com.example.aidungeonmaster.data.model.Item
 
 class SocialViewModel : ViewModel() {
 
     private val repository = SocialRepository()
     private val guildDetailsRepository = GuildDetailsRepository()
+    private val guildRaidRepository = GuildRaidRepository()
 
     private var incomingRequestsListener: ListenerRegistration? = null
     private var friendsListener: ListenerRegistration? = null
     private var guildsListener: ListenerRegistration? = null
     private var guildChatListener: ListenerRegistration? = null
-
-    private val guildRaidRepository = GuildRaidRepository()
 
     private var guildBossRoomListener: ListenerRegistration? = null
     private var guildBossParticipantsListener: ListenerRegistration? = null
@@ -67,6 +65,9 @@ class SocialViewModel : ViewModel() {
 
     private val _profile = MutableStateFlow<AppUser?>(null)
     val profile = _profile.asStateFlow()
+
+    private val _profileCharacters = MutableStateFlow<List<Character>>(emptyList())
+    val profileCharacters = _profileCharacters.asStateFlow()
 
     private val _myGuilds = MutableStateFlow<List<Guild>>(emptyList())
     val myGuilds = _myGuilds.asStateFlow()
@@ -103,6 +104,11 @@ class SocialViewModel : ViewModel() {
 
     private val _guildBossConsumables = MutableStateFlow<List<Item>>(emptyList())
     val guildBossConsumables = _guildBossConsumables.asStateFlow()
+
+    // FIX NAVEGACIÓN: Flag para que GuildDetailsScreen no vuelva a redirigir al
+    // usuario a la batalla cuando acaba de pulsar "Volver" intencionalmente.
+    private val _userExplicitlyLeftBattle = MutableStateFlow(false)
+    val userExplicitlyLeftBattle = _userExplicitlyLeftBattle.asStateFlow()
 
     fun refreshBossConsumables() {
         val guildId = _selectedGuild.value?.id ?: return
@@ -201,6 +207,24 @@ class SocialViewModel : ViewModel() {
         }
     }
 
+    fun loadProfileCharacters(userUid: String) {
+        viewModelScope.launch {
+            if (userUid.isBlank()) {
+                _profileCharacters.value = emptyList()
+                return@launch
+            }
+
+            runCatching {
+                repository.getUserCharacters(userUid)
+            }.onSuccess { characters ->
+                _profileCharacters.value = characters
+            }.onFailure {
+                _profileCharacters.value = emptyList()
+                _message.value = it.message ?: "No se pudieron cargar los personajes"
+            }
+        }
+    }
+
     fun saveMyProfile(
         displayName: String,
         bio: String,
@@ -283,6 +307,12 @@ class SocialViewModel : ViewModel() {
     fun stopGuildsListener() {
         guildsListener?.remove()
         guildsListener = null
+    }
+
+    fun clearGuildSearch() {
+        _lastGuildQuery.value = ""
+        _guildSearchResults.value = emptyList()
+        _isSearching.value = false
     }
 
     fun searchGuilds(query: String) {
@@ -657,11 +687,6 @@ class SocialViewModel : ViewModel() {
         }
     }
 
-    // FIX NAVEGACIÓN: Flag para que GuildDetailsScreen no vuelva a redirigir al
-    // usuario a la batalla cuando acaba de pulsar "Volver" intencionalmente.
-    private val _userExplicitlyLeftBattle = MutableStateFlow(false)
-    val userExplicitlyLeftBattle = _userExplicitlyLeftBattle.asStateFlow()
-
     fun markUserLeftBattle() {
         _userExplicitlyLeftBattle.value = true
     }
@@ -745,7 +770,7 @@ class SocialViewModel : ViewModel() {
         stopFriendsListener()
         stopGuildsListener()
         stopGuildChatListener()
-        super.onCleared()
         stopGuildBossListeners()
+        super.onCleared()
     }
 }

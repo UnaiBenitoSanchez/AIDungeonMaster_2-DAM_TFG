@@ -2,6 +2,7 @@ package com.example.aidungeonmaster.ui.social
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -40,16 +41,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.aidungeonmaster.utils.ImageUtils
 import com.example.aidungeonmaster.viewmodel.SocialViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import androidx.compose.foundation.Image
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.platform.LocalContext
-import com.example.aidungeonmaster.utils.ImageUtils
 
 private data class ProfilePalette(val accent: String, val background: String)
 
@@ -68,9 +68,11 @@ fun SocialProfileScreen(
     isMe: Boolean,
     onBack: () -> Unit,
     onOpenChat: ((String, String) -> Unit)? = null,
+    onOpenPersonalRoom: ((String, String, String) -> Unit)? = null,
     viewModel: SocialViewModel = viewModel()
 ) {
     val profile by viewModel.profile.collectAsState()
+    val profileCharacters by viewModel.profileCharacters.collectAsState()
     val message by viewModel.message.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -83,6 +85,7 @@ fun SocialProfileScreen(
 
     LaunchedEffect(userUid) {
         viewModel.loadProfile(userUid)
+        viewModel.loadProfileCharacters(userUid)
     }
 
     LaunchedEffect(profile?.uid) {
@@ -119,6 +122,7 @@ fun SocialProfileScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         val currentProfile = profile
+
         if (currentProfile == null) {
             Column(
                 modifier = Modifier
@@ -159,8 +163,13 @@ fun SocialProfileScreen(
                         val profileBitmap = remember(currentProfile.photoUrl) {
                             runCatching {
                                 if (currentProfile.photoUrl.startsWith("data:image")) {
-                                    val base64Part = currentProfile.photoUrl.substringAfter("base64,", "")
-                                    if (base64Part.isNotBlank()) ImageUtils.base64ToBitmap(base64Part) else null
+                                    val base64Part =
+                                        currentProfile.photoUrl.substringAfter("base64,", "")
+                                    if (base64Part.isNotBlank()) {
+                                        ImageUtils.base64ToBitmap(base64Part)
+                                    } else {
+                                        null
+                                    }
                                 } else {
                                     null
                                 }
@@ -197,6 +206,7 @@ fun SocialProfileScreen(
                                 color = Color.White,
                                 style = MaterialTheme.typography.titleLarge
                             )
+
                             Text(
                                 text = "@${currentProfile.username}",
                                 color = parseColor(accentColor)
@@ -223,6 +233,7 @@ fun SocialProfileScreen(
                     label = { Text("Nombre visible") },
                     modifier = Modifier.fillMaxWidth()
                 )
+
                 OutlinedTextField(
                     value = bio,
                     onValueChange = { bio = it },
@@ -239,11 +250,13 @@ fun SocialProfileScreen(
                 }
 
                 Text("Colores del perfil", style = MaterialTheme.typography.titleMedium)
+
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     profilePalettes.forEach { palette ->
                         ProfilePaletteChip(
                             palette = palette,
-                            selected = palette.accent == accentColor && palette.background == backgroundColor,
+                            selected = palette.accent == accentColor &&
+                                    palette.background == backgroundColor,
                             onClick = {
                                 accentColor = palette.accent
                                 backgroundColor = palette.background
@@ -262,10 +275,61 @@ fun SocialProfileScreen(
                 }
             } else {
                 Button(
-                    onClick = { onOpenChat?.invoke(currentProfile.uid, currentProfile.displayName) },
+                    onClick = {
+                        onOpenChat?.invoke(currentProfile.uid, currentProfile.displayName)
+                    },
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text("Abrir chat privado")
+                }
+
+                Text(
+                    text = "Salas de personajes",
+                    style = MaterialTheme.typography.titleMedium
+                )
+
+                if (profileCharacters.isEmpty()) {
+                    Text(
+                        text = "Este amigo todavía no tiene personajes visibles.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        profileCharacters.forEach { character ->
+                            Card(
+                                shape = RoundedCornerShape(16.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(14.dp),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text(
+                                        text = character.name,
+                                        style = MaterialTheme.typography.titleMedium
+                                    )
+
+                                    Text(
+                                        text = "${character.race} · ${character.characterClass} · Nivel ${character.level}",
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+
+                                    Button(
+                                        onClick = {
+                                            onOpenPersonalRoom?.invoke(
+                                                currentProfile.uid,
+                                                character.id,
+                                                character.name
+                                            )
+                                        },
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text("Visitar sala")
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -282,17 +346,22 @@ private fun ProfilePaletteChip(
         onClick = onClick,
         modifier = Modifier.height(48.dp)
     ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Column(
                 modifier = Modifier
                     .size(18.dp)
                     .background(parseColor(palette.accent), CircleShape)
             ) {}
+
             Column(
                 modifier = Modifier
                     .size(18.dp)
                     .background(parseColor(palette.background), CircleShape)
             ) {}
+
             Text(if (selected) "Seleccionado" else "Aplicar")
         }
     }
@@ -309,9 +378,12 @@ fun PresenceIndicator(
         "Última vez: " + when {
             lastSeen == null || lastSeen <= 0L -> "sin datos"
             System.currentTimeMillis() - lastSeen < 60_000 -> "hace un momento"
-            System.currentTimeMillis() - lastSeen < 3_600_000 -> "hace ${(System.currentTimeMillis() - lastSeen) / 60_000} min"
-            System.currentTimeMillis() - lastSeen < 86_400_000 -> "hace ${(System.currentTimeMillis() - lastSeen) / 3_600_000} h"
-            else -> "hace ${(System.currentTimeMillis() - lastSeen) / 86_400_000} d"
+            System.currentTimeMillis() - lastSeen < 3_600_000 ->
+                "hace ${(System.currentTimeMillis() - lastSeen) / 60_000} min"
+            System.currentTimeMillis() - lastSeen < 86_400_000 ->
+                "hace ${(System.currentTimeMillis() - lastSeen) / 3_600_000} h"
+            else ->
+                "hace ${(System.currentTimeMillis() - lastSeen) / 86_400_000} d"
         }
     }
 
@@ -322,7 +394,9 @@ fun PresenceIndicator(
                 .clip(CircleShape)
                 .background(if (isOnline) Color(0xFF4CAF50) else Color.Gray)
         )
+
         Spacer(Modifier.width(8.dp))
+
         Text(
             text = text,
             color = if (isOnline) Color(0xFF7CFC00) else Color.LightGray
@@ -330,8 +404,9 @@ fun PresenceIndicator(
     }
 }
 
-private fun parseColor(hex: String): Color = runCatching { Color(android.graphics.Color.parseColor(hex)) }
-    .getOrElse { Color(0xFF1E1E1E) }
+private fun parseColor(hex: String): Color =
+    runCatching { Color(android.graphics.Color.parseColor(hex)) }
+        .getOrElse { Color(0xFF1E1E1E) }
 
 private fun formatLastSeen(timestamp: Long): String {
     if (timestamp <= 0L) return "sin datos"
