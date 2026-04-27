@@ -21,6 +21,7 @@ import com.example.aidungeonmaster.ui.achievements.AchievementsScreen
 import com.example.aidungeonmaster.ui.game.ARMapScreen
 import com.example.aidungeonmaster.ui.game.BestiaryScreen
 import com.example.aidungeonmaster.ui.game.CombatScreen
+import com.example.aidungeonmaster.ui.game.DeathSummaryScreen
 import com.example.aidungeonmaster.ui.game.GamePlayScreen
 import com.example.aidungeonmaster.ui.game.GameSetupScreen
 import com.example.aidungeonmaster.ui.game.InventoryScreen
@@ -105,6 +106,11 @@ sealed class Screen(val route: String) {
     object LocationsGallery : Screen("locations_gallery/{charId}/{characterName}") {
         fun createRoute(charId: String, characterName: String) =
             "locations_gallery/${Uri.encode(charId)}/${Uri.encode(characterName)}"
+    }
+
+    object DeathSummary : Screen("death_summary/{xpGained}/{coinsGained}") {
+        fun createRoute(xpGained: Int, coinsGained: Int) =
+            "death_summary/$xpGained/$coinsGained"
     }
 
     object Journal : Screen("journal/{charId}") {
@@ -322,6 +328,7 @@ fun AppNavigation(navController: NavHostController) {
                                     .removePrefix("${currentUserId}_")
                                     .substringBefore("_")
 
+                                // Borrar personaje en background y navegar al resumen de muerte
                                 scope.launch {
                                     try {
                                         deletionRepository.deleteEverywhere(
@@ -334,18 +341,51 @@ fun AppNavigation(navController: NavHostController) {
                                             "Error borrando personaje al morir: ${e.message}",
                                             e
                                         )
-                                    } finally {
-                                        AdventureMusicEngine.stopNow()
-
-                                        navController.navigate(Screen.Home.route) {
-                                            popUpTo(Screen.Home.route) { inclusive = false }
-                                            launchSingleTop = true
-                                        }
                                     }
+                                }
+
+                                AdventureMusicEngine.stopNow()
+
+                                navController.navigate(
+                                    Screen.DeathSummary.createRoute(
+                                        xpGained   = xpGained,
+                                        coinsGained = 0
+                                    )
+                                ) {
+                                    // Limpiar el back stack de la aventura completa
+                                    popUpTo(Screen.Home.route) { inclusive = false }
+                                    launchSingleTop = true
                                 }
                             }
 
                             else -> Unit
+                        }
+                    }
+                )
+            }
+
+            // ── PANTALLA DE RESUMEN DE MUERTE ─────────────────────────────
+            composable(
+                route = Screen.DeathSummary.route,
+                arguments = listOf(
+                    navArgument("xpGained")    { type = NavType.IntType; defaultValue = 0 },
+                    navArgument("coinsGained") { type = NavType.IntType; defaultValue = 0 }
+                )
+            ) { backStackEntry ->
+                val xpGained    = backStackEntry.arguments?.getInt("xpGained")    ?: 0
+                val coinsGained = backStackEntry.arguments?.getInt("coinsGained") ?: 0
+
+                val character by inventoryViewModel.character.collectAsState()
+
+                DeathSummaryScreen(
+                    character    = character,
+                    xpGained     = xpGained,
+                    coinsGained  = coinsGained,
+                    itemsFound   = emptyList(), // los ítems de sesión no viajan por ruta; se muestran los del inventario final
+                    onGoHome     = {
+                        navController.navigate(Screen.Home.route) {
+                            popUpTo(Screen.Home.route) { inclusive = false }
+                            launchSingleTop = true
                         }
                     }
                 )

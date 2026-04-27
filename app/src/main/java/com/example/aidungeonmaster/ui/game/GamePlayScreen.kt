@@ -51,6 +51,13 @@ import kotlin.math.roundToInt
 
 import kotlinx.coroutines.delay
 
+import androidx.compose.animation.core.*
+import androidx.compose.animation.*
+import androidx.compose.foundation.border
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import com.example.aidungeonmaster.data.model.Character
+
 @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -77,9 +84,7 @@ fun GamePlayScreen(
     val hpMax     = characterState?.hpMax     ?: 20
 
     var customAction by remember { mutableStateOf("") }
-    var isDeletingDeadCharacter by remember { mutableStateOf(false) }
     var deathDeleteStarted by remember { mutableStateOf(false) }
-    var deathDeleteError by remember { mutableStateOf<String?>(null) }
 
     val gameId = "${userId}_${characterName}_${theme}".replace(" ", "_")
     val charId = "${userId}_${characterName}"
@@ -89,43 +94,30 @@ fun GamePlayScreen(
 
     var levelUpDialogLevel by remember { mutableStateOf<Int?>(null) }
 
+    var sessionItemsFound    by remember { mutableStateOf<List<Item>>(emptyList()) }
+    var sessionCoinsGained   by remember { mutableStateOf(0) }
+    var sessionXpGained      by remember { mutableStateOf(0) }
+    var sessionDamageTaken   by remember { mutableStateOf(0) }
+    var sessionHealingRecv   by remember { mutableStateOf(0) }
+    var sessionMessagesCount by remember { mutableStateOf(0) }
+
     // ── MÚSICA ───────────────────────────────────────────────────────────────
     LifecycleResumeEffect(theme) {
         AdventureMusicEngine.enterGameplay(theme)
-
-        onPauseOrDispose {
-            // No parar aquí.  a
-            // El stop total lo controla la navegación al salir del flujo de aventura.
-        }
+        onPauseOrDispose { }
     }
-
-    // ── DETECCIÓN DE SUPERMERCADOS EN TIEMPO REAL ─────────────────────────
-    // Se activa mientras el jugador está en la pantalla de juego y se detiene
-    // automáticamente al salir (onDispose). El Worker del background sigue
-    // funcionando cuando la app está cerrada.
-//    val context = LocalContext.current
-//
-//    DisposableEffect(Unit) {
-//        val proximityManager = SupermarketProximityManager(context)
-//        proximityManager.start()
-//        onDispose { proximityManager.stop() }
-//    }
 
     // ── CARGA INICIAL ─────────────────────────────────────────────────────────
     LaunchedEffect(charId) {
         inventoryViewModel.loadInventory(charId)
         journalViewModel.loadJournal(charId)
-
         viewModel.worldMapViewModel = mapViewModel
-
         mapViewModel.onLocationDiscoveredForAchievements = { discoveredCharId, locationCount ->
             achievementViewModel.onLocationDiscovered(discoveredCharId, locationCount)
         }
-
         mapViewModel.loadMap(charId)
         viewModel.startStory(userId, characterName, theme)
         achievementViewModel.loadForCharacter(charId)
-
         journalViewModel.addOrMergeSimpleEntry(
             charId = charId,
             title = "Comienzo de la aventura",
@@ -145,6 +137,7 @@ fun GamePlayScreen(
 
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
+            sessionMessagesCount = messages.size
             achievementViewModel.onMessageSent(charId)
         }
     }
@@ -174,9 +167,9 @@ fun GamePlayScreen(
             val current = inventoryViewModel.character.value
 
             if (step.damageTaken > 0 && current != null) {
+                sessionDamageTaken += step.damageTaken
                 val newHp = (current.hpCurrent - step.damageTaken).coerceAtLeast(0)
                 inventoryViewModel.updateHp(charId, newHp)
-
                 journalViewModel.addEntry(
                     charId = charId,
                     title = "Has recibido daño",
@@ -189,9 +182,9 @@ fun GamePlayScreen(
             }
 
             if (step.healingReceived > 0 && current != null) {
+                sessionHealingRecv += step.healingReceived
                 val newHp = (current.hpCurrent + step.healingReceived).coerceAtMost(current.hpMax)
                 inventoryViewModel.updateHp(charId, newHp)
-
                 journalViewModel.addEntry(
                     charId = charId,
                     title = "Has recuperado salud",
@@ -204,8 +197,8 @@ fun GamePlayScreen(
             }
 
             step.itemFound?.let { item ->
+                sessionItemsFound = sessionItemsFound + item
                 inventoryViewModel.addItemToInventory(charId, item)
-
                 journalViewModel.addEntry(
                     charId = charId,
                     title = "Has encontrado un objeto",
@@ -226,9 +219,8 @@ fun GamePlayScreen(
             if (step.coinsFound > 0) {
                 val currentLocationState = mapState.locationStates[mapState.currentLocationId]
                 val adjustedCoins = adjustCoinsFoundByWorld(step.coinsFound, currentLocationState)
-
+                sessionCoinsGained += adjustedCoins
                 inventoryViewModel.addCoins(charId, adjustedCoins)
-
                 journalViewModel.addEntry(
                     charId = charId,
                     title = "Has encontrado monedas",
@@ -245,6 +237,7 @@ fun GamePlayScreen(
     LaunchedEffect(Unit) {
         viewModel.pendingXp.collect { xp ->
             if (xp > 0) {
+                sessionXpGained += xp
                 inventoryViewModel.addXp(charId, xp)
                 viewModel.consumePendingXp()
             }
@@ -284,31 +277,26 @@ fun GamePlayScreen(
 
     val isDead = characterState != null && hpCurrent <= 0
 
+    // ── MUERTE FUERA DE COMBATE: navegar a pantalla de resumen ───────────────
     LaunchedEffect(isDead) {
         if (isDead && !deathDeleteStarted) {
             deathDeleteStarted = true
-            isDeletingDeadCharacter = true
-            deathDeleteError = null
-
+            // Borrar el personaje
             viewModel.deleteCurrentCharacterAfterDeath(
-                onDeleted = {
-                    isDeletingDeadCharacter = false
-                },
+                onDeleted = {},
                 onError = { error ->
                     Log.e("GamePlayScreen", "Error borrando personaje muerto: $error")
-                    isDeletingDeadCharacter = false
-                    deathDeleteError = error
                 }
             )
-
-            delay(1500)
-
             AdventureMusicEngine.stopNow()
-
-            navController.navigate(Screen.Home.route) {
-                popUpTo(Screen.Home.route) {
-                    inclusive = false
-                }
+            // Navegar a la pantalla de resumen de muerte
+            navController.navigate(
+                Screen.DeathSummary.createRoute(
+                    xpGained    = sessionXpGained,
+                    coinsGained = sessionCoinsGained
+                )
+            ) {
+                popUpTo(Screen.Home.route) { inclusive = false }
                 launchSingleTop = true
             }
         }
@@ -330,30 +318,16 @@ fun GamePlayScreen(
                                 MedievalTitle(text = "Aventura: $theme", modifier = Modifier.padding(vertical = 4.dp))
                             }
                             IconButton(onClick = { navController.navigate("bestiary/$charId") }) {
-                                Icon(
-                                    Icons.Default.AutoStories,
-                                    contentDescription = "Bestiario",
-                                    tint = Color(0xFFFFD700),
-                                    modifier = Modifier.size(30.dp)
-                                )
+                                Icon(Icons.Default.AutoStories, contentDescription = "Bestiario",
+                                    tint = Color(0xFFFFD700), modifier = Modifier.size(30.dp))
                             }
-
                             IconButton(onClick = { navController.navigate(Screen.Journal.createRoute(charId)) }) {
-                                Icon(
-                                    Icons.Default.MenuBook,
-                                    contentDescription = "Diario",
-                                    tint = Color(0xFFFFD700),
-                                    modifier = Modifier.size(30.dp)
-                                )
+                                Icon(Icons.Default.MenuBook, contentDescription = "Diario",
+                                    tint = Color(0xFFFFD700), modifier = Modifier.size(30.dp))
                             }
-
                             IconButton(onClick = { navController.navigate("inventory/$charId") }) {
-                                Icon(
-                                    Icons.Default.Inventory,
-                                    contentDescription = "Mochila",
-                                    tint = Color(0xFFFFD700),
-                                    modifier = Modifier.size(30.dp)
-                                )
+                                Icon(Icons.Default.Inventory, contentDescription = "Mochila",
+                                    tint = Color(0xFFFFD700), modifier = Modifier.size(30.dp))
                             }
                         }
                         PlayerStatsHeader(hpCurrent = hpCurrent, hpMax = hpMax)
@@ -401,9 +375,7 @@ fun GamePlayScreen(
                                     onClick = {
                                         if (customAction.isNotBlank()) {
                                             val actionText = customAction.trim()
-
                                             viewModel.sendCustomAction(actionText)
-
                                             journalViewModel.addEntry(
                                                 charId = charId,
                                                 title = "Has tomado una decisión",
@@ -412,7 +384,6 @@ fun GamePlayScreen(
                                                 type = "story",
                                                 tags = listOf("decision", "accion")
                                             )
-
                                             customAction = ""
                                         }
                                     },
@@ -446,13 +417,12 @@ fun GamePlayScreen(
             }
 
             // ── BOTÓN FLOTANTE DEL MAPA ──────────────────────────────────────
-            // Posicionado sobre la barra inferior, a la izquierda.
             WorldMapFab(
                 mapViewModel = mapViewModel,
                 modifier     = Modifier
                     .align(Alignment.BottomStart)
                     .padding(start = 16.dp, bottom = 110.dp),
-                onOpenAR     = {                                          // ← NUEVO
+                onOpenAR     = {
                     navController.navigate(Screen.ARMap.createRoute(charId))
                 }
             )
@@ -464,14 +434,6 @@ fun GamePlayScreen(
                     AdventureMusicEngine.stopNow()
                     navController.navigate("combat/$charId")
                 }
-            }
-
-            // ── PANTALLA DE MUERTE ───────────────────────────────────────────
-            if (isDead) {
-                DeathScreen(
-                    isDeleting = isDeletingDeadCharacter,
-                    errorMessage = deathDeleteError
-                )
             }
 
             Column(modifier = Modifier.align(Alignment.TopCenter)) {
@@ -489,74 +451,6 @@ fun GamePlayScreen(
             )
         }
     } // fin MedievalBackground
-}
-
-// ── PANTALLA DE MUERTE ────────────────────────────────────────────────────────
-
-@Composable
-private fun DeathScreen(
-    isDeleting: Boolean,
-    errorMessage: String?
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.92f)),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(22.dp),
-            modifier = Modifier.padding(32.dp)
-        ) {
-            Text("💀", fontSize = 80.sp)
-
-            Text(
-                text = "Has muerto",
-                color = Color.Red,
-                fontSize = 30.sp,
-                fontWeight = FontWeight.Black,
-                fontFamily = FontFamily.Serif,
-                textAlign = TextAlign.Center
-            )
-
-            Text(
-                text = "Tu aventura ha llegado a su fin.\nEl personaje y sus registros se eliminarán automáticamente.",
-                color = Color.LightGray,
-                fontSize = 15.sp,
-                textAlign = TextAlign.Center,
-                lineHeight = 22.sp
-            )
-
-            if (isDeleting) {
-                CircularProgressIndicator(
-                    color = Color.Red,
-                    modifier = Modifier.size(34.dp)
-                )
-
-                Text(
-                    text = "Borrando personaje...",
-                    color = Color.LightGray,
-                    fontSize = 14.sp
-                )
-            } else {
-                Text(
-                    text = "Volviendo al inicio...",
-                    color = Color.LightGray,
-                    fontSize = 14.sp
-                )
-            }
-
-            if (!errorMessage.isNullOrBlank()) {
-                Text(
-                    text = errorMessage,
-                    color = Color(0xFFFF8A80),
-                    fontSize = 13.sp,
-                    textAlign = TextAlign.Center
-                )
-            }
-        }
-    }
 }
 
 // ── BURBUJAS DE CHAT ──────────────────────────────────────────────────────────
@@ -620,16 +514,11 @@ private fun adjustCoinsFoundByWorld(
     state: com.example.aidungeonmaster.data.model.LocationLifeState?
 ): Int {
     if (state == null) return baseCoins
-
     var multiplier = 1f
-
     if (state.prosperity >= 70) multiplier += 0.15f
     if (state.prosperity <= 20) multiplier -= 0.10f
-
     if (state.danger >= 70) multiplier += 0.20f
     else if (state.danger >= 50) multiplier += 0.10f
-
     if (state.corruption >= 60) multiplier += 0.10f
-
     return (baseCoins * multiplier).roundToInt().coerceAtLeast(1)
 }
