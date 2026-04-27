@@ -78,20 +78,41 @@ fun DragonTutorialOverlay(
         modifier = Modifier.fillMaxSize()
     ) {
         val density = LocalDensity.current
+
         val screenWidthPx = with(density) { maxWidth.toPx() }
         val screenHeightPx = with(density) { maxHeight.toPx() }
 
-        val hasTarget = rawTarget != null && rawTarget.width > 0f && rawTarget.height > 0f
+        fun safeCoerce(value: Float, min: Float, max: Float): Float {
+            return if (max < min) min else value.coerceIn(min, max)
+        }
 
-        val fallbackRect = Rect(
-            left = screenWidthPx * 0.35f,
-            top = screenHeightPx * 0.25f,
-            right = screenWidthPx * 0.65f,
-            bottom = screenHeightPx * 0.35f
-        )
+        val isWelcomeStep = step.targetKey == "welcome"
+        val hasTarget = !isWelcomeStep && rawTarget != null && rawTarget.width > 0f && rawTarget.height > 0f
+
+        val fallbackRect = if (isWelcomeStep) {
+            Rect(
+                left = screenWidthPx * 0.25f,
+                top = screenHeightPx * 0.42f,
+                right = screenWidthPx * 0.75f,
+                bottom = screenHeightPx * 0.58f
+            )
+        } else {
+            Rect(
+                left = screenWidthPx * 0.35f,
+                top = screenHeightPx * 0.25f,
+                right = screenWidthPx * 0.65f,
+                bottom = screenHeightPx * 0.35f
+            )
+        }
 
         val baseTargetRect = rawTarget ?: fallbackRect
 
+        /*
+         * Ajuste vertical del foco.
+         * Sube o baja el recuadro amarillo.
+         * Si lo ves un poco bajo: sube a 12.dp o 14.dp.
+         * Si lo ves alto: baja a 6.dp.
+         */
         val correctionYPx = with(density) { 30.dp.toPx() }
 
         val targetRect = Rect(
@@ -101,72 +122,139 @@ fun DragonTutorialOverlay(
             bottom = (baseTargetRect.bottom - correctionYPx).coerceAtLeast(0f)
         )
 
-        val highlightPaddingPx = with(density) { 6.dp.toPx() }
-        val screenMarginPx = with(density) { 14.dp.toPx() }
+        /*
+         * Tamaño y margen del recuadro amarillo.
+         */
+        val highlightPaddingPx = with(density) { 4.dp.toPx() }
+        val highlightRadiusPx = with(density) { 14.dp.toPx() }
+        val highlightStrokePx = with(density) { 2.5.dp.toPx() }
+
+        /*
+         * Tamaño de la mascota.
+         * En móviles normales se verá más grande, pero sin salirse.
+         */
+        val mascotSizeDp = when {
+            maxWidth < 360.dp -> 150.dp
+            maxWidth < 420.dp -> 180.dp
+            else -> 200.dp
+        }
+
+        val mascotSizePx = with(density) { mascotSizeDp.toPx() }
+
+        /*
+         * Margen visual real. Antes estaba en 12.dp y para imágenes grandes
+         * quedaba demasiado pegada al borde. Con 34.dp no se corta.
+         */
+        val screenMarginPx = with(density) { 34.dp.toPx() }
+        val gapPx = with(density) { 24.dp.toPx() }
 
         val isSocialStep = step.targetKey.startsWith("social_")
-        val isTargetUpperHalf = targetRect.center.y < screenHeightPx / 2f
         val isTargetOnLeft = targetRect.center.x < screenWidthPx * 0.5f
-        val isTargetNearBottom = targetRect.center.y > screenHeightPx * 0.66f
+        val isTargetOnRight = targetRect.center.x >= screenWidthPx * 0.5f
+        val isTargetUpperHalf = targetRect.center.y < screenHeightPx * 0.5f
+        val isTargetNearBottom = targetRect.center.y > screenHeightPx * 0.68f
+        val isTopBarTarget = targetRect.top < with(density) { 90.dp.toPx() }
 
         val cardAlignment = when {
+            isWelcomeStep -> Alignment.TopCenter
             isSocialStep -> Alignment.TopCenter
             isTargetUpperHalf -> Alignment.BottomCenter
             else -> Alignment.TopCenter
         }
 
         val cardPaddingTop = when {
-            isSocialStep -> 18.dp
+            isWelcomeStep -> 48.dp
+            isSocialStep -> 14.dp
             isTargetUpperHalf -> 0.dp
-            else -> 70.dp
+            else -> 52.dp
         }
 
         val cardPaddingBottom = when {
             isSocialStep -> 0.dp
-            isTargetUpperHalf -> 32.dp
+            isTargetUpperHalf -> 24.dp
             else -> 0.dp
         }
 
-        val mascotSizeDp = 220.dp
-        val mascotSizePx = with(density) { mascotSizeDp.toPx() }
-        val gapPx = with(density) { 22.dp.toPx() }
+        val cardApproxHeightPx = with(density) { 210.dp.toPx() }
+        val cardTopPx = when (cardAlignment) {
+            Alignment.TopCenter -> with(density) { cardPaddingTop.toPx() }
+            else -> screenHeightPx - cardApproxHeightPx - with(density) { cardPaddingBottom.toPx() }
+        }
+        val cardBottomPx = cardTopPx + cardApproxHeightPx
 
-        val forceAboveTarget = step.targetKey == "btn_social" ||
-                step.targetKey == "btn_create_character" ||
-                isSocialStep ||
-                isTargetNearBottom
+        /*
+         * X de la mascota.
+         *
+         * Cambio importante:
+         * - Si el objetivo está a la derecha, NO la pegamos al objetivo.
+         *   La mandamos a una zona segura izquierda con margen amplio.
+         * - Si el objetivo está a la izquierda, la mandamos a una zona segura derecha.
+         */
+        val preferredMascotX = when {
+            step.targetKey == "welcome" -> {
+                (screenWidthPx - mascotSizePx) / 2f
+            }
 
-        val mascotX = when {
             step.targetKey == "btn_social" -> {
-                // Botón abajo izquierda: dragón a la derecha del botón.
-                targetRect.right + gapPx
+                screenWidthPx - mascotSizePx - screenMarginPx
             }
 
             step.targetKey == "btn_create_character" -> {
-                // Botón abajo derecha: dragón a la izquierda del botón.
-                targetRect.left - mascotSizePx - gapPx
+                screenMarginPx
+            }
+
+            step.targetKey == "btn_characters_title" -> {
+                screenWidthPx - mascotSizePx - screenMarginPx
             }
 
             isSocialStep -> {
-                // Opciones del panel social: dragón a la derecha si puede.
-                targetRect.right + gapPx
+                screenWidthPx - mascotSizePx - screenMarginPx
             }
 
-            isTargetOnLeft -> {
-                targetRect.right + gapPx
+            isTargetOnRight -> {
+                screenMarginPx
             }
 
             else -> {
-                targetRect.left - mascotSizePx - gapPx
+                screenWidthPx - mascotSizePx - screenMarginPx
             }
-        }.coerceIn(
-            screenMarginPx,
-            screenWidthPx - mascotSizePx - screenMarginPx
+        }
+
+        val mascotX = safeCoerce(
+            value = preferredMascotX,
+            min = screenMarginPx,
+            max = screenWidthPx - mascotSizePx - screenMarginPx
         )
 
-        val mascotY = when {
-            forceAboveTarget -> {
+        /*
+         * Y de la mascota.
+         *
+         * Si el objetivo está en la barra superior, la bajamos debajo de la barra.
+         * Si está abajo, la subimos.
+         */
+        val preferredMascotY = when {
+            step.targetKey == "welcome" -> {
+                screenHeightPx * 0.44f
+            }
+
+            step.targetKey == "btn_social" -> {
                 targetRect.top - mascotSizePx - gapPx
+            }
+
+            step.targetKey == "btn_create_character" -> {
+                targetRect.top - mascotSizePx - gapPx
+            }
+
+            isSocialStep -> {
+                targetRect.top - mascotSizePx - gapPx
+            }
+
+            isTargetNearBottom -> {
+                targetRect.top - mascotSizePx - gapPx
+            }
+
+            isTopBarTarget -> {
+                targetRect.bottom + gapPx
             }
 
             isTargetUpperHalf -> {
@@ -176,12 +264,50 @@ fun DragonTutorialOverlay(
             else -> {
                 targetRect.top - mascotSizePx - gapPx
             }
-        }.coerceIn(
-            screenMarginPx + with(density) { 70.dp.toPx() },
-            screenHeightPx - mascotSizePx - screenMarginPx
-        )
+        }
 
-        val mirrorDragon = isTargetOnLeft
+        val minMascotYPx = when (cardAlignment) {
+            Alignment.TopCenter -> cardBottomPx + with(density) { 8.dp.toPx() }
+            else -> screenMarginPx + with(density) { 52.dp.toPx() }
+        }
+
+        val maxMascotYPx = when (cardAlignment) {
+            Alignment.BottomCenter -> cardTopPx - mascotSizePx - with(density) { 8.dp.toPx() }
+            else -> screenHeightPx - mascotSizePx - screenMarginPx
+        }
+
+        val fallbackMascotY = when {
+            isTargetUpperHalf -> targetRect.bottom + gapPx
+            else -> targetRect.top - mascotSizePx - gapPx
+        }
+
+        val mascotY = if (maxMascotYPx < minMascotYPx) {
+            safeCoerce(
+                value = fallbackMascotY,
+                min = screenMarginPx + with(density) { 52.dp.toPx() },
+                max = screenHeightPx - mascotSizePx - screenMarginPx
+            )
+        } else {
+            safeCoerce(
+                value = preferredMascotY,
+                min = minMascotYPx,
+                max = maxMascotYPx
+            )
+        }
+
+        /*
+         * Espejo:
+         * Si el objetivo está a la derecha, se invierte.
+         * Si está a la izquierda, se queda normal.
+         */
+        val mirrorMascot = when {
+            step.targetKey == "welcome" -> false
+            step.targetKey == "btn_social" -> false
+            step.targetKey == "btn_create_character" -> true
+            step.targetKey == "btn_characters_title" -> false
+            isSocialStep -> false
+            else -> isTargetOnRight
+        }
 
         Canvas(
             modifier = Modifier
@@ -190,14 +316,14 @@ fun DragonTutorialOverlay(
                     compositingStrategy = CompositingStrategy.Offscreen
                 }
         ) {
-            drawRect(Color.Black.copy(alpha = 0.46f))
+            drawRect(Color.Black.copy(alpha = 0.42f))
 
             if (hasTarget) {
                 val left = targetRect.left - highlightPaddingPx
                 val top = targetRect.top - highlightPaddingPx
                 val width = targetRect.width + highlightPaddingPx * 2f
                 val height = targetRect.height + highlightPaddingPx * 2f
-                val radius = CornerRadius(22.dp.toPx(), 22.dp.toPx())
+                val radius = CornerRadius(highlightRadiusPx, highlightRadiusPx)
 
                 drawRoundRect(
                     color = Color.Transparent,
@@ -208,7 +334,7 @@ fun DragonTutorialOverlay(
                 )
 
                 drawRoundRect(
-                    color = Color(0x22FFD54F),
+                    color = Color(0x1CFFD54F),
                     topLeft = Offset(left, top),
                     size = Size(width, height),
                     cornerRadius = radius
@@ -219,7 +345,7 @@ fun DragonTutorialOverlay(
                     topLeft = Offset(left, top),
                     size = Size(width, height),
                     cornerRadius = radius,
-                    style = Stroke(width = 4.dp.toPx())
+                    style = Stroke(width = highlightStrokePx)
                 )
             }
         }
@@ -230,7 +356,7 @@ fun DragonTutorialOverlay(
             modifier = Modifier
                 .size(mascotSizeDp)
                 .graphicsLayer {
-                    scaleX = if (mirrorDragon) -1f else 1f
+                    scaleX = if (mirrorMascot) -1f else 1f
                 }
                 .offset {
                     IntOffset(
@@ -250,13 +376,13 @@ fun DragonTutorialOverlay(
                     top = cardPaddingTop,
                     bottom = cardPaddingBottom
                 ),
-            shape = RoundedCornerShape(24.dp),
+            shape = RoundedCornerShape(22.dp),
             color = Color(0xFF2A120B).copy(alpha = 0.97f),
             shadowElevation = 10.dp
         ) {
             Column(
                 modifier = Modifier.padding(18.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
                     text = "Tutorial ${safeIndex + 1}/${steps.size}",
@@ -308,7 +434,13 @@ fun DragonTutorialOverlay(
                                 contentColor = Color.Black
                             )
                         ) {
-                            Text(if (safeIndex == steps.lastIndex) "Entendido" else "Siguiente")
+                            Text(
+                                if (safeIndex == steps.lastIndex) {
+                                    "Entendido"
+                                } else {
+                                    "Siguiente"
+                                }
+                            )
                         }
                     }
                 }

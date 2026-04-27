@@ -119,6 +119,15 @@ fun HomeScreen(
         buildList {
             add(
                 TutorialStep(
+                    targetKey = "welcome",
+                    title = "¡Bienvenido a AI Dungeon Master!",
+                    description = "Soy Enzo, tu guía de aventura. Te enseñaré rápidamente las zonas principales de la app para que puedas empezar sin perderte.",
+                    mascotRes = R.drawable.dragon_idle
+                )
+            )
+
+            add(
+                TutorialStep(
                     targetKey = "btn_characters_title",
                     title = "Tus personajes",
                     description = "Esta es la pantalla principal. Aquí aparecen todos tus héroes creados y puedes continuar sus aventuras.",
@@ -491,27 +500,6 @@ fun HomeScreen(
             lockForTutorial = showTutorial && currentTargetKey.startsWith("social_")
         )
     }
-
-    DragonTutorialOverlay(
-        visible = showTutorial,
-        steps = tutorialSteps,
-        currentStepIndex = tutorialStepIndex,
-        targets = tutorialTargets,
-        onNext = {
-            if (tutorialStepIndex < tutorialSteps.lastIndex) {
-                tutorialStepIndex++
-            } else {
-                finishTutorial()
-            }
-        },
-        onBack = {
-            if (tutorialStepIndex > 0) {
-                tutorialStepIndex--
-            }
-        },
-        onFinish = { finishTutorial() },
-        onSkip = { finishTutorial() }
-    )
 
     if (showDialog) {
         CreateCharacterDialog(
