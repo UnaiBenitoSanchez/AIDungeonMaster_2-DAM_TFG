@@ -88,6 +88,7 @@ import java.util.concurrent.TimeUnit
 import androidx.compose.material.icons.filled.Description
 
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.filled.HelpOutline
 import com.example.aidungeonmaster.ui.social.NotificationBadge
 import com.example.aidungeonmaster.viewmodel.SocialViewModel
 
@@ -349,6 +350,23 @@ fun HomeScreen(
                         )
                     },
                     actions = {
+                        // Botón para relanzar el tutorial
+                        IconButton(
+                            onClick = {
+                                tutorialPrefs.edit()
+                                    .putBoolean("home_tutorial_completed", false)
+                                    .apply()
+                                tutorialStepIndex = 0
+                                showTutorial = true
+                            }
+                        ) {
+                            Icon(
+                                Icons.Default.HelpOutline,
+                                contentDescription = "Ver tutorial",
+                                tint = Color(0xFFFFD700)
+                            )
+                        }
+
                         IconButton(
                             onClick = {
                                 achievementViewModel.onRankingOpened()
