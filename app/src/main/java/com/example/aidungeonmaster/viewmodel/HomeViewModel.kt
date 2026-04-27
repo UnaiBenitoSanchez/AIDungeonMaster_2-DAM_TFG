@@ -17,8 +17,10 @@ import kotlinx.coroutines.tasks.await
 class HomeViewModel : ViewModel() {
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
-    private val deletionRepository = CharacterDeletionRepository(db)
+
     private val socialRepository = SocialRepository()
+
+    private val deletionRepository = CharacterDeletionRepository()
 
     private val _characters = MutableStateFlow<List<Character>>(emptyList())
     val characters = _characters.asStateFlow()
@@ -188,6 +190,11 @@ class HomeViewModel : ViewModel() {
     fun deleteCharacter(characterId: String, characterName: String) {
         val userId = auth.currentUser?.uid ?: return
 
+        // Quitar la tarjeta al instante para que no parezca que no funciona.
+        _characters.value = _characters.value.filterNot {
+            it.id == characterId || it.name == characterName
+        }
+
         viewModelScope.launch {
             try {
                 deletionRepository.deleteEverywhere(
@@ -196,12 +203,14 @@ class HomeViewModel : ViewModel() {
                     userCharacterDocId = characterId
                 )
 
-                val remainingCount = (_characters.value.size - 1).coerceAtLeast(0)
-                syncCharacterCount(userId, remainingCount)
+                syncCharacterCount(userId, _characters.value.size)
 
                 Log.d("APP_SUCCESS", "Personaje eliminado completamente: ${userId}_${characterName}")
             } catch (e: Exception) {
                 Log.e("APP_ERROR", "Error eliminando personaje completo: ${e.message}", e)
+
+                // Si algo falla, recargamos para no dejar la UI en estado raro.
+                fetchCharacters()
             }
         }
     }

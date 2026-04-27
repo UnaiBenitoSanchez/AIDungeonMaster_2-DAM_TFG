@@ -63,6 +63,7 @@ import androidx.compose.ui.platform.LocalContext
 import com.example.aidungeonmaster.ui.tutorial.DragonTutorialOverlay
 
 import com.example.aidungeonmaster.ui.home.CharacterSheetScreen
+import com.example.aidungeonmaster.viewmodel.CombatPhase
 
 sealed class Screen(val route: String) {
     object Login : Screen("login")
@@ -296,40 +297,55 @@ fun AppNavigation(navController: NavHostController) {
                     inventoryViewModel = inventoryViewModel,
                     gameId = gameId,
                     achievementViewModel = achievementViewModel,
-                    onCombatEnd = { victory, xpGained ->
-                        if (victory && xpGained > 0) {
-                            gameViewModel.addPendingXp(xpGained)
-                        }
-
+                    onCombatEnd = { result, xpGained ->
                         val enemyName =
                             gameViewModel.currentAdventureStep.value?.enemy?.name ?: "el enemigo"
 
-                        if (victory) {
-                            gameViewModel.notifyCombatEnd(true, enemyName)
-                            navController.popBackStack()
-                        } else {
-                            val currentUserId = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
-                            val characterName = gameId.removePrefix("${currentUserId}_")
+                        when (result) {
+                            CombatPhase.VICTORY -> {
+                                if (xpGained > 0) {
+                                    gameViewModel.addPendingXp(xpGained)
+                                }
 
-                            scope.launch {
-                                try {
-                                    deletionRepository.deleteEverywhere(
-                                        userId = currentUserId,
-                                        characterName = characterName
-                                    )
-                                } catch (e: Exception) {
-                                    Log.e(
-                                        "APP_NAV",
-                                        "Error borrando personaje al morir: ${e.message}",
-                                        e
-                                    )
-                                } finally {
-                                    navController.navigate(Screen.Home.route) {
-                                        popUpTo(Screen.Home.route) { inclusive = false }
-                                        launchSingleTop = true
+                                gameViewModel.notifyCombatEnd(true, enemyName)
+                                navController.popBackStack()
+                            }
+
+                            CombatPhase.FLED -> {
+                                gameViewModel.notifyCombatFled(enemyName)
+                                navController.popBackStack()
+                            }
+
+                            CombatPhase.DEFEAT -> {
+                                val currentUserId = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+                                val characterName = gameId
+                                    .removePrefix("${currentUserId}_")
+                                    .substringBefore("_")
+
+                                scope.launch {
+                                    try {
+                                        deletionRepository.deleteEverywhere(
+                                            userId = currentUserId,
+                                            characterName = characterName
+                                        )
+                                    } catch (e: Exception) {
+                                        Log.e(
+                                            "APP_NAV",
+                                            "Error borrando personaje al morir: ${e.message}",
+                                            e
+                                        )
+                                    } finally {
+                                        AdventureMusicEngine.stopNow()
+
+                                        navController.navigate(Screen.Home.route) {
+                                            popUpTo(Screen.Home.route) { inclusive = false }
+                                            launchSingleTop = true
+                                        }
                                     }
                                 }
                             }
+
+                            else -> Unit
                         }
                     }
                 )

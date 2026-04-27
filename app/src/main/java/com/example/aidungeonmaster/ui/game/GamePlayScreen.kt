@@ -1,6 +1,7 @@
 package com.example.aidungeonmaster.ui.game
 
 import android.os.Build
+import android.util.Log
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -48,6 +49,8 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 
 import kotlin.math.roundToInt
 
+import kotlinx.coroutines.delay
+
 @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -74,6 +77,9 @@ fun GamePlayScreen(
     val hpMax     = characterState?.hpMax     ?: 20
 
     var customAction by remember { mutableStateOf("") }
+    var isDeletingDeadCharacter by remember { mutableStateOf(false) }
+    var deathDeleteStarted by remember { mutableStateOf(false) }
+    var deathDeleteError by remember { mutableStateOf<String?>(null) }
 
     val gameId = "${userId}_${characterName}_${theme}".replace(" ", "_")
     val charId = "${userId}_${characterName}"
@@ -278,6 +284,36 @@ fun GamePlayScreen(
 
     val isDead = characterState != null && hpCurrent <= 0
 
+    LaunchedEffect(isDead) {
+        if (isDead && !deathDeleteStarted) {
+            deathDeleteStarted = true
+            isDeletingDeadCharacter = true
+            deathDeleteError = null
+
+            viewModel.deleteCurrentCharacterAfterDeath(
+                onDeleted = {
+                    isDeletingDeadCharacter = false
+                },
+                onError = { error ->
+                    Log.e("GamePlayScreen", "Error borrando personaje muerto: $error")
+                    isDeletingDeadCharacter = false
+                    deathDeleteError = error
+                }
+            )
+
+            delay(1500)
+
+            AdventureMusicEngine.stopNow()
+
+            navController.navigate(Screen.Home.route) {
+                popUpTo(Screen.Home.route) {
+                    inclusive = false
+                }
+                launchSingleTop = true
+            }
+        }
+    }
+
     MedievalBackground {
         Box(modifier = Modifier.fillMaxSize()) {
 
@@ -433,14 +469,8 @@ fun GamePlayScreen(
             // ── PANTALLA DE MUERTE ───────────────────────────────────────────
             if (isDead) {
                 DeathScreen(
-                    onRestart = {
-                        inventoryViewModel.resetCharacter(charId)
-                        viewModel.resetStory()
-                    },
-                    onGoHome = {
-                        AdventureMusicEngine.stopNow()
-                        navController.popBackStack("home", inclusive = false)
-                    }
+                    isDeleting = isDeletingDeadCharacter,
+                    errorMessage = deathDeleteError
                 )
             }
 
@@ -464,7 +494,10 @@ fun GamePlayScreen(
 // ── PANTALLA DE MUERTE ────────────────────────────────────────────────────────
 
 @Composable
-private fun DeathScreen(onRestart: () -> Unit, onGoHome: () -> Unit) {
+private fun DeathScreen(
+    isDeleting: Boolean,
+    errorMessage: String?
+) {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -473,41 +506,54 @@ private fun DeathScreen(onRestart: () -> Unit, onGoHome: () -> Unit) {
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(24.dp),
+            verticalArrangement = Arrangement.spacedBy(22.dp),
             modifier = Modifier.padding(32.dp)
         ) {
             Text("💀", fontSize = 80.sp)
+
             Text(
-                text = "Has caído en batalla",
+                text = "Has muerto",
                 color = Color.Red,
-                fontSize = 28.sp,
+                fontSize = 30.sp,
                 fontWeight = FontWeight.Black,
                 fontFamily = FontFamily.Serif,
                 textAlign = TextAlign.Center
             )
+
             Text(
-                text = "Tu aventura ha llegado a su fin...\nPero los héroes siempre pueden volver a levantarse.",
+                text = "Tu aventura ha llegado a su fin.\nEl personaje y sus registros se eliminarán automáticamente.",
                 color = Color.LightGray,
                 fontSize = 15.sp,
                 textAlign = TextAlign.Center,
                 lineHeight = 22.sp
             )
-            Spacer(Modifier.height(8.dp))
 
-            Button(
-                onClick = onRestart,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7B0000)),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("🔄  Nueva Historia", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            if (isDeleting) {
+                CircularProgressIndicator(
+                    color = Color.Red,
+                    modifier = Modifier.size(34.dp)
+                )
+
+                Text(
+                    text = "Borrando personaje...",
+                    color = Color.LightGray,
+                    fontSize = 14.sp
+                )
+            } else {
+                Text(
+                    text = "Volviendo al inicio...",
+                    color = Color.LightGray,
+                    fontSize = 14.sp
+                )
             }
 
-            OutlinedButton(
-                onClick = onGoHome,
-                modifier = Modifier.fillMaxWidth(),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color.LightGray)
-            ) {
-                Text("🏠  Volver al Inicio", fontSize = 16.sp, color = Color.LightGray)
+            if (!errorMessage.isNullOrBlank()) {
+                Text(
+                    text = errorMessage,
+                    color = Color(0xFFFF8A80),
+                    fontSize = 13.sp,
+                    textAlign = TextAlign.Center
+                )
             }
         }
     }

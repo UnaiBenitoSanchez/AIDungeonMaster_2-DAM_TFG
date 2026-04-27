@@ -24,6 +24,8 @@ import kotlinx.coroutines.tasks.await
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
+import com.example.aidungeonmaster.data.repository.CharacterDeletionRepository
+
 // ── MODELOS DE DATOS ─────────────────────────────────────────────────────────
 
 data class Enemy(
@@ -42,10 +44,7 @@ data class AdventureStep(
     val itemFound: Item? = null,
     val combatStarted: Boolean = false,
     val enemy: Enemy? = null,
-    val coinsFound: Int = 0,   // Monedas encontradas en la aventura (sin combate)
-    // ── NUEVO: JSON de la ubicación actual del jugador ──────────────────────
-    // El DM lo rellena cuando el jugador llega a un lugar nuevo.
-    // Formato: {"name":"...","type":"ciudad|bosque|...","description":"..."}
+    val coinsFound: Int = 0,
     val locationJson: String? = null
 )
 
@@ -62,6 +61,8 @@ class GameViewModel : ViewModel() {
     private val gson = Gson()
     private val chatHistory = mutableListOf<ChatMessage>()
     private val db = FirebaseFirestore.getInstance()
+
+    private val deletionRepository = CharacterDeletionRepository()
 
     /**
      * Referencia al WorldMapViewModel para notificarle ubicaciones nuevas.
@@ -171,6 +172,51 @@ class GameViewModel : ViewModel() {
         else
             "He sido derrotado por $enemyName pero consigo escapar malherido."
         sendPlayerAction(msg)
+        _currentAdventureStep.value = _currentAdventureStep.value
+            ?.copy(combatStarted = false, enemy = null)
+    }
+
+    fun deleteCurrentCharacterAfterDeath(
+        onDeleted: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        val userId = currentUserId
+        val characterName = currentCharacterName
+
+        if (userId.isBlank() || characterName.isBlank()) {
+            onError("No se pudo identificar el personaje muerto.")
+            return
+        }
+
+        viewModelScope.launch {
+            try {
+                deletionRepository.deleteEverywhere(
+                    userId = userId,
+                    characterName = characterName
+                )
+
+                _messages.value = emptyList()
+                _currentOptions.value = emptyList()
+                _currentAdventureStep.value = null
+                chatHistory.clear()
+
+                currentGameId = ""
+                currentCharId = ""
+                currentCharacterName = ""
+                currentTheme = ""
+
+                onDeleted()
+            } catch (e: Exception) {
+                onError(e.message ?: "No se pudieron borrar los datos del personaje.")
+            }
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
+    fun notifyCombatFled(enemyName: String) {
+        val msg = "He logrado huir del combate contra $enemyName. Continúa la historia desde mi estado actual, teniendo en cuenta que escapé malherido o con prisa."
+        sendPlayerAction(msg)
+
         _currentAdventureStep.value = _currentAdventureStep.value
             ?.copy(combatStarted = false, enemy = null)
     }
@@ -374,6 +420,7 @@ Reglas:
                 val now = System.currentTimeMillis()
                 val data = mapOf(
                     "userId"          to currentUserId,
+                    "characterName"   to currentCharacterName,   // necesario para poder borrar por query
                     "displayMessages" to _messages.value.map { mapOf("first" to it.first, "second" to it.second) },
                     "chatHistory"     to chatHistory.map { mapOf("role" to it.role, "content" to it.content) },
                     "lastOptions"     to _currentOptions.value,

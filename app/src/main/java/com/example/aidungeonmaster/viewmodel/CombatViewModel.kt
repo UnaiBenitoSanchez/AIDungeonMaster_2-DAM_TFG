@@ -31,7 +31,8 @@ enum class CombatPhase {
     ROLLING,
     ENEMY_TURN,
     VICTORY,
-    DEFEAT
+    DEFEAT,
+    FLED
 }
 
 enum class LogType {
@@ -200,20 +201,27 @@ class CombatViewModel(
     //  INICIO DEL COMBATE
     // ============================================================
     init {
-        viewModelScope.launch {
-            registerEncounterInBestiary()
+        if (playerCharacter.hpCurrent <= 0) {
+            _playerHp.value = 0
+            _phase.value = CombatPhase.DEFEAT
+            log("💀 Tu personaje ya no puede continuar combatiendo.", LogType.SYSTEM)
+        } else {
+            viewModelScope.launch {
+                registerEncounterInBestiary()
 
-            log("📚 Guardando bestiario en partida: $charId", LogType.SYSTEM)
-            android.util.Log.d("BESTIARY_DEBUG", "registerEncounterInBestiary charId=$charId enemy=${enemy.name}")
+                log("📚 Guardando bestiario en partida: $charId", LogType.SYSTEM)
+                android.util.Log.d("BESTIARY_DEBUG", "registerEncounterInBestiary charId=$charId enemy=${enemy.name}")
 
-            delay(400)
-            log("⚔️ ¡${enemy.name} aparece ante ti!", LogType.SYSTEM)
-            log("📊 CA enemiga: $enemyAC | HP: ${enemy.hpMax}", LogType.SYSTEM)
-            delay(600)
-            log("🎲 Tu turno — elige tu acción", LogType.SYSTEM)
-            _phase.value = CombatPhase.PLAYER_TURN
+                delay(400)
+                log("⚔️ ¡${enemy.name} aparece ante ti!", LogType.SYSTEM)
+                log("📊 CA enemiga: $enemyAC | HP: ${enemy.hpMax}", LogType.SYSTEM)
+                delay(600)
+                log("🎲 Tu turno — elige tu acción", LogType.SYSTEM)
+                _phase.value = CombatPhase.PLAYER_TURN
+            }
         }
     }
+
 
     private fun inferEnemyTags(): List<String> {
         val basis = enemy.name.lowercase()
@@ -563,7 +571,7 @@ class CombatViewModel(
                     if (total >= 12) {
                         log("💨 ¡Logras huir del combate! ($total ≥ 12)", LogType.SYSTEM)
                         delay(500)
-                        _phase.value = CombatPhase.DEFEAT
+                        _phase.value = CombatPhase.FLED
                     } else {
                         log("🚫 Fallas la huida ($total < 12). ¡${enemy.name} te corta el paso!", LogType.PLAYER_MISS)
                         if (ability.cooldownTurns > 0) addCooldown(ability)
@@ -588,7 +596,11 @@ class CombatViewModel(
     private fun endPlayerTurn() {
         viewModelScope.launch {
             delay(600)
-            if (_phase.value == CombatPhase.VICTORY || _phase.value == CombatPhase.DEFEAT) return@launch
+            if (
+                _phase.value == CombatPhase.VICTORY ||
+                _phase.value == CombatPhase.DEFEAT ||
+                _phase.value == CombatPhase.FLED
+            ) return@launch
             _phase.value = CombatPhase.ENEMY_TURN
             log("🔴 Turno de ${enemy.name}...", LogType.SYSTEM)
             delay(900)

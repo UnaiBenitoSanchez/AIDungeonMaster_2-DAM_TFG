@@ -27,9 +27,6 @@ import com.example.aidungeonmaster.utils.CombatMusicEngine
 import com.example.aidungeonmaster.viewmodel.*
 import kotlinx.coroutines.delay
 
-import androidx.compose.ui.platform.LocalContext
-import coil.compose.SubcomposeAsyncImage
-
 import androidx.compose.foundation.Image
 import androidx.compose.ui.graphics.asImageBitmap
 import com.example.aidungeonmaster.utils.ImageUtils
@@ -54,7 +51,7 @@ fun CombatScreen(
     gameViewModel: GameViewModel,
     inventoryViewModel: InventoryViewModel,
     gameId: String,
-    onCombatEnd: (victory: Boolean, xpGained: Int) -> Unit,
+    onCombatEnd: (result: CombatPhase, xpGained: Int) -> Unit,
     achievementViewModel: AchievementViewModel? = null
 ) {
     val step by gameViewModel.currentAdventureStep.collectAsState()
@@ -100,7 +97,7 @@ private fun CombatScreenReady(
     character: com.example.aidungeonmaster.data.model.Character,
     gameId: String,
     inventoryViewModel: InventoryViewModel,
-    onCombatEnd: (victory: Boolean, xpGained: Int) -> Unit,
+    onCombatEnd: (result: CombatPhase, xpGained: Int) -> Unit,
     achievementViewModel: AchievementViewModel? = null
 ) {
     val combatVm: CombatViewModel = viewModel(
@@ -131,7 +128,7 @@ private fun CombatContent(
     playerHpMax: Int,
     inventoryViewModel: InventoryViewModel,
     gameId: String,
-    onCombatEnd: (victory: Boolean, xpGained: Int) -> Unit
+    onCombatEnd: (result: CombatPhase, xpGained: Int) -> Unit
 ) {
     val phase by combatVm.phase.collectAsState()
     val enemyHp by combatVm.enemyHp.collectAsState()
@@ -155,13 +152,26 @@ private fun CombatContent(
     }
 
     LaunchedEffect(phase) {
-        if (phase == CombatPhase.VICTORY || phase == CombatPhase.DEFEAT) {
+        if (
+            phase == CombatPhase.VICTORY ||
+            phase == CombatPhase.DEFEAT ||
+            phase == CombatPhase.FLED
+        ) {
             CombatMusicEngine.fadeOutAndStop(musicScope)
-            delay(2200)
-            val xpGained = if (phase == CombatPhase.VICTORY)
+
+            val xpGained = if (phase == CombatPhase.VICTORY) {
                 (combatVm.enemy.hpMax / 2).coerceAtLeast(5)
-            else 0
-            onCombatEnd(phase == CombatPhase.VICTORY, xpGained)
+            } else {
+                0
+            }
+
+            if (phase == CombatPhase.VICTORY) {
+                delay(1600)
+            } else {
+                delay(350)
+            }
+
+            onCombatEnd(phase, xpGained)
         }
     }
 
@@ -209,8 +219,12 @@ private fun CombatContent(
         }
 
         if (dice.isVisible) DiceOverlay(dice = dice)
-        if (phase == CombatPhase.VICTORY || phase == CombatPhase.DEFEAT) {
-            CombatEndOverlay(victory = phase == CombatPhase.VICTORY)
+        if (
+            phase == CombatPhase.VICTORY ||
+            phase == CombatPhase.DEFEAT ||
+            phase == CombatPhase.FLED
+        ) {
+            CombatEndOverlay(phase = phase)
         }
         TurnIndicator(
             phase = phase,
@@ -711,37 +725,63 @@ private fun DiceOverlay(dice: DiceAnimState) {
 }
 
 @Composable
-private fun CombatEndOverlay(victory: Boolean) {
-    val alpha by animateFloatAsState(1f, tween(900), label = "eof")
+private fun CombatEndOverlay(
+    phase: CombatPhase
+) {
+    val title = when (phase) {
+        CombatPhase.VICTORY -> "VICTORIA"
+        CombatPhase.DEFEAT -> "DERROTA"
+        CombatPhase.FLED -> "HUIDA EXITOSA"
+        else -> ""
+    }
+
+    val subtitle = when (phase) {
+        CombatPhase.VICTORY -> "Has derrotado al enemigo."
+        CombatPhase.DEFEAT -> "Has caído en combate."
+        CombatPhase.FLED -> "Has escapado del combate con vida."
+        else -> ""
+    }
+
+    val color = when (phase) {
+        CombatPhase.VICTORY -> GoldAccent
+        CombatPhase.DEFEAT -> EnemyRed
+        CombatPhase.FLED -> Color(0xFF64B5F6)
+        else -> Color.White
+    }
+
     Box(
-        Modifier
+        modifier = Modifier
             .fillMaxSize()
-            .alpha(alpha)
-            .background(
-                Brush.radialGradient(
-                    if (victory) listOf(Color(0xFF001500), Color.Black)
-                    else listOf(Color(0xFF200000), Color.Black)
-                )
-            ),
+            .background(Color.Black.copy(alpha = 0.72f)),
         contentAlignment = Alignment.Center
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(if (victory) "🏆" else "💀", fontSize = 68.sp)
-            Spacer(Modifier.height(14.dp))
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
             Text(
-                if (victory) "¡VICTORIA!" else "HAS CAÍDO",
-                color = if (victory) GoldAccent else EnemyRed,
+                text = when (phase) {
+                    CombatPhase.VICTORY -> "🏆"
+                    CombatPhase.DEFEAT -> "💀"
+                    CombatPhase.FLED -> "💨"
+                    else -> ""
+                },
+                fontSize = 68.sp
+            )
+
+            Text(
+                text = title,
+                color = color,
                 fontSize = 30.sp,
                 fontWeight = FontWeight.Black,
-                fontFamily = FontFamily.Monospace,
-                letterSpacing = 4.sp
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                if (victory) "Regresando a la aventura..." else "Game over",
-                color = Color.White.copy(0.6f),
-                fontSize = 13.sp,
                 fontFamily = FontFamily.Monospace
+            )
+
+            Text(
+                text = subtitle,
+                color = Color.LightGray,
+                fontSize = 15.sp,
+                textAlign = TextAlign.Center
             )
         }
     }
@@ -755,6 +795,7 @@ private fun TurnIndicator(phase: CombatPhase, modifier: Modifier = Modifier) {
         CombatPhase.ROLLING -> "TIRANDO…" to GoldAccent
         CombatPhase.VICTORY -> "VICTORIA" to GoldAccent
         CombatPhase.DEFEAT -> "DERROTA" to EnemyRed
+        CombatPhase.FLED -> "HUIDA" to Color(0xFF64B5F6)
         else -> "" to Color.Transparent
     }
 

@@ -118,6 +118,11 @@ fun HomeScreen(
 
     val characters by viewModel.characters.collectAsState()
 
+    // Los personajes muertos (hpCurrent <= 0) siguen apareciendo en la lista
+    // para que el jugador pueda eliminarlos manualmente. La tarjeta se muestra
+    // desactivada con un mensaje de "personaje caído".
+    val visibleCharacters = characters
+
     val incomingRequests by socialViewModel.incomingRequests.collectAsState()
     val friends by socialViewModel.friends.collectAsState()
 
@@ -415,7 +420,7 @@ fun HomeScreen(
                     } else {
                         LazyColumn(state = listState) {
                             itemsIndexed(
-                                items = characters,
+                                items = visibleCharacters,
                                 key = { _, character -> character.id.ifBlank { character.name } }
                             ) { index, character ->
                                 CharacterCard(
@@ -648,7 +653,9 @@ fun CharacterCard(
         modifier = modifier
             .fillMaxWidth()
             .padding(vertical = 8.dp)
-            .clickable { onClick() },
+            .clickable(enabled = character.hpCurrent > 0) {
+                onClick()
+            },
         elevation = CardDefaults.cardElevation(4.dp)
     ) {
         Row(
@@ -725,6 +732,15 @@ fun CharacterCard(
                             character.hpCurrent <= character.hpMax * 0.5f -> Color(0xFFFF9800)
                             else -> Color(0xFF4CAF50)
                         }
+                    )
+                }
+
+                if (character.hpCurrent <= 0) {
+                    Text(
+                        "💀 Personaje caído. Elimínalo para limpiar sus registros.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        fontWeight = FontWeight.Bold
                     )
                 }
 
