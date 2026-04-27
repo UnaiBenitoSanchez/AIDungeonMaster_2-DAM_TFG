@@ -41,17 +41,25 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.aidungeonmaster.ui.theme.ColorBlindType
+import com.example.aidungeonmaster.ui.theme.colorMatrixForType
 
 /**
  * Bottom Sheet que permite al usuario seleccionar su tipo de daltonismo.
  *
- * @param currentType   Tipo actualmente activo en la app.
+ * NOTA: ModalBottomSheet renderiza en su propia ventana de sistema, por lo que
+ * el graphicsLayer global de MainActivity NO se aplica aquí. Eso nos permite
+ * aplicar la matriz del tipo *pendiente* directamente sobre el preview para que
+ * el usuario vea exactamente cómo quedará la paleta de colores.
+ *
+ * @param currentType    Tipo actualmente activo en la app.
  * @param onTypeSelected Callback invocado al confirmar la selección.
- * @param onDismiss     Callback invocado al cerrar sin confirmar.
+ * @param onDismiss      Callback invocado al cerrar sin confirmar.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -102,7 +110,9 @@ fun ColorBlindSettingsSheet(
                 }
             }
 
-            // ── Paleta de vista previa (ilustrativa) ─────────────────────────
+            // ── Paleta de vista previa ────────────────────────────────────────
+            // FIX: se pasa pendingType para que la fila de colores aplique
+            // la matriz correspondiente y el usuario vea el cambio en tiempo real.
             ColorPreviewRow(type = pendingType)
 
             Spacer(Modifier.height(4.dp))
@@ -110,9 +120,9 @@ fun ColorBlindSettingsSheet(
             // ── Opciones ─────────────────────────────────────────────────────
             ColorBlindType.entries.forEach { type ->
                 ColorBlindOptionItem(
-                    type        = type,
-                    isSelected  = pendingType == type,
-                    onClick     = { pendingType = type }
+                    type       = type,
+                    isSelected = pendingType == type,
+                    onClick    = { pendingType = type }
                 )
             }
 
@@ -144,11 +154,15 @@ fun ColorBlindSettingsSheet(
     }
 }
 
-// ─── Fila de círculos de color de vista previa ───────────────────────────────
+// ─── Vista previa de colores ─────────────────────────────────────────────────
+//
+// FIX: La Row de colores ahora lleva su propio graphicsLayer con la matriz
+// del tipo pendiente. Como ModalBottomSheet corre en una ventana propia
+// (separada del graphicsLayer raíz de MainActivity), esto funciona
+// directamente sin interferencias.
 
 @Composable
 private fun ColorPreviewRow(type: ColorBlindType) {
-    // Colores representativos: rojo, verde, azul, amarillo, naranja
     val sampleColors = listOf(
         Color(0xFFE53935), // rojo
         Color(0xFF43A047), // verde
@@ -157,6 +171,9 @@ private fun ColorPreviewRow(type: ColorBlindType) {
         Color(0xFFFF6F00), // naranja
         Color(0xFFAB47BC), // morado
     )
+
+    // Obtenemos la matriz del tipo pendiente (null = sin filtro)
+    val matrix = remember(type) { colorMatrixForType(type) }
 
     Surface(
         shape = RoundedCornerShape(12.dp),
@@ -170,9 +187,23 @@ private fun ColorPreviewRow(type: ColorBlindType) {
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
             )
             Spacer(Modifier.height(8.dp))
+
+            // FIX: aplicamos la matriz del tipo seleccionado a esta Row.
+            // Al estar en una ventana separada, el filtro refleja exactamente
+            // cómo percibirá el usuario daltónico esos colores.
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(
+                        if (matrix != null) {
+                            Modifier.graphicsLayer {
+                                colorFilter = ColorFilter.colorMatrix(matrix)
+                            }
+                        } else {
+                            Modifier
+                        }
+                    )
             ) {
                 sampleColors.forEach { color ->
                     Box(
@@ -184,6 +215,7 @@ private fun ColorPreviewRow(type: ColorBlindType) {
                     )
                 }
             }
+
             Spacer(Modifier.height(4.dp))
             Text(
                 text = when (type) {
