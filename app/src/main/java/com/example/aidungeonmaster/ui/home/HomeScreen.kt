@@ -169,6 +169,22 @@ fun HomeScreen(
             )
             add(
                 TutorialStep(
+                    targetKey = "btn_colorblind",
+                    title = "Modo daltónico",
+                    description = "Pulsa aquí para activar un filtro de color adaptado a tu tipo de daltonismo. El filtro se aplica a toda la app al instante.",
+                    mascotRes = R.drawable.dragon_idle
+                )
+            )
+            add(
+                TutorialStep(
+                    targetKey = "btn_repeat_tutorial",
+                    title = "Repetir tutorial",
+                    description = "¿Necesitas repasar algo? Este botón relanza esta guía desde el principio cuando quieras.",
+                    mascotRes = R.drawable.dragon_waving
+                )
+            )
+            add(
+                TutorialStep(
                     targetKey = "btn_ranking",
                     title = "Ranking mundial",
                     description = "Aquí puedes ver la clasificación global y comparar tu progreso con otros jugadores.",
@@ -360,7 +376,8 @@ fun HomeScreen(
                     },
                     actions = {
                         IconButton(
-                            onClick = { showColorBlindSheet = true }
+                            onClick = { showColorBlindSheet = true },
+                            modifier = Modifier.tutorialAnchor("btn_colorblind", tutorialTargets)
                         ) {
                             Icon(
                                 imageVector        = Icons.Default.Palette,
@@ -380,7 +397,8 @@ fun HomeScreen(
                                     .apply()
                                 tutorialStepIndex = 0
                                 showTutorial = true
-                            }
+                            },
+                            modifier = Modifier.tutorialAnchor("btn_repeat_tutorial", tutorialTargets)
                         ) {
                             Icon(
                                 Icons.Default.HelpOutline,
