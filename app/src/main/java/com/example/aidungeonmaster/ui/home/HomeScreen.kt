@@ -170,20 +170,31 @@ fun HomeScreen(
                         mascotRes = R.drawable.dragon_pointing
                     )
                 )
+
                 add(
                     TutorialStep(
                         targetKey = "first_character_room",
                         title = "Sala personal",
-                        description = "Este botón abre la fortaleza o sala personal del personaje.",
+                        description = "Este botón abre la fortaleza o sala personal del personaje, donde puedes decorar su habitación.",
                         mascotRes = R.drawable.dragon_idle
                     )
                 )
+
+                add(
+                    TutorialStep(
+                        targetKey = "first_character_sheet",
+                        title = "Ficha RPG",
+                        description = "Este botón abre la ficha visual del personaje con estilo RPG. Desde ahí puedes ver sus datos y descargarla en PDF.",
+                        mascotRes = R.drawable.dragon_pointing
+                    )
+                )
+
                 add(
                     TutorialStep(
                         targetKey = "first_character_delete",
                         title = "Eliminar personaje",
                         description = "Este botón borra el personaje. La app te pedirá confirmación antes de eliminarlo.",
-                        mascotRes = R.drawable.dragon_pointing
+                        mascotRes = R.drawable.dragon_waving
                     )
                 )
             }
@@ -267,6 +278,7 @@ fun HomeScreen(
         when (currentTargetKey) {
             "first_character_card",
             "first_character_room",
+            "first_character_sheet",
             "first_character_delete" -> {
                 if (characters.isNotEmpty()) {
                     listState.animateScrollToItem(0)
@@ -381,6 +393,11 @@ fun HomeScreen(
                                     },
                                     roomButtonModifier = if (index == 0) {
                                         Modifier.tutorialAnchor("first_character_room", tutorialTargets)
+                                    } else {
+                                        Modifier
+                                    },
+                                    sheetButtonModifier = if (index == 0) {
+                                        Modifier.tutorialAnchor("first_character_sheet", tutorialTargets)
                                     } else {
                                         Modifier
                                     },
@@ -550,6 +567,7 @@ fun CharacterCard(
     character: Character,
     modifier: Modifier = Modifier,
     roomButtonModifier: Modifier = Modifier,
+    sheetButtonModifier: Modifier = Modifier,
     deleteButtonModifier: Modifier = Modifier,
     onClick: () -> Unit,
     onOpenRoom: () -> Unit,
@@ -723,7 +741,8 @@ fun CharacterCard(
                 }
 
                 IconButton(
-                    onClick = onOpenSheet
+                    onClick = onOpenSheet,
+                    modifier = sheetButtonModifier
                 ) {
                     Icon(
                         Icons.Default.Description,
