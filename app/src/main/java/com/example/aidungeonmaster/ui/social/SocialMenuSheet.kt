@@ -1,10 +1,16 @@
 package com.example.aidungeonmaster.ui.social
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -13,8 +19,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.snapshots.SnapshotStateMap
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.aidungeonmaster.ui.tutorial.tutorialAnchor
@@ -29,7 +37,9 @@ fun SocialMenuSheet(
     onFriendsList: () -> Unit,
     onGuilds: () -> Unit,
     tutorialTargets: SnapshotStateMap<String, Rect>? = null,
-    lockForTutorial: Boolean = false
+    lockForTutorial: Boolean = false,
+    pendingFriendRequestsCount: Int = 0,
+    unreadPrivateMessagesCount: Int = 0
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
@@ -68,12 +78,14 @@ fun SocialMenuSheet(
 
             SocialOptionItem(
                 text = "Solicitudes de amistad",
+                badgeCount = pendingFriendRequestsCount,
                 modifier = anchorOrPlain("social_friend_requests", tutorialTargets),
                 onClick = onFriendRequests
             )
 
             SocialOptionItem(
                 text = "Lista de amigos",
+                badgeCount = unreadPrivateMessagesCount,
                 modifier = anchorOrPlain("social_friends_list", tutorialTargets),
                 onClick = onFriendsList
             )
@@ -91,20 +103,59 @@ fun SocialMenuSheet(
 private fun SocialOptionItem(
     text: String,
     modifier: Modifier = Modifier,
+    badgeCount: Int = 0,
     onClick: () -> Unit
 ) {
     Surface(
-        shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(16.dp),
         tonalElevation = 3.dp,
         shadowElevation = 1.dp,
         modifier = modifier
             .fillMaxWidth()
             .clickable { onClick() }
     ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 18.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.weight(1f)
+            )
+
+            if (badgeCount > 0) {
+                Spacer(Modifier.width(10.dp))
+
+                NotificationBadge(count = badgeCount)
+            }
+        }
+    }
+}
+
+@Composable
+fun NotificationBadge(
+    count: Int,
+    modifier: Modifier = Modifier
+) {
+    if (count <= 0) return
+
+    Box(
+        modifier = modifier
+            .background(
+                color = Color(0xFFE53935),
+                shape = RoundedCornerShape(999.dp)
+            )
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+        contentAlignment = Alignment.Center
+    ) {
         Text(
-            text = text,
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 18.dp)
+            text = if (count > 99) "99+" else count.toString(),
+            color = Color.White,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold
         )
     }
 }

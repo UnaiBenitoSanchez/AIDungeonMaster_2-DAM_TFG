@@ -87,11 +87,16 @@ import java.util.concurrent.TimeUnit
 
 import androidx.compose.material.icons.filled.Description
 
+import androidx.compose.foundation.shape.CircleShape
+import com.example.aidungeonmaster.ui.social.NotificationBadge
+import com.example.aidungeonmaster.viewmodel.SocialViewModel
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     navController: NavHostController,
-    viewModel: HomeViewModel = viewModel()
+    viewModel: HomeViewModel = viewModel(),
+    socialViewModel: SocialViewModel = viewModel()
 ) {
     val context = LocalContext.current
     val tutorialPrefs = remember {
@@ -109,6 +114,14 @@ fun HomeScreen(
     }
 
     val characters by viewModel.characters.collectAsState()
+
+    val incomingRequests by socialViewModel.incomingRequests.collectAsState()
+    val friends by socialViewModel.friends.collectAsState()
+
+    val pendingFriendRequestsCount = incomingRequests.size
+    val unreadPrivateMessagesCount = friends.sumOf { it.unreadCount }
+    val totalSocialNotifications = pendingFriendRequestsCount + unreadPrivateMessagesCount
+
     var showDialog by remember { mutableStateOf(false) }
     var characterToDelete by remember { mutableStateOf<Character?>(null) }
     var showSocialSheet by remember { mutableStateOf(false) }
@@ -304,6 +317,18 @@ fun HomeScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
+    LaunchedEffect(Unit) {
+        socialViewModel.startIncomingRequestsListener()
+        socialViewModel.startFriendsListener()
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            socialViewModel.stopIncomingRequestsListener()
+            socialViewModel.stopFriendsListener()
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             topBar = {
@@ -437,17 +462,29 @@ fun HomeScreen(
                     }
                 }
 
-                FloatingActionButton(
-                    onClick = { showSocialSheet = true },
+                Box(
                     modifier = Modifier
                         .align(Alignment.BottomStart)
                         .padding(16.dp)
-                        .tutorialAnchor("btn_social", tutorialTargets)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.People,
-                        contentDescription = "Social"
-                    )
+                    FloatingActionButton(
+                        onClick = { showSocialSheet = true },
+                        modifier = Modifier.tutorialAnchor("btn_social", tutorialTargets)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.People,
+                            contentDescription = "Social"
+                        )
+                    }
+
+                    if (totalSocialNotifications > 0) {
+                        NotificationBadge(
+                            count = totalSocialNotifications,
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(top = 0.dp, end = 0.dp)
+                        )
+                    }
                 }
 
                 FloatingActionButton(
@@ -465,7 +502,9 @@ fun HomeScreen(
         if (showTutorialSocialPanel) {
             TutorialSocialPanel(
                 modifier = Modifier.align(Alignment.BottomCenter),
-                tutorialTargets = tutorialTargets
+                tutorialTargets = tutorialTargets,
+                pendingFriendRequestsCount = pendingFriendRequestsCount,
+                unreadPrivateMessagesCount = unreadPrivateMessagesCount
             )
         }
 
@@ -519,7 +558,9 @@ fun HomeScreen(
                 navController.navigate(Screen.Guilds.route)
             },
             tutorialTargets = tutorialTargets,
-            lockForTutorial = showTutorial && currentTargetKey.startsWith("social_")
+            lockForTutorial = showTutorial && currentTargetKey.startsWith("social_"),
+            pendingFriendRequestsCount = pendingFriendRequestsCount,
+            unreadPrivateMessagesCount = unreadPrivateMessagesCount
         )
     }
 
@@ -769,7 +810,9 @@ fun CharacterCard(
 @Composable
 private fun TutorialSocialPanel(
     modifier: Modifier = Modifier,
-    tutorialTargets: androidx.compose.runtime.snapshots.SnapshotStateMap<String, Rect>
+    tutorialTargets: androidx.compose.runtime.snapshots.SnapshotStateMap<String, Rect>,
+    pendingFriendRequestsCount: Int = 0,
+    unreadPrivateMessagesCount: Int = 0
 ) {
     Surface(
         modifier = modifier
@@ -815,11 +858,13 @@ private fun TutorialSocialPanel(
 
             TutorialSocialOption(
                 text = "Solicitudes de amistad",
+                badgeCount = pendingFriendRequestsCount,
                 modifier = Modifier.tutorialAnchor("social_friend_requests", tutorialTargets)
             )
 
             TutorialSocialOption(
                 text = "Lista de amigos",
+                badgeCount = unreadPrivateMessagesCount,
                 modifier = Modifier.tutorialAnchor("social_friends_list", tutorialTargets)
             )
 
@@ -834,7 +879,8 @@ private fun TutorialSocialPanel(
 @Composable
 private fun TutorialSocialOption(
     text: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    badgeCount: Int = 0
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
@@ -842,13 +888,24 @@ private fun TutorialSocialOption(
         color = Color(0xFF2D281B),
         shadowElevation = 2.dp
     ) {
-        Text(
-            text = text,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 18.dp),
-            style = MaterialTheme.typography.titleMedium,
-            color = Color(0xFFFFF1C2),
-            fontWeight = FontWeight.Bold
-        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 18.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.titleMedium,
+                color = Color(0xFFFFF1C2),
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f)
+            )
+
+            if (badgeCount > 0) {
+                NotificationBadge(count = badgeCount)
+            }
+        }
     }
 }
 
