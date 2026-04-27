@@ -26,6 +26,8 @@ class WorldMapViewModel : ViewModel() {
 
     private var currentCharId: String = ""
 
+    var onLocationDiscoveredForAchievements: ((charId: String, locationCount: Int) -> Unit)? = null
+
     private val locationIcons = mapOf(
         "ciudad" to "🏰",
         "pueblo" to "🏘️",
@@ -286,10 +288,18 @@ class WorldMapViewModel : ViewModel() {
             locationStates = updatedStates
         )
 
+        if (!alreadyExists) {
+            onLocationDiscoveredForAchievements?.invoke(
+                currentCharId,
+                updatedLocations.size
+            )
+        }
+
         Log.d(
             "WORLDMAP",
             "Ubicación actualizada: ${newLocation.name} (total: ${updatedLocations.size})"
         )
+
         saveMap()
     }
 

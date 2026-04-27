@@ -64,9 +64,11 @@ class AchievementViewModel : ViewModel() {
 
     fun loadForCharacter(charId: String) {
         val uid = auth.currentUser?.uid ?: return
+
         viewModelScope.launch {
             loadAchievements(uid)
             loadQuests(uid, charId)
+            syncCharacterProgressFromFirestore(charId)
         }
     }
 
@@ -156,10 +158,17 @@ class AchievementViewModel : ViewModel() {
 
     /** Llamar cuando se descubre una nueva ubicación en el mapa */
     fun onLocationDiscovered(charId: String, locationCount: Int) {
-        updateQuestProgress(charId, QuestObjectiveType.LOCATIONS, 1)
-        if (locationCount >= 1)  checkAchievement("first_location")
-        if (locationCount >= 5)  checkAchievement("five_locations")
+        if (locationCount >= 1) checkAchievement("first_location")
+        if (locationCount >= 5) checkAchievement("five_locations")
         if (locationCount >= 10) checkAchievement("ten_locations")
+        if (locationCount >= 20) checkAchievement("twenty_locations")
+
+        updateQuestProgress(
+            charId = charId,
+            objectiveType = QuestObjectiveType.LOCATIONS,
+            increment = 0,
+            absolute = locationCount
+        )
     }
 
     /** Llamar cuando se encuentra un objeto */
@@ -175,14 +184,46 @@ class AchievementViewModel : ViewModel() {
 
     /** Llamar cuando el personaje sube de nivel */
     fun onLevelUp(charId: String, newLevel: Int) {
-        checkAchievement("first_levelup")
-        if (newLevel >= 5)  checkAchievement("level_5")
+        if (newLevel >= 2) checkAchievement("first_levelup")
+        if (newLevel >= 3) checkAchievement("level_3")
+        if (newLevel >= 5) checkAchievement("level_5")
         if (newLevel >= 10) checkAchievement("level_10")
-        updateQuestProgress(charId, QuestObjectiveType.LEVEL_REACH, 0, absolute = newLevel)
+        if (newLevel >= 15) checkAchievement("level_15")
+
+        updateQuestProgress(
+            charId = charId,
+            objectiveType = QuestObjectiveType.LEVEL_REACH,
+            increment = 0,
+            absolute = newLevel
+        )
     }
 
     /** Llamar cuando el jugador escanea un QR */
     fun onQrScanned() = checkAchievement("qr_scan")
+
+    fun onCharacterCreated() {
+        checkAchievement("first_character_created")
+    }
+
+    fun onCharacterSheetOpened() {
+        checkAchievement("character_sheet_opened")
+    }
+
+    fun onCharacterSheetExported() {
+        checkAchievement("character_sheet_exported")
+    }
+
+    fun onSocialOpened() {
+        checkAchievement("social_opened")
+    }
+
+    fun onRankingOpened() {
+        checkAchievement("ranking_opened")
+    }
+
+    fun onAchievementsOpened() {
+        checkAchievement("achievements_opened")
+    }
 
     /**
      * Carga logros y misiones sin necesitar un charId (útil desde pantallas
@@ -190,9 +231,99 @@ class AchievementViewModel : ViewModel() {
      */
     fun load() {
         val uid = auth.currentUser?.uid ?: return
+
         viewModelScope.launch {
             loadAchievements(uid)
             loadQuests(uid, "")
+            syncAllCharactersProgress(uid)
+            checkAchievement("achievements_opened")
+        }
+    }
+
+    private suspend fun syncAllCharactersProgress(uid: String) {
+        try {
+            val charactersSnap = db.collection("users")
+                .document(uid)
+                .collection("characters")
+                .get()
+                .await()
+
+            val characterDocs = charactersSnap.documents
+
+            if (characterDocs.isNotEmpty()) {
+                checkAchievement("first_character_created")
+            }
+
+            characterDocs.forEach { characterDoc ->
+                val characterName = characterDoc.getString("name").orEmpty()
+                if (characterName.isBlank()) return@forEach
+
+                val charId = "${uid}_${characterName}"
+                syncCharacterProgressFromFirestore(charId)
+            }
+        } catch (e: Exception) {
+            Log.e("AchievVM", "syncAllCharactersProgress: ${e.message}")
+        }
+    }
+
+    private suspend fun syncCharacterProgressFromFirestore(charId: String) {
+        if (charId.isBlank()) return
+
+        syncLevelAchievements(charId)
+        syncLocationAchievements(charId)
+    }
+
+    private suspend fun syncLevelAchievements(charId: String) {
+        try {
+            val partidaDoc = db.collection("partidas")
+                .document(charId)
+                .get()
+                .await()
+
+            val level = partidaDoc.getLong("level")?.toInt() ?: 1
+
+            if (level >= 2) checkAchievement("first_levelup")
+            if (level >= 3) checkAchievement("level_3")
+            if (level >= 5) checkAchievement("level_5")
+            if (level >= 10) checkAchievement("level_10")
+            if (level >= 15) checkAchievement("level_15")
+
+            updateQuestProgress(
+                charId = charId,
+                objectiveType = QuestObjectiveType.LEVEL_REACH,
+                increment = 0,
+                absolute = level
+            )
+        } catch (e: Exception) {
+            Log.e("AchievVM", "syncLevelAchievements: ${e.message}")
+        }
+    }
+
+    private suspend fun syncLocationAchievements(charId: String) {
+        try {
+            val worldMapDoc = db.collection("partidas")
+                .document(charId)
+                .collection("worldMap")
+                .document("state")
+                .get()
+                .await()
+
+            val locations = worldMapDoc.get("locations") as? List<*> ?: emptyList<Any>()
+            val locationCount = locations.size
+
+            if (locationCount >= 1) checkAchievement("first_location")
+            if (locationCount >= 5) checkAchievement("five_locations")
+            if (locationCount >= 10) checkAchievement("ten_locations")
+            if (locationCount >= 20) checkAchievement("twenty_locations")
+
+            updateQuestProgress(
+                charId = charId,
+                objectiveType = QuestObjectiveType.LOCATIONS,
+                increment = 0,
+                absolute = locationCount
+            )
+        } catch (e: Exception) {
+            Log.e("AchievVM", "syncLocationAchievements: ${e.message}")
         }
     }
 
@@ -200,26 +331,79 @@ class AchievementViewModel : ViewModel() {
 
     private fun checkAchievement(achievementId: String) {
         val uid = auth.currentUser?.uid ?: return
-        val current = _achievements.value.firstOrNull { it.id == achievementId } ?: return
-        if (current.isUnlocked) return
+
+        val catalogAchievement = AchievementCatalog.getById(achievementId) ?: run {
+            Log.w("AchievVM", "Logro no existe en catálogo: $achievementId")
+            return
+        }
+
+        val localAchievement = _achievements.value.firstOrNull { it.id == achievementId }
+
+        if (localAchievement?.isUnlocked == true) {
+            return
+        }
 
         viewModelScope.launch {
             try {
-                val now = System.currentTimeMillis()
-                db.collection("users").document(uid)
-                    .collection("achievements").document(achievementId)
-                    .set(mapOf("isUnlocked" to true, "unlockedAt" to now), SetOptions.merge())
-                    .await()
+                val achievementRef = db.collection("users")
+                    .document(uid)
+                    .collection("achievements")
+                    .document(achievementId)
 
-                val unlocked = current.copy(isUnlocked = true, unlockedAt = now)
-                _achievements.value = _achievements.value.map {
-                    if (it.id == achievementId) unlocked else it
+                val existing = achievementRef.get().await()
+
+                if (existing.getBoolean("isUnlocked") == true) {
+                    val unlockedAt = existing.getLong("unlockedAt") ?: 0L
+
+                    val alreadyUnlocked = catalogAchievement.copy(
+                        isUnlocked = true,
+                        unlockedAt = unlockedAt
+                    )
+
+                    if (_achievements.value.isEmpty()) {
+                        _achievements.value = AchievementCatalog.all.map {
+                            if (it.id == achievementId) alreadyUnlocked else it
+                        }
+                    } else {
+                        _achievements.value = _achievements.value.map {
+                            if (it.id == achievementId) alreadyUnlocked else it
+                        }
+                    }
+
+                    return@launch
                 }
+
+                val now = System.currentTimeMillis()
+
+                achievementRef.set(
+                    mapOf(
+                        "isUnlocked" to true,
+                        "unlockedAt" to now
+                    ),
+                    SetOptions.merge()
+                ).await()
+
+                val unlocked = catalogAchievement.copy(
+                    isUnlocked = true,
+                    unlockedAt = now
+                )
+
+                if (_achievements.value.isEmpty()) {
+                    _achievements.value = AchievementCatalog.all.map {
+                        if (it.id == achievementId) unlocked else it
+                    }
+                } else {
+                    _achievements.value = _achievements.value.map {
+                        if (it.id == achievementId) unlocked else it
+                    }
+                }
+
                 _pendingAchievementXp.value += unlocked.xpReward
                 _newAchievement.emit(unlocked)
+
                 Log.d("AchievVM", "Logro desbloqueado: ${unlocked.title}")
             } catch (e: Exception) {
-                Log.e("AchievVM", "checkAchievement: ${e.message}")
+                Log.e("AchievVM", "checkAchievement: ${e.message}", e)
             }
         }
     }

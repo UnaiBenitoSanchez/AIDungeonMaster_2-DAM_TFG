@@ -87,8 +87,32 @@ object AchievementCatalog {
             emoji = "🌍",
             xpReward = 200
         ),
+        Achievement(
+            id = "twenty_locations",
+            title = "Leyenda de los Caminos",
+            description = "Descubre 20 ubicaciones distintas.",
+            category = AchievementCategory.EXPLORATION,
+            emoji = "🧳",
+            xpReward = 300
+        ),
 
         // ── PROGRESIÓN ───────────────────────────────────────────────────────
+        Achievement(
+            id = "first_levelup",
+            title = "¡Subiste de Nivel!",
+            description = "Sube de nivel por primera vez.",
+            category = AchievementCategory.PROGRESSION,
+            emoji = "🆙",
+            xpReward = 50
+        ),
+        Achievement(
+            id = "level_3",
+            title = "Héroe Prometedor",
+            description = "Alcanza el nivel 3.",
+            category = AchievementCategory.PROGRESSION,
+            emoji = "⚜️",
+            xpReward = 75
+        ),
         Achievement(
             id = "level_5",
             title = "Aventurero Consagrado",
@@ -106,12 +130,12 @@ object AchievementCatalog {
             xpReward = 250
         ),
         Achievement(
-            id = "first_levelup",
-            title = "¡Subiste de Nivel!",
-            description = "Sube de nivel por primera vez.",
+            id = "level_15",
+            title = "Nombre de Leyenda",
+            description = "Alcanza el nivel 15.",
             category = AchievementCategory.PROGRESSION,
-            emoji = "🆙",
-            xpReward = 50
+            emoji = "👑",
+            xpReward = 400
         ),
 
         // ── COLECCIONISTA ────────────────────────────────────────────────────
@@ -130,6 +154,56 @@ object AchievementCatalog {
             category = AchievementCategory.COLLECTOR,
             emoji = "💼",
             xpReward = 80
+        ),
+
+        // ── APP / SOCIAL ─────────────────────────────────────────────────────
+        Achievement(
+            id = "first_character_created",
+            title = "El Nacimiento de un Héroe",
+            description = "Crea tu primer personaje.",
+            category = AchievementCategory.PROGRESSION,
+            emoji = "🧙",
+            xpReward = 40
+        ),
+        Achievement(
+            id = "character_sheet_opened",
+            title = "Ficha Preparada",
+            description = "Abre la ficha RPG visual de un personaje.",
+            category = AchievementCategory.PROGRESSION,
+            emoji = "📄",
+            xpReward = 35
+        ),
+        Achievement(
+            id = "character_sheet_exported",
+            title = "Aventurero Documentado",
+            description = "Exporta una ficha RPG en PDF.",
+            category = AchievementCategory.PROGRESSION,
+            emoji = "🖨️",
+            xpReward = 60
+        ),
+        Achievement(
+            id = "social_opened",
+            title = "Primer Contacto",
+            description = "Abre la zona social por primera vez.",
+            category = AchievementCategory.SOCIAL,
+            emoji = "🤝",
+            xpReward = 30
+        ),
+        Achievement(
+            id = "ranking_opened",
+            title = "Mirada Competitiva",
+            description = "Consulta el ranking mundial.",
+            category = AchievementCategory.SOCIAL,
+            emoji = "🏆",
+            xpReward = 30
+        ),
+        Achievement(
+            id = "achievements_opened",
+            title = "Cazador de Logros",
+            description = "Visita el Salón de la Fama.",
+            category = AchievementCategory.PROGRESSION,
+            emoji = "🎖️",
+            xpReward = 25
         ),
 
         // ── SECRETOS ─────────────────────────────────────────────────────────

@@ -69,6 +69,9 @@ import java.util.Date
 import java.util.Locale
 import kotlin.math.floor
 
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.aidungeonmaster.viewmodel.AchievementViewModel
+
 private val SheetBg = Color(0xFF120C07)
 private val ParchmentTop = Color(0xFFF8EAC5)
 private val ParchmentBottom = Color(0xFFE4C98E)
@@ -87,7 +90,8 @@ fun CharacterSheetScreen(
     characterName: String,
     onBack: () -> Unit,
     onOpenRoom: (String, String) -> Unit,
-    onContinueAdventure: (String, String, String) -> Unit
+    onContinueAdventure: (String, String, String) -> Unit,
+    achievementViewModel: AchievementViewModel = viewModel()
 ) {
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
@@ -107,6 +111,7 @@ fun CharacterSheetScreen(
                 uri = uri,
                 character = current
             ).onSuccess {
+                achievementViewModel.onCharacterSheetExported()
                 errorMessage = "Ficha PDF guardada correctamente."
             }.onFailure {
                 errorMessage = it.message ?: "No se pudo guardar el PDF."

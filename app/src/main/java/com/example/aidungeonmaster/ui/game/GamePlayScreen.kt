@@ -111,7 +111,12 @@ fun GamePlayScreen(
         journalViewModel.loadJournal(charId)
 
         viewModel.worldMapViewModel = mapViewModel
-        mapViewModel.loadMap(charId)   // charId = "${userId}_${characterName}" (sin tema)
+
+        mapViewModel.onLocationDiscoveredForAchievements = { discoveredCharId, locationCount ->
+            achievementViewModel.onLocationDiscovered(discoveredCharId, locationCount)
+        }
+
+        mapViewModel.loadMap(charId)
         viewModel.startStory(userId, characterName, theme)
         achievementViewModel.loadForCharacter(charId)
 
@@ -243,6 +248,7 @@ fun GamePlayScreen(
     LaunchedEffect(Unit) {
         inventoryViewModel.levelUpEvent.collect { newLevel ->
             levelUpDialogLevel = newLevel
+            achievementViewModel.onLevelUp(charId, newLevel)
         }
     }
 

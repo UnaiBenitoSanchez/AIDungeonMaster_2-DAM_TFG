@@ -91,12 +91,15 @@ import androidx.compose.foundation.shape.CircleShape
 import com.example.aidungeonmaster.ui.social.NotificationBadge
 import com.example.aidungeonmaster.viewmodel.SocialViewModel
 
+import com.example.aidungeonmaster.viewmodel.AchievementViewModel
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     navController: NavHostController,
     viewModel: HomeViewModel = viewModel(),
-    socialViewModel: SocialViewModel = viewModel()
+    socialViewModel: SocialViewModel = viewModel(),
+    achievementViewModel: AchievementViewModel = viewModel()
 ) {
     val context = LocalContext.current
     val tutorialPrefs = remember {
@@ -342,7 +345,10 @@ fun HomeScreen(
                     },
                     actions = {
                         IconButton(
-                            onClick = { navController.navigate("ranking") },
+                            onClick = {
+                                achievementViewModel.onRankingOpened()
+                                navController.navigate("ranking")
+                            },
                             modifier = Modifier.tutorialAnchor("btn_ranking", tutorialTargets)
                         ) {
                             Icon(
@@ -353,7 +359,10 @@ fun HomeScreen(
                         }
 
                         IconButton(
-                            onClick = { navController.navigate(Screen.Achievements.route) },
+                            onClick = {
+                                achievementViewModel.onAchievementsOpened()
+                                navController.navigate(Screen.Achievements.route)
+                            },
                             modifier = Modifier.tutorialAnchor("btn_achievements", tutorialTargets)
                         ) {
                             Icon(
@@ -453,6 +462,7 @@ fun HomeScreen(
                                         )
                                     },
                                     onOpenSheet = {
+                                        achievementViewModel.onCharacterSheetOpened()
                                         navController.navigate(Screen.CharacterSheet.createRoute(userId, character.name))
                                     },
                                     onDelete = { characterToDelete = character }
@@ -468,7 +478,10 @@ fun HomeScreen(
                         .padding(16.dp)
                 ) {
                     FloatingActionButton(
-                        onClick = { showSocialSheet = true },
+                        onClick = {
+                            achievementViewModel.onSocialOpened()
+                            showSocialSheet = true
+                        },
                         modifier = Modifier.tutorialAnchor("btn_social", tutorialTargets)
                     ) {
                         Icon(
@@ -569,6 +582,7 @@ fun HomeScreen(
             onDismiss = { showDialog = false },
             onCreate = { name, race, clazz, stats, traits, portraitUrl ->
                 viewModel.saveCharacter(name, race, clazz, stats, traits, portraitUrl)
+                achievementViewModel.onCharacterCreated()
                 showDialog = false
             }
         )
