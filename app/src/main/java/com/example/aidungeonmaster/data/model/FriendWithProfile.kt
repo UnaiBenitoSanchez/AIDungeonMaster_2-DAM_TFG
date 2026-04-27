@@ -10,5 +10,6 @@ data class FriendWithProfile(
     val accentColor: String = "#D4AF37",
     val profileBackgroundColor: String = "#1E1E1E",
     val isOnline: Boolean = false,
-    val lastSeen: Long = 0L
+    val lastSeen: Long = 0L,
+    val unreadCount: Int = 0
 )

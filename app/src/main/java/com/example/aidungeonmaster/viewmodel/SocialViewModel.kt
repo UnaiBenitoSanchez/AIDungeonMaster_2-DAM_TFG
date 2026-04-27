@@ -267,8 +267,9 @@ class SocialViewModel : ViewModel() {
     fun stopFriendsListener() {
         friendsListener?.remove()
         friendsListener = null
+        repository.clearFriendListeners()
+        _friends.value = emptyList()
     }
-
     fun startGuildsListener() {
         if (guildsListener != null) return
 

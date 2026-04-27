@@ -13,7 +13,7 @@ import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.tasks.await
-
+import com.example.aidungeonmaster.data.model.ChatMessage
 class SocialRepository {
 
     companion object {
@@ -27,6 +27,7 @@ class SocialRepository {
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
     private val friendProfileListeners = mutableListOf<ListenerRegistration>()
+    private val friendUnreadListeners = mutableListOf<ListenerRegistration>()
 
     fun currentUid(): String? = auth.currentUser?.uid
 
@@ -247,6 +248,7 @@ class SocialRepository {
                 }
 
                 clearFriendProfileListeners()
+                clearFriendUnreadListeners()
 
                 val docs = snapshot?.documents.orEmpty()
                 if (docs.isEmpty()) {
@@ -255,14 +257,24 @@ class SocialRepository {
                 }
 
                 val liveFriends = linkedMapOf<String, FriendWithProfile>()
+                val unreadCounts = linkedMapOf<String, Int>()
+
+                fun publishFriends() {
+                    onChange(
+                        liveFriends.values.sortedBy {
+                            it.username.lowercase()
+                        }
+                    )
+                }
 
                 docs.forEach { friendDoc ->
                     val friendUid = friendDoc.getString("uid").orEmpty()
                     if (friendUid.isBlank()) return@forEach
 
                     val friendshipId = friendDoc.getString("friendshipId").orEmpty()
+                        .ifBlank { buildFriendshipId(myUid, friendUid) }
 
-                    val reg = db.collection("users")
+                    val profileReg = db.collection("users")
                         .document(friendUid)
                         .addSnapshotListener { userSnapshot, userError ->
                             if (userError != null) {
@@ -284,14 +296,45 @@ class SocialRepository {
                                     accentColor = user.accentColor,
                                     profileBackgroundColor = user.profileBackgroundColor,
                                     isOnline = user.isOnline,
-                                    lastSeen = user.lastSeen
+                                    lastSeen = user.lastSeen,
+                                    unreadCount = unreadCounts[friendUid] ?: 0
                                 )
                             }
 
-                            onChange(liveFriends.values.sortedBy { it.username.lowercase() })
+                            publishFriends()
                         }
 
-                    friendProfileListeners += reg
+                    friendProfileListeners += profileReg
+
+                    val unreadReg = db.collection("private_chats")
+                        .document(friendshipId)
+                        .collection("messages")
+                        .addSnapshotListener { messageSnapshot, messageError ->
+                            if (messageError != null) {
+                                onError(messageError.message ?: "Error escuchando mensajes sin leer")
+                                return@addSnapshotListener
+                            }
+
+                            val unreadCount = messageSnapshot?.documents.orEmpty()
+                                .mapNotNull { doc ->
+                                    doc.toObject(ChatMessage::class.java)?.copy(id = doc.id)
+                                }
+                                .count { msg ->
+                                    msg.senderUid == friendUid && !msg.seenBy.contains(myUid)
+                                }
+
+                            unreadCounts[friendUid] = unreadCount
+
+                            liveFriends[friendUid]?.let { currentFriend ->
+                                liveFriends[friendUid] = currentFriend.copy(
+                                    unreadCount = unreadCount
+                                )
+                            }
+
+                            publishFriends()
+                        }
+
+                    friendUnreadListeners += unreadReg
                 }
             }
     }
@@ -798,6 +841,16 @@ class SocialRepository {
     private fun clearFriendProfileListeners() {
         friendProfileListeners.forEach { it.remove() }
         friendProfileListeners.clear()
+    }
+
+    private fun clearFriendUnreadListeners() {
+        friendUnreadListeners.forEach { it.remove() }
+        friendUnreadListeners.clear()
+    }
+
+    fun clearFriendListeners() {
+        clearFriendProfileListeners()
+        clearFriendUnreadListeners()
     }
 
     private fun DocumentSnapshot.toAppUser(): AppUser? {
