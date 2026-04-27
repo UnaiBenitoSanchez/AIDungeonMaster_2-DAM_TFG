@@ -62,6 +62,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import com.example.aidungeonmaster.ui.tutorial.DragonTutorialOverlay
 
+import com.example.aidungeonmaster.ui.home.CharacterSheetScreen
+
 sealed class Screen(val route: String) {
     object Login : Screen("login")
     object Register : Screen("register")
@@ -71,6 +73,13 @@ sealed class Screen(val route: String) {
 
     object Inventory : Screen("inventory/{userId}") {
         fun createRoute(userId: String) = "inventory/${Uri.encode(userId)}"
+    }
+
+    object CharacterSheet : Screen("character_sheet/{userId}/{characterName}") {
+        fun createRoute(userId: String, characterName: String): String {
+            val encodedName = Uri.encode(characterName)
+            return "character_sheet/$userId/$encodedName"
+        }
     }
 
     object QRScanner : Screen("qr_scanner")
@@ -244,6 +253,25 @@ fun AppNavigation(navController: NavHostController) {
                 QRScannerScreen(
                     gameId = gameId,
                     onBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(Screen.CharacterSheet.route) { backStackEntryArg ->
+                val userId = backStackEntryArg.arguments?.getString("userId").orEmpty()
+                val characterName = Uri.decode(
+                    backStackEntryArg.arguments?.getString("characterName").orEmpty()
+                )
+
+                CharacterSheetScreen(
+                    userId = userId,
+                    characterName = characterName,
+                    onBack = { navController.popBackStack() },
+                    onOpenRoom = { charId, name ->
+                        navController.navigate(Screen.PersonalRoom.createRoute(charId, name))
+                    },
+                    onContinueAdventure = { uid, name, theme ->
+                        navController.navigate(Screen.GamePlay.createRoute(uid, name, theme))
+                    }
                 )
             }
 

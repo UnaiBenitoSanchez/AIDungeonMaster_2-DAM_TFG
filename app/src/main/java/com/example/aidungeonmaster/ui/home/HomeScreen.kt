@@ -85,6 +85,8 @@ import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 
+import androidx.compose.material.icons.filled.Description
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
@@ -408,6 +410,9 @@ fun HomeScreen(
                                             Screen.PersonalRoom.createRoute(partidaId, character.name)
                                         )
                                     },
+                                    onOpenSheet = {
+                                        navController.navigate(Screen.CharacterSheet.createRoute(userId, character.name))
+                                    },
                                     onDelete = { characterToDelete = character }
                                 )
                             }
@@ -548,6 +553,7 @@ fun CharacterCard(
     deleteButtonModifier: Modifier = Modifier,
     onClick: () -> Unit,
     onOpenRoom: () -> Unit,
+    onOpenSheet: () -> Unit,
     onDelete: () -> Unit
 ) {
     val imageModel = remember(character.portraitUrl) {
@@ -713,6 +719,16 @@ fun CharacterCard(
                         Icons.Default.Home,
                         contentDescription = "Abrir fortaleza",
                         tint = Color(0xFFFFD700)
+                    )
+                }
+
+                IconButton(
+                    onClick = onOpenSheet
+                ) {
+                    Icon(
+                        Icons.Default.Description,
+                        contentDescription = "Ver ficha RPG",
+                        tint = Color(0xFF8B1E16)
                     )
                 }
 
