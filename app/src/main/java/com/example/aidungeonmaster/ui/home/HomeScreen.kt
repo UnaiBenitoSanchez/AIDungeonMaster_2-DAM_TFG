@@ -94,13 +94,19 @@ import com.example.aidungeonmaster.viewmodel.SocialViewModel
 
 import com.example.aidungeonmaster.viewmodel.AchievementViewModel
 
+import androidx.compose.material.icons.filled.Palette
+import com.example.aidungeonmaster.ui.settings.ColorBlindSettingsSheet
+import com.example.aidungeonmaster.ui.theme.ColorBlindType
+import com.example.aidungeonmaster.ui.theme.LocalColorBlindType
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     navController: NavHostController,
     viewModel: HomeViewModel = viewModel(),
     socialViewModel: SocialViewModel = viewModel(),
-    achievementViewModel: AchievementViewModel = viewModel()
+    achievementViewModel: AchievementViewModel = viewModel(),
+    onColorBlindChanged: (ColorBlindType) -> Unit = {}
 ) {
     val context = LocalContext.current
     val tutorialPrefs = remember {
@@ -135,6 +141,9 @@ fun HomeScreen(
     var characterToDelete by remember { mutableStateOf<Character?>(null) }
     var showSocialSheet by remember { mutableStateOf(false) }
     var showTutorialSocialPanel by remember { mutableStateOf(false) }
+
+    var showColorBlindSheet by remember { mutableStateOf(false) }
+    val currentColorBlindType = LocalColorBlindType.current
 
     val userId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
     val listState = rememberLazyListState()
@@ -350,6 +359,19 @@ fun HomeScreen(
                         )
                     },
                     actions = {
+                        IconButton(
+                            onClick = { showColorBlindSheet = true }
+                        ) {
+                            Icon(
+                                imageVector        = Icons.Default.Palette,
+                                contentDescription = "Modo daltónico",
+                                tint               = if (currentColorBlindType != ColorBlindType.NONE)
+                                    Color(0xFFD4AF37)
+                                else
+                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                            )
+                        }
+
                         // Botón para relanzar el tutorial
                         IconButton(
                             onClick = {
@@ -597,6 +619,15 @@ fun HomeScreen(
             lockForTutorial = showTutorial && currentTargetKey.startsWith("social_"),
             pendingFriendRequestsCount = pendingFriendRequestsCount,
             unreadPrivateMessagesCount = unreadPrivateMessagesCount
+        )
+    }
+
+    // Diálogo de accesibilidad daltónica
+    if (showColorBlindSheet) {
+        ColorBlindSettingsSheet(
+            currentType    = currentColorBlindType,
+            onTypeSelected = { newType -> onColorBlindChanged(newType) },
+            onDismiss      = { showColorBlindSheet = false }
         )
     }
 

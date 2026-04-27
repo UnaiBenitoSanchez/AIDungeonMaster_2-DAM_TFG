@@ -65,6 +65,7 @@ import com.example.aidungeonmaster.ui.tutorial.DragonTutorialOverlay
 
 import com.example.aidungeonmaster.ui.home.CharacterSheetScreen
 import com.example.aidungeonmaster.viewmodel.CombatPhase
+import com.example.aidungeonmaster.ui.theme.ColorBlindType
 
 sealed class Screen(val route: String) {
     object Login : Screen("login")
@@ -153,7 +154,10 @@ sealed class Screen(val route: String) {
 
 @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
 @Composable
-fun AppNavigation(navController: NavHostController) {
+fun AppNavigation(
+    navController: NavHostController,
+    onColorBlindChanged: (ColorBlindType) -> Unit = {}
+) {
     val authViewModel: AuthViewModel = viewModel()
     val gameViewModel: GameViewModel = viewModel()
     val inventoryViewModel: InventoryViewModel = viewModel()
@@ -189,7 +193,10 @@ fun AppNavigation(navController: NavHostController) {
             }
 
             composable(Screen.Home.route) {
-                HomeScreen(navController)
+                HomeScreen(
+                    navController       = navController,
+                    onColorBlindChanged = onColorBlindChanged
+                )
             }
 
             composable(Screen.MyProfile.route) {
