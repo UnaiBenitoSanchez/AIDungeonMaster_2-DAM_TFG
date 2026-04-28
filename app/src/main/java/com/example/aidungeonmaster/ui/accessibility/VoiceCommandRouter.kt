@@ -63,7 +63,7 @@ fun executeVoiceCommand(
     }
 
     if (command.containsAny("ayuda", "que puedo decir", "comandos", "ordenes disponibles")) {
-        return "Puedes decir: abre lista de amigos, abre ranking, abre gremios, abre la partida de un personaje, abre inventario, abre diario, abre ficha, vuelve atrás o, dentro de una aventura, dictar una acción como atacar con la espada."
+        return "Puedes decir: ir a registro, crear personaje, abre lista de amigos, abre ranking, abre gremios, crear gremio, abre la partida de un personaje, abre inventario, abre diario, abre ficha, vuelve atrás o rellenar campos diciendo, por ejemplo, correo con usuario arroba gmail punto com."
     }
 
     if (command.containsAny("opciones de usabilidad", "ajustes de usabilidad", "accesibilidad", "modo daltonico", "daltónico", "daltonico")) {
@@ -74,6 +74,56 @@ fun executeVoiceCommand(
     if (command.containsAny("volver atras", "vuelve atras", "atras", "retrocede", "pantalla anterior")) {
         val didPop = navController.popBackStack()
         return if (didPop) "Volviendo atrás." else "No hay una pantalla anterior a la que volver."
+    }
+
+    VoiceFormRegistry.tryHandle(rawCommand)?.let { feedback ->
+        return feedback
+    }
+
+    if (command.containsAny(
+            "ir a registro",
+            "ve a registro",
+            "abre registro",
+            "abrir registro",
+            "pantalla de registro",
+            "registrarme",
+            "crear cuenta",
+            "crear una cuenta"
+        )
+    ) {
+        return navigate(Screen.Register.route, "Abriendo registro.")
+    }
+
+    if (command.containsAny(
+            "ir a login",
+            "ir a inicio de sesion",
+            "ir a iniciar sesion",
+            "abre login",
+            "abrir login",
+            "pantalla de login",
+            "iniciar sesion",
+            "inicio de sesion"
+        )
+    ) {
+        return navigate(Screen.Login.route, "Abriendo inicio de sesión.")
+    }
+
+    if (command.containsAny(
+            "crear personaje",
+            "crear un personaje",
+            "nuevo personaje",
+            "nuevo heroe",
+            "nuevo héroe",
+            "crear heroe",
+            "crear héroe",
+            "crear aventurero",
+            "nuevo aventurero"
+        )
+    ) {
+        return navigate(
+            Screen.Home.createRoute(openCreateCharacter = true),
+            "Abriendo creación de personaje."
+        )
     }
 
     if (command.containsAny("inicio", "pantalla principal", "home", "mis personajes", "tus personajes")) {

@@ -32,7 +32,12 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -51,6 +56,11 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.aidungeonmaster.R
+import com.example.aidungeonmaster.ui.accessibility.VoiceFormAction
+import com.example.aidungeonmaster.ui.accessibility.VoiceFormField
+import com.example.aidungeonmaster.ui.accessibility.VoiceFormRegistry
+import com.example.aidungeonmaster.ui.accessibility.VoiceFormScreen
+import com.example.aidungeonmaster.ui.accessibility.VoiceInputType
 import com.example.aidungeonmaster.viewmodel.AuthViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -66,6 +76,102 @@ fun RegisterScreen(
     var username by remember { mutableStateOf("") }
 
     val context = LocalContext.current
+
+    fun submitRegister() {
+        when {
+            displayName.isBlank() -> viewModel.errorMessage = "Introduce un nombre visible."
+            username.length < 3 -> viewModel.errorMessage = "El nombre de usuario debe tener al menos 3 caracteres."
+            password != confirmPassword -> viewModel.errorMessage = "Las contraseñas no coinciden."
+            else -> {
+                viewModel.register(
+                    email = email,
+                    pass = password,
+                    displayName = displayName,
+                    username = username
+                ) {
+                    Toast.makeText(
+                        context,
+                        "¡Revisa tu correo! Te hemos enviado un email de verificación.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                    navController.popBackStack()
+                }
+            }
+        }
+    }
+
+    DisposableEffect(email, password, confirmPassword, displayName, username) {
+        val registration = VoiceFormRegistry.register(
+            VoiceFormScreen(
+                screenName = "registro",
+                fields = listOf(
+                    VoiceFormField(
+                        label = "nombre visible",
+                        aliases = listOf("nombre visible", "nombre", "nombre completo"),
+                        inputType = VoiceInputType.HUMAN_NAME,
+                        onValue = { displayName = it }
+                    ),
+                    VoiceFormField(
+                        label = "nombre de usuario",
+                        aliases = listOf("nombre de usuario", "usuario", "username"),
+                        inputType = VoiceInputType.USERNAME,
+                        onValue = { username = it }
+                    ),
+                    VoiceFormField(
+                        label = "correo electrónico",
+                        aliases = listOf("correo", "email", "correo electronico", "correo electrónico"),
+                        inputType = VoiceInputType.EMAIL,
+                        onValue = { email = it }
+                    ),
+                    VoiceFormField(
+                        label = "contraseña",
+                        aliases = listOf("contraseña", "contrasena", "password", "clave"),
+                        inputType = VoiceInputType.PASSWORD,
+                        onValue = { password = it },
+                        feedback = { "Contraseña actualizada." }
+                    ),
+                    VoiceFormField(
+                        label = "confirmar contraseña",
+                        aliases = listOf(
+                            "confirmar contraseña",
+                            "confirmar contrasena",
+                            "repetir contraseña",
+                            "repetir contrasena",
+                            "confirmacion",
+                            "confirmación"
+                        ),
+                        inputType = VoiceInputType.PASSWORD,
+                        onValue = { confirmPassword = it },
+                        feedback = { "Confirmación de contraseña actualizada." }
+                    )
+                ),
+                actions = listOf(
+                    VoiceFormAction(
+                        label = "crear cuenta",
+                        aliases = listOf(
+                            "crear cuenta",
+                            "crear una cuenta",
+                            "registrarme",
+                            "forjar destino",
+                            "crear aventurero"
+                        ),
+                        enabled = {
+                            email.isNotBlank() &&
+                                    password.isNotBlank() &&
+                                    confirmPassword.isNotBlank() &&
+                                    displayName.isNotBlank() &&
+                                    username.isNotBlank()
+                        },
+                        disabledFeedback = "Faltan campos obligatorios para crear la cuenta.",
+                        onRun = { submitRegister() },
+                        feedback = "Creando cuenta."
+                    )
+                )
+            )
+        )
+
+        onDispose { registration.dispose() }
+    }
 
     Box(
         modifier = Modifier
@@ -213,28 +319,7 @@ fun RegisterScreen(
                     )
 
                     Button(
-                        onClick = {
-                            when {
-                                displayName.isBlank() -> viewModel.errorMessage = "Introduce un nombre visible."
-                                username.length < 3 -> viewModel.errorMessage = "El nombre de usuario debe tener al menos 3 caracteres."
-                                password != confirmPassword -> viewModel.errorMessage = "Las contraseñas no coinciden."
-                                else -> {
-                                    viewModel.register(
-                                        email = email,
-                                        pass = password,
-                                        displayName = displayName,
-                                        username = username
-                                    ) {
-                                        Toast.makeText(
-                                            context,
-                                            "¡Revisa tu correo! Te hemos enviado un email de verificación.",
-                                            Toast.LENGTH_LONG
-                                        ).show()
-                                        navController.popBackStack()
-                                    }
-                                }
-                            }
-                        },
+                        onClick = { submitRegister() },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(55.dp),

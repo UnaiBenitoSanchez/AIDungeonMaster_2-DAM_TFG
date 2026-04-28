@@ -21,11 +21,22 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.aidungeonmaster.data.model.AppUser
+import com.example.aidungeonmaster.ui.accessibility.VoiceFormField
+import com.example.aidungeonmaster.ui.accessibility.VoiceFormRegistry
+import com.example.aidungeonmaster.ui.accessibility.VoiceFormScreen
+import com.example.aidungeonmaster.ui.accessibility.VoiceInputType
 import com.example.aidungeonmaster.viewmodel.SocialViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -40,6 +51,40 @@ fun UserSearchScreen(
     val message by viewModel.message.collectAsState()
 
     val snackbarHostState = remember { SnackbarHostState() }
+
+    DisposableEffect(query, isSearching) {
+        val registration = VoiceFormRegistry.register(
+            VoiceFormScreen(
+                screenName = "búsqueda de usuarios",
+                fields = listOf(
+                    VoiceFormField(
+                        label = "buscar usuario",
+                        aliases = listOf(
+                            "buscar usuario",
+                            "buscar jugador",
+                            "buscar aventurero",
+                            "usuario",
+                            "jugador",
+                            "aventurero",
+                            "busqueda",
+                            "búsqueda"
+                        ),
+                        inputType = VoiceInputType.USERNAME,
+                        onValue = { value ->
+                            query = value
+
+                            if (value.length >= 2) {
+                                viewModel.searchUsers(value)
+                            }
+                        },
+                        feedback = { value -> "Buscando usuarios por $value." }
+                    )
+                )
+            )
+        )
+
+        onDispose { registration.dispose() }
+    }
 
     LaunchedEffect(message) {
         if (!message.isNullOrBlank()) {
@@ -70,6 +115,7 @@ fun UserSearchScreen(
                 value = query,
                 onValueChange = {
                     query = it
+
                     if (it.length >= 2) {
                         viewModel.searchUsers(it)
                     }
@@ -83,18 +129,21 @@ fun UserSearchScreen(
                 isSearching -> {
                     CircularProgressIndicator()
                 }
+
                 query.length < 2 -> {
                     Text(
                         "Escribe al menos 2 caracteres.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+
                 results.isEmpty() -> {
                     Text(
                         "No se encontraron usuarios.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+
                 else -> {
                     LazyColumn(
                         contentPadding = PaddingValues(vertical = 8.dp),
@@ -120,9 +169,18 @@ private fun UserResultCard(
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(user.displayName, style = MaterialTheme.typography.titleMedium)
-            Text("@${user.username}", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                user.displayName,
+                style = MaterialTheme.typography.titleMedium
+            )
+
+            Text(
+                "@${user.username}",
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+
             Button(onClick = onSendRequest) {
                 Text("Enviar solicitud")
             }

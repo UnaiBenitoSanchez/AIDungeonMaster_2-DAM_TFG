@@ -71,12 +71,22 @@ import com.example.aidungeonmaster.viewmodel.CombatPhase
 import com.example.aidungeonmaster.ui.theme.ColorBlindType
 import com.example.aidungeonmaster.ui.theme.LocalColorBlindType
 
-import androidx.navigation.navArgument
-
 sealed class Screen(val route: String) {
     object Login : Screen("login")
     object Register : Screen("register")
-    object Home : Screen("home")
+
+    object Home : Screen("home") {
+        const val openCreateRoute = "home?openCreateCharacter={openCreateCharacter}"
+
+        fun createRoute(openCreateCharacter: Boolean = false): String {
+            return if (openCreateCharacter) {
+                "home?openCreateCharacter=true"
+            } else {
+                route
+            }
+        }
+    }
+
     object MyProfile : Screen("my_profile")
     object Guilds : Screen("guilds?openCreate={openCreate}") {
         fun createRoute(openCreate: Boolean = false): String {
@@ -180,7 +190,7 @@ fun AppNavigation(
     val deletionRepository = CharacterDeletionRepository()
     val scope = rememberCoroutineScope()
 
-    val startRoute = if (authViewModel.isUserLoggedIn()) Screen.Home.route else Screen.Login.route
+    val startRoute = if (authViewModel.isUserLoggedIn()) Screen.Home.createRoute() else Screen.Login.route
 
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
@@ -199,9 +209,26 @@ fun AppNavigation(
 
     Box(modifier = Modifier.fillMaxSize()) {
 
+        val homeContent: @Composable (Boolean) -> Unit = { autoOpenCreateCharacter ->
+            HomeScreen(
+                navController = navController,
+                viewModel = homeViewModel,
+                onColorBlindChanged = onColorBlindChanged,
+                onOpenAccessibilityOptions = {
+                    accessibilityOpenRequest++
+                },
+                autoOpenCreateCharacter = autoOpenCreateCharacter
+            )
+        }
+
         NavHost(navController = navController, startDestination = startRoute) {
             composable(Screen.Login.route) {
-                LoginScreen(navController)
+                LoginScreen(
+                    navController = navController,
+                    onOpenAccessibilityOptions = {
+                        accessibilityOpenRequest++
+                    }
+                )
             }
 
             composable(Screen.Register.route) {
@@ -209,14 +236,22 @@ fun AppNavigation(
             }
 
             composable(Screen.Home.route) {
-                HomeScreen(
-                    navController = navController,
-                    viewModel = homeViewModel,
-                    onColorBlindChanged = onColorBlindChanged,
-                    onOpenAccessibilityOptions = {
-                        accessibilityOpenRequest++
+                homeContent(false)
+            }
+
+            composable(
+                route = Screen.Home.openCreateRoute,
+                arguments = listOf(
+                    navArgument("openCreateCharacter") {
+                        type = NavType.BoolType
+                        defaultValue = false
                     }
                 )
+            ) { backStackEntryArg ->
+                val openCreateCharacter =
+                    backStackEntryArg.arguments?.getBoolean("openCreateCharacter") ?: false
+
+                homeContent(openCreateCharacter)
             }
 
             composable(Screen.MyProfile.route) {
@@ -666,29 +701,33 @@ fun AppNavigation(
             }
         }
 
+        UsabilityAssistantOverlay(
+            navController = navController,
+            currentRoute = currentRoute,
+            currentArguments = backStackEntry?.arguments,
+            characters = characters,
+            gameViewModel = gameViewModel,
+            currentColorBlindType = LocalColorBlindType.current,
+            onColorBlindChanged = onColorBlindChanged,
+            openSheetRequest = accessibilityOpenRequest,
+            showFloatingButton = false
+        )
     }
-    UsabilityAssistantOverlay(
-        navController = navController,
-        currentRoute = currentRoute,
-        currentArguments = backStackEntry?.arguments,
-        characters = characters,
-        gameViewModel = gameViewModel,
-        currentColorBlindType = LocalColorBlindType.current,
-        onColorBlindChanged = onColorBlindChanged,
-        openSheetRequest = accessibilityOpenRequest,
-        showFloatingButton = false
-    )
+
 }
 
 private fun String?.isAdventureRoute(): Boolean {
     val route = this?.lowercase().orEmpty()
 
-    return route.startsWith("gameplay/") ||
-            route.startsWith("gamelayout/") ||
-            route.startsWith("inventory/") ||
-            route.startsWith("journal/") ||
-            route.startsWith("bestiary/") ||
-            route.startsWith("armap/") ||
-            route.startsWith("locationsgallery/") ||
-            route.startsWith("combat/")
+    return route.startsWith("game_play") ||
+            route.startsWith("gameplay") ||
+            route.startsWith("gamelayout") ||
+            route.startsWith("inventory") ||
+            route.startsWith("journal") ||
+            route.startsWith("bestiary") ||
+            route.startsWith("ar_map") ||
+            route.startsWith("armap") ||
+            route.startsWith("locations_gallery") ||
+            route.startsWith("locationsgallery") ||
+            route.startsWith("combat")
 }

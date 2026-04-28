@@ -28,6 +28,7 @@ object AdventureMusicEngine {
     private const val DELAY_BUFFER_SECONDS = 0.75
     private const val CROSSFADE_STEPS = 8
     private const val DEFAULT_STOP_DELAY_MS = 900L
+    private const val VOICE_CONTROL_DUCKING_MULTIPLIER = 0.16f
 
     private val engineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val DELAY_BUF = (SR * DELAY_BUFFER_SECONDS).toInt().coerceAtLeast(1)
@@ -254,6 +255,9 @@ object AdventureMusicEngine {
     @Volatile
     private var requestedScreen: MusicScreen = MusicScreen.GAMEPLAY
 
+    @Volatile
+    private var voiceControlDuckingEnabled = false
+
     private var activeState = RenderState(AdventureThemeProfile.fromTheme("Fantasía Épica"))
     private var pendingState: RenderState? = null
     private var crossfadeProgress = 1f
@@ -270,6 +274,10 @@ object AdventureMusicEngine {
     fun setScreen(screen: MusicScreen) {
         requestedScreen = screen
         stopJob?.cancel()
+    }
+
+    fun setVoiceControlDucking(enabled: Boolean) {
+        voiceControlDuckingEnabled = enabled
     }
 
     fun releaseScreen(delayMs: Long = DEFAULT_STOP_DELAY_MS) {
@@ -391,7 +399,7 @@ object AdventureMusicEngine {
                 activeBuffer
             }
 
-            val targetGain = requestedScreen.volume
+            val targetGain = effectiveRequestedVolume()
             val outShorts = applyMasterGainAndConvert(
                 input = mixedBuffer,
                 startGain = currentGain,
@@ -402,6 +410,15 @@ object AdventureMusicEngine {
             audioTrack?.write(outShorts, 0, outShorts.size)
             stepCounter++
         }
+    }
+
+    private fun effectiveRequestedVolume(): Float {
+        val duckingMultiplier = if (voiceControlDuckingEnabled) {
+            VOICE_CONTROL_DUCKING_MULTIPLIER
+        } else {
+            1f
+        }
+        return (requestedScreen.volume * duckingMultiplier).coerceIn(0f, 1f)
     }
 
     private fun stepSamplesFor(profile: AdventureThemeProfile): Int {

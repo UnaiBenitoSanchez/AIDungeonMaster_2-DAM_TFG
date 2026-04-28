@@ -1,21 +1,55 @@
 package com.example.aidungeonmaster.ui.login
 
 import android.app.Activity
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccessibilityNew
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -32,19 +66,30 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.aidungeonmaster.R
 import com.example.aidungeonmaster.data.auth.GoogleAuthManager
+import com.example.aidungeonmaster.ui.theme.ColorBlindType
+import com.example.aidungeonmaster.ui.theme.LocalColorBlindType
 import com.example.aidungeonmaster.viewmodel.AuthViewModel
 import kotlinx.coroutines.launch
+
+import com.example.aidungeonmaster.navigation.Screen
+import com.example.aidungeonmaster.ui.accessibility.VoiceFormAction
+import com.example.aidungeonmaster.ui.accessibility.VoiceFormField
+import com.example.aidungeonmaster.ui.accessibility.VoiceFormRegistry
+import com.example.aidungeonmaster.ui.accessibility.VoiceFormScreen
+import com.example.aidungeonmaster.ui.accessibility.VoiceInputType
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginScreen(
     navController: NavController,
     modifier: Modifier = Modifier,
-    viewModel: AuthViewModel = viewModel()
+    viewModel: AuthViewModel = viewModel(),
+    onOpenAccessibilityOptions: () -> Unit = {}
 ) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -54,6 +99,75 @@ fun LoginScreen(
     val googleAuthManager = remember { GoogleAuthManager() }
     val coroutineScope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
+
+    fun submitLogin() {
+        viewModel.login(email, password) {
+            navController.navigate(Screen.Home.createRoute()) {
+                popUpTo(Screen.Login.route) { inclusive = true }
+            }
+        }
+    }
+
+    DisposableEffect(email, password, viewModel.isLoading) {
+        val registration = VoiceFormRegistry.register(
+            VoiceFormScreen(
+                screenName = "login",
+                fields = listOf(
+                    VoiceFormField(
+                        label = "correo electrónico",
+                        aliases = listOf("correo", "email", "correo electronico", "correo electrónico"),
+                        inputType = VoiceInputType.EMAIL,
+                        onValue = { email = it }
+                    ),
+                    VoiceFormField(
+                        label = "contraseña",
+                        aliases = listOf("contraseña", "contrasena", "password", "clave"),
+                        inputType = VoiceInputType.PASSWORD,
+                        onValue = { password = it },
+                        feedback = { "Contraseña actualizada." }
+                    )
+                ),
+                actions = listOf(
+                    VoiceFormAction(
+                        label = "iniciar sesión",
+                        aliases = listOf(
+                            "iniciar sesion",
+                            "iniciar sesión",
+                            "entrar",
+                            "acceder",
+                            "entrar a la aventura"
+                        ),
+                        enabled = {
+                            !viewModel.isLoading &&
+                                    email.isNotBlank() &&
+                                    password.isNotBlank()
+                        },
+                        disabledFeedback = "Necesito correo y contraseña para iniciar sesión.",
+                        onRun = { submitLogin() },
+                        feedback = "Iniciando sesión."
+                    ),
+                    VoiceFormAction(
+                        label = "ir a registro",
+                        aliases = listOf(
+                            "ir a registro",
+                            "abre registro",
+                            "abrir registro",
+                            "crear cuenta",
+                            "crear una cuenta",
+                            "registrarme"
+                        ),
+                        enabled = { !viewModel.isLoading },
+                        onRun = { navController.navigate(Screen.Register.route) },
+                        feedback = "Abriendo registro."
+                    )
+                )
+            )
+        )
+
+        onDispose { registration.dispose() }
+    }
+
+    val currentColorBlindType = LocalColorBlindType.current
 
     Box(
         modifier = modifier
@@ -167,8 +281,17 @@ fun LoginScreen(
                             Icon(imageVector = Icons.Default.Lock, contentDescription = null)
                         },
                         trailingIcon = {
-                            val image = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff
-                            val description = if (passwordVisible) "Ocultar contraseña" else "Mostrar contraseña"
+                            val image = if (passwordVisible) {
+                                Icons.Default.Visibility
+                            } else {
+                                Icons.Default.VisibilityOff
+                            }
+
+                            val description = if (passwordVisible) {
+                                "Ocultar contraseña"
+                            } else {
+                                "Mostrar contraseña"
+                            }
 
                             IconButton(onClick = { passwordVisible = !passwordVisible }) {
                                 Icon(imageVector = image, contentDescription = description)
@@ -176,7 +299,11 @@ fun LoginScreen(
                         },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
-                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                        visualTransformation = if (passwordVisible) {
+                            VisualTransformation.None
+                        } else {
+                            PasswordVisualTransformation()
+                        },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = MaterialTheme.colorScheme.primary,
@@ -201,7 +328,9 @@ fun LoginScreen(
                                     contentDescription = "Error",
                                     tint = MaterialTheme.colorScheme.onErrorContainer
                                 )
+
                                 Spacer(modifier = Modifier.width(8.dp))
+
                                 Text(
                                     text = errorMsg,
                                     color = MaterialTheme.colorScheme.onErrorContainer,
@@ -213,13 +342,7 @@ fun LoginScreen(
                     }
 
                     Button(
-                        onClick = {
-                            viewModel.login(email, password) {
-                                navController.navigate("home") {
-                                    popUpTo("login") { inclusive = true }
-                                }
-                            }
-                        },
+                        onClick = { submitLogin() },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(50.dp),
@@ -247,7 +370,8 @@ fun LoginScreen(
                         onClick = {
                             val activity = context as? Activity
                             if (activity == null) {
-                                viewModel.errorMessage = "No se pudo abrir Google Login en este contexto."
+                                viewModel.errorMessage =
+                                    "No se pudo abrir Google Login en este contexto."
                                 return@OutlinedButton
                             }
 
@@ -262,8 +386,9 @@ fun LoginScreen(
                                         }
                                     }
                                     .onFailure { throwable ->
-                                        viewModel.errorMessage = throwable.message
-                                            ?: "No se pudo iniciar sesión con Google."
+                                        viewModel.errorMessage =
+                                            throwable.message
+                                                ?: "No se pudo iniciar sesión con Google."
                                     }
                             }
                         },
@@ -272,7 +397,7 @@ fun LoginScreen(
                             .height(50.dp),
                         shape = RoundedCornerShape(12.dp),
                         enabled = !viewModel.isLoading,
-                        border = androidx.compose.foundation.BorderStroke(
+                        border = BorderStroke(
                             1.dp,
                             MaterialTheme.colorScheme.outline.copy(alpha = 0.7f)
                         )
@@ -300,6 +425,25 @@ fun LoginScreen(
                     }
                 }
             }
+        }
+
+        IconButton(
+            onClick = { onOpenAccessibilityOptions() },
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = 20.dp, end = 16.dp)
+                .size(48.dp)
+                .zIndex(10f)
+        ) {
+            Icon(
+                imageVector = Icons.Default.AccessibilityNew,
+                contentDescription = "Opciones de accesibilidad",
+                tint = if (currentColorBlindType != ColorBlindType.NONE) {
+                    Color(0xFFD4AF37)
+                } else {
+                    MaterialTheme.colorScheme.primary
+                }
+            )
         }
     }
 }

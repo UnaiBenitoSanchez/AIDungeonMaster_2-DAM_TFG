@@ -54,6 +54,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.SubcomposeAsyncImage
 import com.example.aidungeonmaster.data.model.Guild
+import com.example.aidungeonmaster.ui.accessibility.VoiceFormAction
+import com.example.aidungeonmaster.ui.accessibility.VoiceFormField
+import com.example.aidungeonmaster.ui.accessibility.VoiceFormRegistry
+import com.example.aidungeonmaster.ui.accessibility.VoiceFormScreen
+import com.example.aidungeonmaster.ui.accessibility.VoiceInputType
 import com.example.aidungeonmaster.viewmodel.SocialViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -85,6 +90,51 @@ fun GuildsScreen(
     }
 
     val shouldShowSearchResults = query.trim().length >= 2
+
+    DisposableEffect(query, showCreateDialog) {
+        val registration = VoiceFormRegistry.register(
+            VoiceFormScreen(
+                screenName = "gremios",
+                fields = listOf(
+                    VoiceFormField(
+                        label = "buscar gremios",
+                        aliases = listOf(
+                            "buscar gremio",
+                            "buscar gremios",
+                            "gremio",
+                            "busqueda",
+                            "búsqueda"
+                        ),
+                        inputType = VoiceInputType.TEXT,
+                        onValue = { value ->
+                            query = value
+
+                            if (value.trim().length >= 2) {
+                                viewModel.searchGuilds(value)
+                            } else {
+                                viewModel.clearGuildSearch()
+                            }
+                        },
+                        feedback = { value -> "Buscando gremios por $value." }
+                    )
+                ),
+                actions = listOf(
+                    VoiceFormAction(
+                        label = "crear gremio",
+                        aliases = listOf(
+                            "crear gremio",
+                            "crear un gremio",
+                            "nuevo gremio"
+                        ),
+                        onRun = { showCreateDialog = true },
+                        feedback = "Abriendo creación de gremio."
+                    )
+                )
+            )
+        )
+
+        onDispose { registration.dispose() }
+    }
 
     LaunchedEffect(Unit) {
         query = ""
@@ -262,6 +312,7 @@ private fun GuildCard(
                         background = Color.White.copy(alpha = 0.18f),
                         content = Color.White
                     )
+
                     if (guild.joined) {
                         MiniBadge(
                             text = "Tu gremio",
@@ -283,6 +334,7 @@ private fun GuildCard(
                     OutlinedButton(onClick = onOpenDetails) {
                         Text("Ver")
                     }
+
                     if (showJoinButton) {
                         Button(
                             onClick = onJoin,
@@ -417,6 +469,81 @@ private fun CreateGuildDialog(
     val accentHex = hueToColor(accentSlider).toHexColor()
     val bannerHex = hueToColor(bannerSlider).copy(alpha = 1f).toHexColor()
 
+    fun submitGuild() {
+        onCreate(
+            name.trim(),
+            description.trim(),
+            accentHex,
+            bannerHex
+        )
+    }
+
+    DisposableEffect(name, description, accentHex, bannerHex) {
+        val registration = VoiceFormRegistry.register(
+            VoiceFormScreen(
+                screenName = "creación de gremio",
+                fields = listOf(
+                    VoiceFormField(
+                        label = "nombre",
+                        aliases = listOf(
+                            "nombre",
+                            "nombre del gremio",
+                            "gremio"
+                        ),
+                        inputType = VoiceInputType.TEXT,
+                        onValue = {
+                            if (it.length <= 32) {
+                                name = it
+                            }
+                        }
+                    ),
+                    VoiceFormField(
+                        label = "descripción",
+                        aliases = listOf(
+                            "descripcion",
+                            "descripción",
+                            "descripcion del gremio",
+                            "descripción del gremio"
+                        ),
+                        inputType = VoiceInputType.TEXT,
+                        onValue = {
+                            if (it.length <= 180) {
+                                description = it
+                            }
+                        }
+                    )
+                ),
+                actions = listOf(
+                    VoiceFormAction(
+                        label = "crear gremio",
+                        aliases = listOf(
+                            "crear gremio",
+                            "guardar gremio",
+                            "confirmar gremio"
+                        ),
+                        enabled = { name.trim().length >= 3 },
+                        disabledFeedback = "El nombre del gremio debe tener al menos 3 caracteres.",
+                        onRun = { submitGuild() },
+                        feedback = "Creando gremio."
+                    ),
+                    VoiceFormAction(
+                        label = "cancelar",
+                        aliases = listOf(
+                            "cancelar",
+                            "cerrar",
+                            "cerrar dialogo",
+                            "cerrar diálogo"
+                        ),
+                        onRun = { onDismiss() },
+                        feedback = "Cerrando creación de gremio."
+                    )
+                )
+            )
+        )
+
+        onDispose { registration.dispose() }
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Crear gremio") },
@@ -424,14 +551,22 @@ private fun CreateGuildDialog(
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(
                     value = name,
-                    onValueChange = { if (it.length <= 32) name = it },
+                    onValueChange = {
+                        if (it.length <= 32) {
+                            name = it
+                        }
+                    },
                     label = { Text("Nombre") },
                     modifier = Modifier.fillMaxWidth()
                 )
 
                 OutlinedTextField(
                     value = description,
-                    onValueChange = { if (it.length <= 180) description = it },
+                    onValueChange = {
+                        if (it.length <= 180) {
+                            description = it
+                        }
+                    },
                     label = { Text("Descripción") },
                     modifier = Modifier.fillMaxWidth(),
                     minLines = 3,
@@ -439,30 +574,27 @@ private fun CreateGuildDialog(
                 )
 
                 Text("Color de acento")
+
                 Slider(
                     value = accentSlider,
                     onValueChange = { accentSlider = it }
                 )
+
                 ColorPreview(color = hueToColor(accentSlider))
 
                 Text("Color de banner")
+
                 Slider(
                     value = bannerSlider,
                     onValueChange = { bannerSlider = it }
                 )
+
                 ColorPreview(color = hueToColor(bannerSlider))
             }
         },
         confirmButton = {
             Button(
-                onClick = {
-                    onCreate(
-                        name.trim(),
-                        description.trim(),
-                        accentHex,
-                        bannerHex
-                    )
-                },
+                onClick = { submitGuild() },
                 enabled = name.trim().length >= 3
             ) {
                 Text("Crear")
@@ -484,12 +616,17 @@ private fun ColorPreview(color: Color) {
             .height(18.dp)
             .clip(RoundedCornerShape(999.dp))
             .background(color)
-            .border(1.dp, Color.Black.copy(alpha = 0.12f), RoundedCornerShape(999.dp))
+            .border(
+                1.dp,
+                Color.Black.copy(alpha = 0.12f),
+                RoundedCornerShape(999.dp)
+            )
     )
 }
 
 private fun formatTimestamp(timestamp: Long): String {
     if (timestamp <= 0L) return ""
+
     return try {
         SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(timestamp))
     } catch (_: Exception) {
@@ -499,15 +636,23 @@ private fun formatTimestamp(timestamp: Long): String {
 
 private fun parseColor(value: String?): Color {
     return try {
-        if (value.isNullOrBlank()) Color(0xFF6750A4)
-        else Color(android.graphics.Color.parseColor(value))
+        if (value.isNullOrBlank()) {
+            Color(0xFF6750A4)
+        } else {
+            Color(android.graphics.Color.parseColor(value))
+        }
     } catch (_: Exception) {
         Color(0xFF6750A4)
     }
 }
 
 private fun hueToColor(value: Float): Color {
-    val hsv = floatArrayOf((value.coerceIn(0f, 1f) * 360f), 0.72f, 0.90f)
+    val hsv = floatArrayOf(
+        value.coerceIn(0f, 1f) * 360f,
+        0.72f,
+        0.90f
+    )
+
     return Color(android.graphics.Color.HSVToColor(hsv))
 }
 
@@ -516,6 +661,7 @@ private fun Color.toHexColor(): String {
     val r = (red * 255).toInt().coerceIn(0, 255)
     val g = (green * 255).toInt().coerceIn(0, 255)
     val b = (blue * 255).toInt().coerceIn(0, 255)
+
     return if (a >= 255) {
         String.format("#%02X%02X%02X", r, g, b)
     } else {

@@ -23,6 +23,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -36,6 +37,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.aidungeonmaster.data.model.ChatMessage
 import com.example.aidungeonmaster.data.repository.ChatRepository
+import com.example.aidungeonmaster.ui.accessibility.VoiceFormAction
+import com.example.aidungeonmaster.ui.accessibility.VoiceFormField
+import com.example.aidungeonmaster.ui.accessibility.VoiceFormRegistry
+import com.example.aidungeonmaster.ui.accessibility.VoiceFormScreen
+import com.example.aidungeonmaster.ui.accessibility.VoiceInputType
 import com.example.aidungeonmaster.viewmodel.PrivateChatViewModel
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -58,6 +64,53 @@ fun PrivateChatScreen(
     val myUid = remember { ChatRepository().currentUid().orEmpty() }
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
+
+    fun sendCurrentMessage() {
+        val toSend = text.trim()
+
+        if (toSend.isNotBlank()) {
+            viewModel.sendMessage(toSend)
+            text = ""
+        }
+    }
+
+    DisposableEffect(text, friendUid, guildId) {
+        val registration = VoiceFormRegistry.register(
+            VoiceFormScreen(
+                screenName = "chat privado",
+                fields = listOf(
+                    VoiceFormField(
+                        label = "mensaje",
+                        aliases = listOf(
+                            "mensaje",
+                            "texto",
+                            "chat"
+                        ),
+                        inputType = VoiceInputType.TEXT,
+                        onValue = { text = it },
+                        feedback = { "Mensaje preparado." }
+                    )
+                ),
+                actions = listOf(
+                    VoiceFormAction(
+                        label = "enviar mensaje",
+                        aliases = listOf(
+                            "enviar",
+                            "enviar mensaje",
+                            "mandar",
+                            "mandar mensaje"
+                        ),
+                        enabled = { text.trim().isNotBlank() },
+                        disabledFeedback = "No hay ningún mensaje preparado para enviar.",
+                        onRun = { sendCurrentMessage() },
+                        feedback = "Mensaje enviado."
+                    )
+                )
+            )
+        )
+
+        onDispose { registration.dispose() }
+    }
 
     LaunchedEffect(friendUid, guildId) {
         viewModel.openChat(friendUid, guildId)
@@ -124,13 +177,7 @@ fun PrivateChatScreen(
                 )
 
                 Button(
-                    onClick = {
-                        val toSend = text.trim()
-                        if (toSend.isNotBlank()) {
-                            viewModel.sendMessage(toSend)
-                            text = ""
-                        }
-                    }
+                    onClick = { sendCurrentMessage() }
                 ) {
                     Text("Enviar")
                 }
@@ -163,7 +210,11 @@ private fun MessageBubble(
                 Text(
                     text = message.text,
                     style = MaterialTheme.typography.bodyLarge,
-                    color = if (isMine) Color.Black else MaterialTheme.colorScheme.onSurfaceVariant
+                    color = if (isMine) {
+                        Color.Black
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    }
                 )
 
                 Row(
@@ -183,7 +234,11 @@ private fun MessageBubble(
                     Text(
                         text = formatMessageTime(message.createdAt),
                         style = MaterialTheme.typography.labelSmall,
-                        color = if (isMine) Color.DarkGray else MaterialTheme.colorScheme.onSurfaceVariant
+                        color = if (isMine) {
+                            Color.DarkGray
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        }
                     )
                 }
             }
@@ -192,5 +247,8 @@ private fun MessageBubble(
 }
 
 private fun formatMessageTime(timestamp: Long): String {
-    return SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(timestamp))
+    return SimpleDateFormat(
+        "HH:mm",
+        Locale.getDefault()
+    ).format(Date(timestamp))
 }

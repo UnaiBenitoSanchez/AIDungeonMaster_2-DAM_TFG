@@ -100,6 +100,10 @@ import com.example.aidungeonmaster.ui.settings.ColorBlindSettingsSheet
 import com.example.aidungeonmaster.ui.theme.ColorBlindType
 import com.example.aidungeonmaster.ui.theme.LocalColorBlindType
 
+import com.example.aidungeonmaster.ui.accessibility.VoiceFormAction
+import com.example.aidungeonmaster.ui.accessibility.VoiceFormRegistry
+import com.example.aidungeonmaster.ui.accessibility.VoiceFormScreen
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
@@ -108,7 +112,8 @@ fun HomeScreen(
     socialViewModel: SocialViewModel = viewModel(),
     achievementViewModel: AchievementViewModel = viewModel(),
     onColorBlindChanged: (ColorBlindType) -> Unit = {},
-    onOpenAccessibilityOptions: () -> Unit = {}
+    onOpenAccessibilityOptions: () -> Unit = {},
+    autoOpenCreateCharacter: Boolean = false
 ) {
     val context = LocalContext.current
     val tutorialPrefs = remember {
@@ -143,6 +148,40 @@ fun HomeScreen(
     var characterToDelete by remember { mutableStateOf<Character?>(null) }
     var showSocialSheet by remember { mutableStateOf(false) }
     var showTutorialSocialPanel by remember { mutableStateOf(false) }
+
+    LaunchedEffect(autoOpenCreateCharacter) {
+        if (autoOpenCreateCharacter) {
+            showDialog = true
+        }
+    }
+
+    DisposableEffect(Unit) {
+        val registration = VoiceFormRegistry.register(
+            VoiceFormScreen(
+                screenName = "pantalla principal",
+                actions = listOf(
+                    VoiceFormAction(
+                        label = "crear personaje",
+                        aliases = listOf(
+                            "crear personaje",
+                            "crear un personaje",
+                            "nuevo personaje",
+                            "crear heroe",
+                            "crear héroe",
+                            "nuevo heroe",
+                            "nuevo héroe",
+                            "crear aventurero",
+                            "nuevo aventurero"
+                        ),
+                        onRun = { showDialog = true },
+                        feedback = "Abriendo creación de personaje."
+                    )
+                )
+            )
+        )
+
+        onDispose { registration.dispose() }
+    }
 
     val currentColorBlindType = LocalColorBlindType.current
 
@@ -632,7 +671,7 @@ fun HomeScreen(
             },
             onGuilds = {
                 showSocialSheet = false
-                navController.navigate(Screen.Guilds.route)
+                navController.navigate(Screen.Guilds.createRoute())
             },
             tutorialTargets = tutorialTargets,
             lockForTutorial = showTutorial && currentTargetKey.startsWith("social_"),

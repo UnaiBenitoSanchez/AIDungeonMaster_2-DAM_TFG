@@ -64,6 +64,8 @@ import androidx.navigation.NavHostController
 import com.example.aidungeonmaster.data.model.Character
 import com.example.aidungeonmaster.ui.theme.ColorBlindType
 import com.example.aidungeonmaster.viewmodel.GameViewModel
+import com.example.aidungeonmaster.utils.AdventureMusicEngine
+import com.example.aidungeonmaster.utils.CombatMusicEngine
 
 import com.example.aidungeonmaster.ui.settings.ColorBlindSettingsSheet
 
@@ -126,6 +128,9 @@ fun UsabilityAssistantOverlay(
     }
 
     LaunchedEffect(voiceEnabled) {
+        AdventureMusicEngine.setVoiceControlDucking(voiceEnabled)
+        CombatMusicEngine.setVoiceControlDucking(voiceEnabled)
+
         if (voiceEnabled) {
             voiceManager.start()
         } else {
@@ -134,7 +139,11 @@ fun UsabilityAssistantOverlay(
     }
 
     DisposableEffect(Unit) {
-        onDispose { voiceManager.destroy() }
+        onDispose {
+            AdventureMusicEngine.setVoiceControlDucking(false)
+            CombatMusicEngine.setVoiceControlDucking(false)
+            voiceManager.destroy()
+        }
     }
 
     Box(modifier = modifier.fillMaxSize()) {

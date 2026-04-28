@@ -26,6 +26,7 @@ object CombatMusicEngine {
 
     private const val SR  = 44100          // Sample rate
     private const val TAG = "COMBAT_MUSIC"
+    private const val VOICE_CONTROL_DUCKING_MULTIPLIER = 0.16f
 
     // ── BPM / TEMPO ───────────────────────────────────────────────
     // setcpm(140/4) = 35 ciclos/min → 1 ciclo = 1.714 s
@@ -106,6 +107,7 @@ object CombatMusicEngine {
     private var audioTrack: AudioTrack? = null
     private var job: Job? = null
     @Volatile private var isPlaying = false
+    @Volatile private var voiceControlDuckingEnabled = false
 
     // Buffer de delay para la melodía
     private val DELAY_BUF_SIZE = (SR * 0.5).toInt()   // 500ms máximo
@@ -142,6 +144,10 @@ object CombatMusicEngine {
             }
             stop()
         }
+    }
+
+    fun setVoiceControlDucking(enabled: Boolean) {
+        voiceControlDuckingEnabled = enabled
     }
 
     // ── BUCLE PRINCIPAL ───────────────────────────────────────────
@@ -215,6 +221,11 @@ object CombatMusicEngine {
         val n   = STEP_SAMPLES
         val dur = n.toDouble() / SR
         val buf = ShortArray(n * 2)   // estéreo
+        val masterGain = if (voiceControlDuckingEnabled) {
+            VOICE_CONTROL_DUCKING_MULTIPLIER
+        } else {
+            1f
+        }
 
         // Detune para el pad: +10 cents → freq × 2^(10/1200)
         val padDetuned = padFreq * 2f.pow(10f / 1200f)
@@ -291,8 +302,8 @@ object CombatMusicEngine {
             val outL = tanh(mixL).toFloat().coerceIn(-1f, 1f)
             val outR = tanh(mixR).toFloat().coerceIn(-1f, 1f)
 
-            buf[i * 2]     = (outL * Short.MAX_VALUE).toInt().toShort()
-            buf[i * 2 + 1] = (outR * Short.MAX_VALUE).toInt().toShort()
+            buf[i * 2]     = (outL * masterGain * Short.MAX_VALUE).toInt().toShort()
+            buf[i * 2 + 1] = (outR * masterGain * Short.MAX_VALUE).toInt().toShort()
         }
         return buf
     }
