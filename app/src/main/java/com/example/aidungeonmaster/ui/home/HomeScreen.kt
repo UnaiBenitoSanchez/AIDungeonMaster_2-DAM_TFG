@@ -113,7 +113,8 @@ fun HomeScreen(
     achievementViewModel: AchievementViewModel = viewModel(),
     onColorBlindChanged: (ColorBlindType) -> Unit = {},
     onOpenAccessibilityOptions: () -> Unit = {},
-    autoOpenCreateCharacter: Boolean = false
+    autoOpenCreateCharacter: Boolean = false,
+    restartTutorialRequest: Int = 0
 ) {
     val context = LocalContext.current
     val tutorialPrefs = remember {
@@ -152,6 +153,18 @@ fun HomeScreen(
     LaunchedEffect(autoOpenCreateCharacter) {
         if (autoOpenCreateCharacter) {
             showDialog = true
+        }
+    }
+
+    LaunchedEffect(restartTutorialRequest) {
+        if (restartTutorialRequest > 0) {
+            tutorialPrefs.edit()
+                .putBoolean("home_tutorial_completed", false)
+                .apply()
+            tutorialStepIndex = 0
+            showTutorial = true
+            showTutorialSocialPanel = false
+            showSocialSheet = false
         }
     }
 

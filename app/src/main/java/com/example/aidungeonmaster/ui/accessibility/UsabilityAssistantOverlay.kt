@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -79,6 +80,8 @@ fun UsabilityAssistantOverlay(
     gameViewModel: GameViewModel,
     currentColorBlindType: ColorBlindType,
     onColorBlindChanged: (ColorBlindType) -> Unit,
+    onRelaunchTutorial: () -> Unit = {},
+    onLogout: () -> Unit = {},
     modifier: Modifier = Modifier,
     openSheetRequest: Int = 0,
     showFloatingButton: Boolean = false
@@ -100,8 +103,13 @@ fun UsabilityAssistantOverlay(
                 currentArguments = currentArguments,
                 characters = characters,
                 gameViewModel = gameViewModel,
+                currentColorBlindType = currentColorBlindType,
+                onColorBlindChanged = onColorBlindChanged,
                 onOpenUsabilityOptions = { showSheet = true },
-                onStopVoiceControl = { voiceEnabled = false }
+                onStartVoiceControl = { voiceEnabled = true },
+                onStopVoiceControl = { voiceEnabled = false },
+                onRelaunchTutorial = onRelaunchTutorial,
+                onLogout = onLogout
             )
         }
     )
@@ -151,8 +159,8 @@ fun UsabilityAssistantOverlay(
             VoiceStatusPill(
                 state = voiceState,
                 modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 12.dp)
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
             )
         }
 
@@ -674,6 +682,9 @@ private fun AccessibilityOptionsSheet(
                             Text("Ejemplos de órdenes", fontWeight = FontWeight.SemiBold)
                             Text("• Abre lista de amigos")
                             Text("• Crear gremio")
+                            Text("• Desactiva la voz")
+                            Text("• Activa protanopía")
+                            Text("• Colores normales")
                             Text("• Abre la partida de A")
                             Text("• Abre inventario de A")
                             Text("• Vuelve atrás")

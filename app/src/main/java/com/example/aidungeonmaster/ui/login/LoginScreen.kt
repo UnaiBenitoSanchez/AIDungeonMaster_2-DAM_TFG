@@ -108,6 +108,30 @@ fun LoginScreen(
         }
     }
 
+    fun startGoogleLogin() {
+        val activity = context as? Activity
+        if (activity == null) {
+            viewModel.errorMessage = "No se pudo abrir Google Login en este contexto."
+            return
+        }
+
+        coroutineScope.launch {
+            viewModel.clearError()
+            googleAuthManager.getGoogleIdToken(activity)
+                .onSuccess { idToken ->
+                    viewModel.loginWithGoogle(idToken) {
+                        navController.navigate(Screen.Home.createRoute()) {
+                            popUpTo(Screen.Login.route) { inclusive = true }
+                        }
+                    }
+                }
+                .onFailure { throwable ->
+                    viewModel.errorMessage =
+                        throwable.message ?: "No se pudo iniciar sesión con Google."
+                }
+        }
+    }
+
     DisposableEffect(email, password, viewModel.isLoading) {
         val registration = VoiceFormRegistry.register(
             VoiceFormScreen(
@@ -128,6 +152,26 @@ fun LoginScreen(
                     )
                 ),
                 actions = listOf(
+                    VoiceFormAction(
+                        label = "iniciar sesión con Google",
+                        aliases = listOf(
+                            "iniciar sesion con google",
+                            "iniciar sesión con google",
+                            "inicia sesion con google",
+                            "inicia sesión con google",
+                            "entrar con google",
+                            "acceder con google",
+                            "continuar con google",
+                            "seguir con google",
+                            "usar google",
+                            "iniciar con google",
+                            "login con google",
+                            "google login"
+                        ),
+                        enabled = { !viewModel.isLoading },
+                        onRun = { startGoogleLogin() },
+                        feedback = "Abriendo selector de cuentas de Google."
+                    ),
                     VoiceFormAction(
                         label = "iniciar sesión",
                         aliases = listOf(
@@ -367,31 +411,7 @@ fun LoginScreen(
                     }
 
                     OutlinedButton(
-                        onClick = {
-                            val activity = context as? Activity
-                            if (activity == null) {
-                                viewModel.errorMessage =
-                                    "No se pudo abrir Google Login en este contexto."
-                                return@OutlinedButton
-                            }
-
-                            coroutineScope.launch {
-                                viewModel.clearError()
-                                googleAuthManager.getGoogleIdToken(activity)
-                                    .onSuccess { idToken ->
-                                        viewModel.loginWithGoogle(idToken) {
-                                            navController.navigate("home") {
-                                                popUpTo("login") { inclusive = true }
-                                            }
-                                        }
-                                    }
-                                    .onFailure { throwable ->
-                                        viewModel.errorMessage =
-                                            throwable.message
-                                                ?: "No se pudo iniciar sesión con Google."
-                                    }
-                            }
-                        },
+                        onClick = { startGoogleLogin() },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(50.dp),

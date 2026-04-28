@@ -44,6 +44,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -71,6 +72,9 @@ import kotlin.math.floor
 
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.aidungeonmaster.viewmodel.AchievementViewModel
+import com.example.aidungeonmaster.ui.accessibility.VoiceFormAction
+import com.example.aidungeonmaster.ui.accessibility.VoiceFormRegistry
+import com.example.aidungeonmaster.ui.accessibility.VoiceFormScreen
 
 private val SheetBg = Color(0xFF120C07)
 private val ParchmentTop = Color(0xFFF8EAC5)
@@ -116,6 +120,50 @@ fun CharacterSheetScreen(
             }.onFailure {
                 errorMessage = it.message ?: "No se pudo guardar el PDF."
             }
+        }
+    }
+
+    fun launchPdfExport(current: Character) {
+        val safeName = current.name
+            .replace(" ", "_")
+            .replace("/", "_")
+            .replace("\\", "_")
+
+        pdfLauncher.launch("Ficha_$safeName.pdf")
+    }
+
+    DisposableEffect(character?.name, isLoading) {
+        val current = character
+
+        if (current == null) {
+            onDispose { }
+        } else {
+            val registration = VoiceFormRegistry.register(
+                VoiceFormScreen(
+                    screenName = "ficha de personaje",
+                    actions = listOf(
+                        VoiceFormAction(
+                            label = "descargar ficha en PDF",
+                            aliases = listOf(
+                                "descargar ficha",
+                                "descarga ficha",
+                                "descargar ficha en pdf",
+                                "descarga ficha en pdf",
+                                "guardar ficha",
+                                "guardar ficha en pdf",
+                                "exportar ficha",
+                                "exportar ficha en pdf"
+                            ),
+                            enabled = { !isLoading },
+                            disabledFeedback = "La ficha todavía se está cargando.",
+                            onRun = { launchPdfExport(current) },
+                            feedback = "Abriendo selector para guardar la ficha en PDF."
+                        )
+                    )
+                )
+            )
+
+            onDispose { registration.dispose() }
         }
     }
 
@@ -326,14 +374,7 @@ fun CharacterSheetScreen(
                     }
 
                     Button(
-                        onClick = {
-                            val safeName = current.name
-                                .replace(" ", "_")
-                                .replace("/", "_")
-                                .replace("\\", "_")
-
-                            pdfLauncher.launch("Ficha_$safeName.pdf")
-                        },
+                        onClick = { launchPdfExport(current) },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(18.dp),
                         colors = ButtonDefaults.buttonColors(

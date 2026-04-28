@@ -579,6 +579,33 @@ class SocialRepository {
         return guild.copy(joined = joined)
     }
 
+    suspend fun updateGuildColors(
+        guildId: String,
+        accentColor: String,
+        bannerColor: String
+    ) {
+        val myUid = currentUid() ?: throw IllegalStateException("Usuario no autenticado")
+        val guildRef = db.collection("guilds").document(guildId)
+        val guildSnapshot = guildRef.get().await()
+
+        if (!guildSnapshot.exists()) {
+            throw IllegalStateException("No se encontró el gremio.")
+        }
+
+        val ownerUid = guildSnapshot.getString("ownerUid").orEmpty()
+        if (ownerUid != myUid) {
+            throw IllegalStateException("Solo el líder puede cambiar los colores del gremio.")
+        }
+
+        guildRef.update(
+            mapOf(
+                "accentColor" to accentColor,
+                "bannerColor" to bannerColor,
+                "updatedAt" to System.currentTimeMillis()
+            )
+        ).await()
+    }
+
     suspend fun joinGuild(guild: Guild) {
         val myUid = auth.currentUser?.uid ?: throw IllegalStateException("Usuario no autenticado")
         val me = getUserProfile(myUid)

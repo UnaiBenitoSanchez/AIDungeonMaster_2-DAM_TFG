@@ -173,6 +173,31 @@ fun CreateCharacterDialog(
         diceResults = diceResults.toMutableMap().also { map ->
             map[stat] = number to emptyList()
         }
+        diceModeActive = false
+    }
+
+    fun changeStatByVoice(stat: String, delta: Int) {
+        val current = diceResults[stat]?.first ?: 10
+        val next = (current + delta).coerceIn(1, 30)
+
+        diceResults = diceResults.toMutableMap().also { map ->
+            map[stat] = next to emptyList()
+        }
+        diceModeActive = false
+    }
+
+    fun toggleBonusByVoice(stat: String, amount: Int) {
+        when (amount) {
+            2 -> {
+                bonusPlus2 = if (bonusPlus2 == stat) null else stat
+                if (bonusPlus1 == stat) bonusPlus1 = null
+            }
+
+            1 -> {
+                bonusPlus1 = if (bonusPlus1 == stat) null else stat
+                if (bonusPlus2 == stat) bonusPlus2 = null
+            }
+        }
     }
 
     fun generatePortraitByVoiceOrButton() {
@@ -230,13 +255,99 @@ fun CreateCharacterDialog(
         portraitState,
         isGenerating
     ) {
+        fun statAliases(stat: String): List<String> = when (stat) {
+            "Fuerza" -> listOf("Fuerza", "fue", "strength")
+            "Destreza" -> listOf("Destreza", "des", "dex", "dexterity")
+            "Constitución" -> listOf("Constitución", "Constitucion", "constitución", "constitucion", "con", "constitution")
+            "Inteligencia" -> listOf("Inteligencia", "int", "intelligence")
+            "Sabiduría" -> listOf("Sabiduría", "Sabiduria", "sabiduría", "sabiduria", "sab", "wisdom")
+            "Carisma" -> listOf("Carisma", "car", "charisma")
+            else -> listOf(stat)
+        }
+
         val statFields = statNames.map { stat ->
             VoiceFormField(
                 label = stat,
-                aliases = listOf(stat),
+                aliases = statAliases(stat),
                 inputType = VoiceInputType.NUMBER,
                 onValue = { value -> setStatByVoice(stat, value) },
                 feedback = { value -> "$stat actualizado a $value." }
+            )
+        }
+
+        val statActions = statNames.flatMap { stat ->
+            val aliases = statAliases(stat)
+
+            listOf(
+                VoiceFormAction(
+                    label = "subir $stat",
+                    aliases = aliases.flatMap { alias ->
+                        listOf(
+                            "subir $alias",
+                            "sube $alias",
+                            "aumentar $alias",
+                            "aumenta $alias",
+                            "sumar $alias",
+                            "suma $alias",
+                            "suma uno a $alias",
+                            "mas $alias",
+                            "más $alias"
+                        )
+                    },
+                    onRun = { changeStatByVoice(stat, 1) },
+                    feedback = "$stat aumentado a ${((diceResults[stat]?.first ?: 10) + 1).coerceIn(1, 30)}."
+                ),
+                VoiceFormAction(
+                    label = "bajar $stat",
+                    aliases = aliases.flatMap { alias ->
+                        listOf(
+                            "bajar $alias",
+                            "baja $alias",
+                            "reducir $alias",
+                            "reduce $alias",
+                            "restar $alias",
+                            "resta $alias",
+                            "resta uno a $alias",
+                            "menos $alias"
+                        )
+                    },
+                    onRun = { changeStatByVoice(stat, -1) },
+                    feedback = "$stat reducido a ${((diceResults[stat]?.first ?: 10) - 1).coerceIn(1, 30)}."
+                ),
+                VoiceFormAction(
+                    label = "bono +2 a $stat",
+                    aliases = aliases.flatMap { alias ->
+                        listOf(
+                            "bono mas dos a $alias",
+                            "bono más dos a $alias",
+                            "bonificacion mas dos a $alias",
+                            "bonificación más dos a $alias",
+                            "poner mas dos en $alias",
+                            "poner más dos en $alias",
+                            "aplicar mas dos a $alias",
+                            "aplicar más dos a $alias"
+                        )
+                    },
+                    onRun = { toggleBonusByVoice(stat, 2) },
+                    feedback = "Bono de más dos aplicado a $stat."
+                ),
+                VoiceFormAction(
+                    label = "bono +1 a $stat",
+                    aliases = aliases.flatMap { alias ->
+                        listOf(
+                            "bono mas uno a $alias",
+                            "bono más uno a $alias",
+                            "bonificacion mas uno a $alias",
+                            "bonificación más uno a $alias",
+                            "poner mas uno en $alias",
+                            "poner más uno en $alias",
+                            "aplicar mas uno a $alias",
+                            "aplicar más uno a $alias"
+                        )
+                    },
+                    onRun = { toggleBonusByVoice(stat, 1) },
+                    feedback = "Bono de más uno aplicado a $stat."
+                )
             )
         }
 
@@ -295,14 +406,33 @@ fun CreateCharacterDialog(
                         }
                     )
                 ) + statFields,
-                actions = listOf(
+                actions = statActions + listOf(
+                    VoiceFormAction(
+                        label = "ayuda de estadísticas",
+                        aliases = listOf(
+                            "sumar stats",
+                            "sumar estadisticas",
+                            "sumar estadísticas",
+                            "subir stats",
+                            "cambiar stats",
+                            "ayuda stats",
+                            "ayuda estadisticas",
+                            "ayuda estadísticas"
+                        ),
+                        onRun = {},
+                        feedback = "Para cambiar estadísticas di, por ejemplo: sube fuerza, baja destreza, fuerza 15, bono más dos a constitución o bono más uno a carisma."
+                    ),
                     VoiceFormAction(
                         label = "tirar dados",
                         aliases = listOf(
                             "tirar dados",
                             "tira dados",
                             "lanzar dados",
-                            "lanza dados"
+                            "lanza dados",
+                            "tirar stats",
+                            "tirar estadísticas",
+                            "tirar estadisticas",
+                            "generar stats"
                         ),
                         enabled = { !isGenerating },
                         onRun = {

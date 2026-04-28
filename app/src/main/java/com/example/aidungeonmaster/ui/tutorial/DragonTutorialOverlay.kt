@@ -20,6 +20,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,6 +42,9 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import com.example.aidungeonmaster.ui.accessibility.TutorialVoiceRegistry
+import java.text.Normalizer
+import java.util.Locale
 import kotlin.math.roundToInt
 
 data class TutorialStep(
@@ -74,6 +80,135 @@ fun DragonTutorialOverlay(
     val step = steps[safeIndex]
     val rawTarget = targets[step.targetKey]
 
+    val currentIndexState by rememberUpdatedState(safeIndex)
+    val stepsCountState by rememberUpdatedState(steps.size)
+    val onNextState by rememberUpdatedState(onNext)
+    val onBackState by rememberUpdatedState(onBack)
+    val onFinishState by rememberUpdatedState(onFinish)
+    val onSkipState by rememberUpdatedState(onSkip)
+
+    DisposableEffect(visible, safeIndex, steps.size) {
+        TutorialVoiceRegistry.register { rawCommand ->
+            val command = rawCommand.normalizedForTutorialVoice()
+
+            when {
+                command.containsAnyTutorial(
+                    "siguiente pagina del tutorial",
+                    "pagina siguiente del tutorial",
+                    "siguiente pagina",
+                    "pagina siguiente",
+                    "pasar pagina",
+                    "pasa pagina",
+                    "avanza pagina",
+                    "avanza tutorial",
+                    "siguiente",
+                    "continua tutorial",
+                    "continua el tutorial",
+                    "continúa tutorial",
+                    "continúa el tutorial"
+                ) -> {
+                    if (currentIndexState >= stepsCountState - 1) {
+                        onFinishState()
+                        "Tutorial finalizado."
+                    } else {
+                        onNextState()
+                        "Pasando a la página ${currentIndexState + 2} del tutorial."
+                    }
+                }
+
+                command.containsAnyTutorial(
+                    "pagina anterior del tutorial",
+                    "anterior pagina del tutorial",
+                    "pagina anterior",
+                    "anterior",
+                    "atras",
+                    "atrás",
+                    "retrocede pagina",
+                    "retrocede tutorial",
+                    "pagina previa",
+                    "pagina anterior tutorial"
+                ) -> {
+                    if (currentIndexState <= 0) {
+                        "Ya estás en la primera página del tutorial."
+                    } else {
+                        onBackState()
+                        "Volviendo a la página $currentIndexState del tutorial."
+                    }
+                }
+
+                command.containsAnyTutorial(
+                    "cerrar tutorial",
+                    "salir del tutorial",
+                    "terminar tutorial",
+                    "finalizar tutorial",
+                    "acabar tutorial",
+                    "omitir tutorial",
+                    "saltar tutorial"
+                ) -> {
+                    onSkipState()
+                    "Cerrando tutorial."
+                }
+
+                command.containsAnyTutorial(
+                    "repetir pagina",
+                    "repite esta pagina",
+                    "explica esta pagina",
+                    "lee esta pagina otra vez",
+                    "en que pagina estoy",
+                    "en qué pagina estoy",
+                    "que pagina es esta",
+                    "qué pagina es esta"
+                ) -> {
+                    "Estás en la página ${currentIndexState + 1} del tutorial."
+                }
+
+                command.startsWithAnyTutorial(
+                    "ir a la pagina",
+                    "ve a la pagina",
+                    "abre la pagina",
+                    "pagina",
+                    "página"
+                ) -> {
+                    val requestedPage = command.extractTutorialPageNumber()
+
+                    when {
+                        requestedPage == null -> {
+                            "No he entendido el número de página."
+                        }
+
+                        requestedPage < 1 || requestedPage > stepsCountState -> {
+                            "Esa página no existe. El tutorial tiene $stepsCountState páginas."
+                        }
+
+                        requestedPage == currentIndexState + 1 -> {
+                            "Ya estás en la página $requestedPage del tutorial."
+                        }
+
+                        requestedPage > currentIndexState + 1 -> {
+                            repeat(requestedPage - (currentIndexState + 1)) {
+                                onNextState()
+                            }
+                            "Abriendo la página $requestedPage del tutorial."
+                        }
+
+                        else -> {
+                            repeat((currentIndexState + 1) - requestedPage) {
+                                onBackState()
+                            }
+                            "Abriendo la página $requestedPage del tutorial."
+                        }
+                    }
+                }
+
+                else -> null
+            }
+        }
+
+        onDispose {
+            TutorialVoiceRegistry.unregister()
+        }
+    }
+
     BoxWithConstraints(
         modifier = Modifier.fillMaxSize()
     ) {
@@ -107,12 +242,6 @@ fun DragonTutorialOverlay(
 
         val baseTargetRect = rawTarget ?: fallbackRect
 
-        /*
-         * Ajuste vertical del foco.
-         * Sube o baja el recuadro amarillo.
-         * Si lo ves un poco bajo: sube a 12.dp o 14.dp.
-         * Si lo ves alto: baja a 6.dp.
-         */
         val correctionYPx = with(density) { 30.dp.toPx() }
 
         val targetRect = Rect(
@@ -122,17 +251,10 @@ fun DragonTutorialOverlay(
             bottom = (baseTargetRect.bottom - correctionYPx).coerceAtLeast(0f)
         )
 
-        /*
-         * Tamaño y margen del recuadro amarillo.
-         */
         val highlightPaddingPx = with(density) { 4.dp.toPx() }
         val highlightRadiusPx = with(density) { 14.dp.toPx() }
         val highlightStrokePx = with(density) { 2.5.dp.toPx() }
 
-        /*
-         * Tamaño de la mascota.
-         * En móviles normales se verá más grande, pero sin salirse.
-         */
         val mascotSizeDp = when {
             maxWidth < 360.dp -> 150.dp
             maxWidth < 420.dp -> 180.dp
@@ -141,15 +263,10 @@ fun DragonTutorialOverlay(
 
         val mascotSizePx = with(density) { mascotSizeDp.toPx() }
 
-        /*
-         * Margen visual real. Antes estaba en 12.dp y para imágenes grandes
-         * quedaba demasiado pegada al borde. Con 34.dp no se corta.
-         */
         val screenMarginPx = with(density) { 34.dp.toPx() }
         val gapPx = with(density) { 24.dp.toPx() }
 
         val isSocialStep = step.targetKey.startsWith("social_")
-        val isTargetOnLeft = targetRect.center.x < screenWidthPx * 0.5f
         val isTargetOnRight = targetRect.center.x >= screenWidthPx * 0.5f
         val isTargetUpperHalf = targetRect.center.y < screenHeightPx * 0.5f
         val isTargetNearBottom = targetRect.center.y > screenHeightPx * 0.68f
@@ -182,14 +299,6 @@ fun DragonTutorialOverlay(
         }
         val cardBottomPx = cardTopPx + cardApproxHeightPx
 
-        /*
-         * X de la mascota.
-         *
-         * Cambio importante:
-         * - Si el objetivo está a la derecha, NO la pegamos al objetivo.
-         *   La mandamos a una zona segura izquierda con margen amplio.
-         * - Si el objetivo está a la izquierda, la mandamos a una zona segura derecha.
-         */
         val preferredMascotX = when {
             step.targetKey == "welcome" -> {
                 (screenWidthPx - mascotSizePx) / 2f
@@ -226,12 +335,6 @@ fun DragonTutorialOverlay(
             max = screenWidthPx - mascotSizePx - screenMarginPx
         )
 
-        /*
-         * Y de la mascota.
-         *
-         * Si el objetivo está en la barra superior, la bajamos debajo de la barra.
-         * Si está abajo, la subimos.
-         */
         val preferredMascotY = when {
             step.targetKey == "welcome" -> {
                 screenHeightPx * 0.44f
@@ -295,11 +398,6 @@ fun DragonTutorialOverlay(
             )
         }
 
-        /*
-         * Espejo:
-         * Si el objetivo está a la derecha, se invierte.
-         * Si está a la izquierda, se queda normal.
-         */
         val mirrorMascot = when {
             step.targetKey == "welcome" -> false
             step.targetKey == "btn_social" -> false
@@ -447,4 +545,57 @@ fun DragonTutorialOverlay(
             }
         }
     }
+}
+
+private fun String.normalizedForTutorialVoice(): String {
+    val withoutAccents = Normalizer.normalize(this, Normalizer.Form.NFD)
+        .replace("\\p{Mn}+".toRegex(), "")
+
+    return withoutAccents
+        .lowercase(Locale("es", "ES"))
+        .replace(Regex("[^a-z0-9ñ ]+"), " ")
+        .replace(Regex("\\s+"), " ")
+        .trim()
+}
+
+private fun String.containsAnyTutorial(vararg candidates: String): Boolean {
+    return candidates.any { candidate -> contains(candidate.normalizedForTutorialVoice()) }
+}
+
+private fun String.startsWithAnyTutorial(vararg prefixes: String): Boolean {
+    return prefixes.any { prefix -> startsWith(prefix.normalizedForTutorialVoice()) }
+}
+
+private fun String.extractTutorialPageNumber(): Int? {
+    Regex("""\b(\d{1,2})\b""").find(this)?.groupValues?.getOrNull(1)?.toIntOrNull()?.let {
+        return it
+    }
+
+    val spokenNumbers = mapOf(
+        "uno" to 1,
+        "dos" to 2,
+        "tres" to 3,
+        "cuatro" to 4,
+        "cinco" to 5,
+        "seis" to 6,
+        "siete" to 7,
+        "ocho" to 8,
+        "nueve" to 9,
+        "diez" to 10,
+        "once" to 11,
+        "doce" to 12,
+        "trece" to 13,
+        "catorce" to 14,
+        "quince" to 15,
+        "dieciseis" to 16,
+        "dieciséis" to 16,
+        "diecisiete" to 17,
+        "dieciocho" to 18,
+        "diecinueve" to 19,
+        "veinte" to 20
+    )
+
+    return spokenNumbers.entries.firstOrNull { (word, _) ->
+        contains(word.normalizedForTutorialVoice())
+    }?.value
 }

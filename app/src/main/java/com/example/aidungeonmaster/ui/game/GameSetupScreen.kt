@@ -21,6 +21,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.example.aidungeonmaster.navigation.Screen
 import com.example.aidungeonmaster.viewmodel.HomeViewModel
+import com.example.aidungeonmaster.ui.accessibility.VoiceFormAction
+import com.example.aidungeonmaster.ui.accessibility.VoiceFormRegistry
+import com.example.aidungeonmaster.ui.accessibility.VoiceFormScreen
 
 @Composable
 fun GameSetupScreen(
@@ -35,6 +38,48 @@ fun GameSetupScreen(
     // Lo buscamos en la lista que ya tiene el HomeViewModel.
     val characters by homeViewModel.characters.collectAsState()
     val characterId = characters.find { it.name == characterName }?.id ?: ""
+
+    fun selectAdventureTheme(theme: String) {
+        if (characterId.isNotEmpty()) {
+            // 1. Guardamos el tema en el personaje (Firebase)
+            homeViewModel.updateCharacterTheme(characterId, theme)
+
+            // 2. Navegamos a la partida
+            navController.navigate(Screen.GamePlay.createRoute(userId, characterName, theme)) {
+                // Limpiamos esta pantalla del historial para que no pueda volver a elegir tema
+                popUpTo(Screen.Home.route)
+            }
+        }
+    }
+
+    DisposableEffect(characterId) {
+        val registration = VoiceFormRegistry.register(
+            VoiceFormScreen(
+                screenName = "selección de aventura",
+                actions = themes.map { theme ->
+                    VoiceFormAction(
+                        label = "elegir $theme",
+                        aliases = listOf(
+                            theme,
+                            "elegir $theme",
+                            "elige $theme",
+                            "seleccionar $theme",
+                            "selecciona $theme",
+                            "tipo de aventura $theme",
+                            "aventura $theme",
+                            "quiero $theme"
+                        ),
+                        enabled = { characterId.isNotEmpty() },
+                        disabledFeedback = "Todavía estoy cargando el personaje.",
+                        onRun = { selectAdventureTheme(theme) },
+                        feedback = "Seleccionando aventura $theme."
+                    )
+                }
+            )
+        )
+
+        onDispose { registration.dispose() }
+    }
 
     Column(
         modifier = Modifier
@@ -59,18 +104,7 @@ fun GameSetupScreen(
         themes.forEach { theme ->
             ThemeButtonCustom(
                 theme = theme,
-                onClick = {
-                    if (characterId.isNotEmpty()) {
-                        // 1. Guardamos el tema en el personaje (Firebase)
-                        homeViewModel.updateCharacterTheme(characterId, theme)
-
-                        // 2. Navegamos a la partida
-                        navController.navigate(Screen.GamePlay.createRoute(userId, characterName, theme)) {
-                            // Limpiamos esta pantalla del historial para que no pueda volver a elegir tema
-                            popUpTo(Screen.Home.route)
-                        }
-                    }
-                }
+                onClick = { selectAdventureTheme(theme) }
             )
         }
     }

@@ -42,6 +42,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -64,6 +65,13 @@ import coil.compose.SubcomposeAsyncImage
 import com.example.aidungeonmaster.data.model.GuildChatMessage
 import com.example.aidungeonmaster.data.model.GuildMemberSummary
 import com.example.aidungeonmaster.data.repository.GuildRaidRepository
+import com.example.aidungeonmaster.ui.accessibility.VoiceFormAction
+import com.example.aidungeonmaster.ui.accessibility.VoiceFormField
+import com.example.aidungeonmaster.ui.accessibility.VoiceFormRegistry
+import com.example.aidungeonmaster.ui.accessibility.VoiceFormScreen
+import com.example.aidungeonmaster.ui.accessibility.VoiceInputType
+import com.example.aidungeonmaster.ui.accessibility.findVoiceNamedColor
+import com.example.aidungeonmaster.ui.accessibility.guildVoiceColorHelp
 import com.example.aidungeonmaster.viewmodel.SocialViewModel
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -166,6 +174,137 @@ fun GuildDetailsScreen(
                 chatListState.animateScrollToItem(guildChatMessages.lastIndex)
             }
         }
+    }
+
+    var lastGuildVoiceFeedback by remember(currentGuild.id) { mutableStateOf("") }
+
+    fun setGuildColorByVoice(value: String, isAccent: Boolean) {
+        val color = findVoiceNamedColor(value)
+
+        if (color == null) {
+            lastGuildVoiceFeedback = "No reconozco ese color. Puedes decir: ${guildVoiceColorHelp()}."
+            return
+        }
+
+        val nextAccent = if (isAccent) color.hex else currentGuild.accentColor
+        val nextBanner = if (isAccent) currentGuild.bannerColor else color.hex
+
+        viewModel.updateGuildColors(
+            guildId = currentGuild.id,
+            accentColor = nextAccent,
+            bannerColor = nextBanner
+        )
+
+        lastGuildVoiceFeedback = if (isAccent) {
+            "Color de acento cambiado a ${color.displayName}."
+        } else {
+            "Color de banner cambiado a ${color.displayName}."
+        }
+    }
+
+    DisposableEffect(
+        currentGuild.id,
+        currentGuild.joined,
+        isOwner,
+        selectedTab,
+        currentGuild.accentColor,
+        currentGuild.bannerColor
+    ) {
+        val tabActions = listOf(
+            VoiceFormAction(
+                label = "abrir resumen del gremio",
+                aliases = listOf(
+                    "abrir resumen del gremio",
+                    "abre resumen del gremio",
+                    "resumen del gremio",
+                    "abre resumen",
+                    "ir a resumen"
+                ),
+                onRun = { selectedTab = GuildDetailsScreenTab.RESUMEN },
+                feedback = "Abriendo resumen del gremio."
+            ),
+            VoiceFormAction(
+                label = "abrir chat del gremio",
+                aliases = listOf(
+                    "abrir chat del gremio",
+                    "abre chat del gremio",
+                    "chat del gremio",
+                    "abre chat",
+                    "ir al chat"
+                ),
+                onRun = { selectedTab = GuildDetailsScreenTab.CHAT },
+                feedback = "Abriendo chat del gremio."
+            ),
+            VoiceFormAction(
+                label = "abrir miembros del gremio",
+                aliases = listOf(
+                    "abrir miembros del gremio",
+                    "abre miembros del gremio",
+                    "miembros del gremio",
+                    "ver miembros",
+                    "abre integrantes",
+                    "ir a miembros"
+                ),
+                onRun = { selectedTab = GuildDetailsScreenTab.MIEMBROS },
+                feedback = "Abriendo miembros del gremio."
+            ),
+            VoiceFormAction(
+                label = "abrir jefe final del gremio",
+                aliases = listOf(
+                    "abrir jefe final",
+                    "abre jefe final",
+                    "jefe final",
+                    "boss del gremio",
+                    "jefe del gremio",
+                    "raid del gremio",
+                    "batalla del gremio"
+                ),
+                onRun = { selectedTab = GuildDetailsScreenTab.JEFE_FINAL },
+                feedback = "Abriendo jefe final del gremio."
+            )
+        )
+
+        val colorFields = if (isOwner) {
+            listOf(
+                VoiceFormField(
+                    label = "color de acento",
+                    aliases = listOf(
+                        "color de acento",
+                        "color principal",
+                        "color del gremio",
+                        "acento"
+                    ),
+                    inputType = VoiceInputType.TEXT,
+                    onValue = { value -> setGuildColorByVoice(value, isAccent = true) },
+                    feedback = { lastGuildVoiceFeedback }
+                ),
+                VoiceFormField(
+                    label = "color de banner",
+                    aliases = listOf(
+                        "color de banner",
+                        "color del banner",
+                        "color de fondo",
+                        "banner",
+                        "fondo"
+                    ),
+                    inputType = VoiceInputType.TEXT,
+                    onValue = { value -> setGuildColorByVoice(value, isAccent = false) },
+                    feedback = { lastGuildVoiceFeedback }
+                )
+            )
+        } else {
+            emptyList()
+        }
+
+        val registration = VoiceFormRegistry.register(
+            VoiceFormScreen(
+                screenName = "detalle de gremio",
+                fields = colorFields,
+                actions = tabActions
+            )
+        )
+
+        onDispose { registration.dispose() }
     }
 
     LaunchedEffect(currentGuild.id, bossRoom?.status, bossRoom?.currentTurnUid) {

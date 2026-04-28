@@ -380,6 +380,24 @@ class SocialViewModel : ViewModel() {
         }
     }
 
+    fun updateGuildColors(guildId: String, accentColor: String, bannerColor: String) {
+        viewModelScope.launch {
+            runCatching {
+                repository.updateGuildColors(guildId, accentColor, bannerColor)
+            }.onSuccess {
+                _message.value = "Colores del gremio actualizados"
+                _selectedGuild.value = _selectedGuild.value?.copy(
+                    accentColor = accentColor,
+                    bannerColor = bannerColor
+                )
+                startGuildsListener()
+                loadGuildSearchResults(_lastGuildQuery.value)
+            }.onFailure {
+                _message.value = it.message ?: "No se pudieron actualizar los colores del gremio"
+            }
+        }
+    }
+
     fun joinGuild(guild: Guild) {
         viewModelScope.launch {
             runCatching {

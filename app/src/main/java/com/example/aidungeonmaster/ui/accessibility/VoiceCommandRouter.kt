@@ -7,6 +7,7 @@ import androidx.annotation.RequiresApi
 import androidx.navigation.NavHostController
 import com.example.aidungeonmaster.data.model.Character
 import com.example.aidungeonmaster.navigation.Screen
+import com.example.aidungeonmaster.ui.theme.ColorBlindType
 import com.example.aidungeonmaster.viewmodel.GameViewModel
 import com.google.firebase.auth.FirebaseAuth
 import java.text.Normalizer
@@ -23,8 +24,13 @@ fun executeVoiceCommand(
     currentArguments: Bundle?,
     characters: List<Character>,
     gameViewModel: GameViewModel,
+    currentColorBlindType: ColorBlindType,
+    onColorBlindChanged: (ColorBlindType) -> Unit,
     onOpenUsabilityOptions: () -> Unit,
-    onStopVoiceControl: () -> Unit
+    onStartVoiceControl: () -> Unit,
+    onStopVoiceControl: () -> Unit,
+    onRelaunchTutorial: () -> Unit,
+    onLogout: () -> Unit
 ): String {
     val command = rawCommand.normalizedForVoice()
     if (command.isBlank()) return "No he entendido la orden."
@@ -57,18 +63,151 @@ fun executeVoiceCommand(
         }
     }
 
-    if (command.containsAny("desactiva control por voz", "apaga control por voz", "para control por voz", "deten control por voz", "desactivar control por voz")) {
+    if (command.containsAny(
+            "activa control por voz",
+            "activar control por voz",
+            "enciende control por voz",
+            "enciende el control por voz",
+            "activa la voz",
+            "activar la voz",
+            "enciende la voz",
+            "activa comandos de voz"
+        )
+    ) {
+        onStartVoiceControl()
+        return "El control por voz ya está activo."
+    }
+
+    if (command.containsAny(
+            "desactiva control por voz",
+            "desactiva el control por voz",
+            "apaga control por voz",
+            "apaga el control por voz",
+            "para control por voz",
+            "deten control por voz",
+            "detén control por voz",
+            "desactivar control por voz",
+            "desactiva la voz",
+            "desactivar la voz",
+            "desactiva voz",
+            "apaga la voz",
+            "apagar la voz",
+            "quita la voz",
+            "quitar la voz",
+            "desactiva comandos de voz",
+            "apaga comandos de voz",
+            "deja de escuchar",
+            "deja de oir",
+            "deja de oír",
+            "apaga el microfono",
+            "apaga el micrófono",
+            "desactiva el microfono",
+            "desactiva el micrófono"
+        )
+    ) {
         onStopVoiceControl()
         return "Control por voz desactivado."
     }
 
-    if (command.containsAny("ayuda", "que puedo decir", "comandos", "ordenes disponibles")) {
-        return "Puedes decir: ir a registro, crear personaje, abre lista de amigos, abre ranking, abre gremios, crear gremio, abre la partida de un personaje, abre inventario, abre diario, abre ficha, vuelve atrás o rellenar campos diciendo, por ejemplo, correo con usuario arroba gmail punto com."
+    if (command.containsAny(
+            "cerrar sesion",
+            "cerrar sesión",
+            "cierra sesion",
+            "cierra sesión",
+            "salir de mi cuenta",
+            "logout"
+        )
+    ) {
+        onLogout()
+        return "Cerrando sesión."
     }
 
-    if (command.containsAny("opciones de usabilidad", "ajustes de usabilidad", "accesibilidad", "modo daltonico", "daltónico", "daltonico")) {
+    if (command.containsAny(
+            "relanzar tutorial",
+            "repetir tutorial",
+            "reiniciar tutorial",
+            "ver tutorial",
+            "abrir tutorial"
+        )
+    ) {
+        onRelaunchTutorial()
+        return "Relanzando tutorial."
+    }
+
+    if (command.containsAny(
+            "desactiva modo daltonico",
+            "desactiva el modo daltonico",
+            "desactiva modo daltónico",
+            "desactiva el modo daltónico",
+            "desactivar modo daltonico",
+            "desactivar el modo daltonico",
+            "desactivar modo daltónico",
+            "desactivar el modo daltónico",
+            "quita modo daltonico",
+            "quita el modo daltonico",
+            "quita modo daltónico",
+            "quita el modo daltónico",
+            "quita el daltonico",
+            "quita el daltónico",
+            "apaga modo daltonico",
+            "apaga el modo daltonico",
+            "apaga modo daltónico",
+            "apaga el modo daltónico",
+            "sin filtro de color",
+            "sin modo daltonico",
+            "sin modo daltónico",
+            "colores normales",
+            "modo normal",
+            "vision normal",
+            "visión normal"
+        )
+    ) {
+        onColorBlindChanged(ColorBlindType.NONE)
+        return "Modo daltónico desactivado."
+    }
+
+    command.requestedColorBlindType()?.let { requestedType ->
+        if (requestedType != currentColorBlindType) {
+            onColorBlindChanged(requestedType)
+        }
+        return "Modo daltónico cambiado a ${requestedType.displayName}."
+    }
+
+    if (command.containsAny(
+            "modo daltonico",
+            "modo daltónico",
+            "activar modo daltonico",
+            "activar modo daltónico",
+            "activa modo daltonico",
+            "activa modo daltónico"
+        )
+    ) {
+        return "Di el tipo: protanopía, deuteranopía, tritanopía o acromatopsia."
+    }
+
+    if (command.containsAny("ayuda", "que puedo decir", "comandos", "ordenes disponibles")) {
+        return "Puedes decir: desactiva la voz, protanopía, deuteranopía, tritanopía, acromatopsia, colores normales, crear personaje, sube fuerza, abre gremios, abre chat del gremio, cambia color de acento a morado, selecciona aventura cyberpunk, descargar ficha en PDF, repetir tutorial, siguiente página del tutorial, página anterior del tutorial, ir a la página 3 del tutorial o cerrar sesión."
+    }
+
+    if (command.containsAny(
+            "opciones de usabilidad",
+            "ajustes de usabilidad",
+            "opciones de accesibilidad",
+            "ajustes de accesibilidad",
+            "abre accesibilidad",
+            "abrir accesibilidad",
+            "abre opciones de accesibilidad",
+            "abrir opciones de accesibilidad",
+            "abre opciones de usabilidad",
+            "abrir opciones de usabilidad"
+        )
+    ) {
         onOpenUsabilityOptions()
         return "Abriendo opciones de usabilidad."
+    }
+
+    TutorialVoiceRegistry.tryHandle(rawCommand)?.let { feedback ->
+        return feedback
     }
 
     if (command.containsAny("volver atras", "vuelve atras", "atras", "retrocede", "pantalla anterior")) {
@@ -307,6 +446,64 @@ private fun String.normalizedForVoice(): String {
         .replace(Regex("[^a-z0-9ñ_ ]+"), " ")
         .replace(Regex("\\s+"), " ")
         .trim()
+}
+
+
+private fun String.requestedColorBlindType(): ColorBlindType? {
+    return when {
+        containsAny(
+            "protanopia",
+            "protanopía",
+            "modo protanopia",
+            "modo protanopía",
+            "activa protanopia",
+            "activa protanopía",
+            "activar protanopia",
+            "activar protanopía",
+            "pon protanopia",
+            "pon protanopía"
+        ) -> ColorBlindType.PROTANOPIA
+
+        containsAny(
+            "deuteranopia",
+            "deuteranopía",
+            "modo deuteranopia",
+            "modo deuteranopía",
+            "activa deuteranopia",
+            "activa deuteranopía",
+            "activar deuteranopia",
+            "activar deuteranopía",
+            "pon deuteranopia",
+            "pon deuteranopía"
+        ) -> ColorBlindType.DEUTERANOPIA
+
+        containsAny(
+            "tritanopia",
+            "tritanopía",
+            "modo tritanopia",
+            "modo tritanopía",
+            "activa tritanopia",
+            "activa tritanopía",
+            "activar tritanopia",
+            "activar tritanopía",
+            "pon tritanopia",
+            "pon tritanopía"
+        ) -> ColorBlindType.TRITANOPIA
+
+        containsAny(
+            "acromatopsia",
+            "modo acromatopsia",
+            "activa acromatopsia",
+            "activar acromatopsia",
+            "pon acromatopsia",
+            "escala de grises",
+            "blanco y negro",
+            "monocromatico",
+            "monocromático"
+        ) -> ColorBlindType.ACHROMATOPSIA
+
+        else -> null
+    }
 }
 
 private fun String.startsWithAny(vararg prefixes: String): Boolean {

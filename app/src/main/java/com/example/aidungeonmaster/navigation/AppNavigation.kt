@@ -197,6 +197,7 @@ fun AppNavigation(
     val characters by homeViewModel.characters.collectAsState()
 
     var accessibilityOpenRequest by remember { mutableIntStateOf(0) }
+    var tutorialOpenRequest by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(currentRoute) {
         homeViewModel.fetchCharacters()
@@ -217,7 +218,8 @@ fun AppNavigation(
                 onOpenAccessibilityOptions = {
                     accessibilityOpenRequest++
                 },
-                autoOpenCreateCharacter = autoOpenCreateCharacter
+                autoOpenCreateCharacter = autoOpenCreateCharacter,
+                restartTutorialRequest = tutorialOpenRequest
             )
         }
 
@@ -709,6 +711,19 @@ fun AppNavigation(
             gameViewModel = gameViewModel,
             currentColorBlindType = LocalColorBlindType.current,
             onColorBlindChanged = onColorBlindChanged,
+            onRelaunchTutorial = {
+                tutorialOpenRequest++
+                navController.navigate(Screen.Home.route) {
+                    launchSingleTop = true
+                }
+            },
+            onLogout = {
+                homeViewModel.logout {
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(0) { inclusive = true }
+                    }
+                }
+            },
             openSheetRequest = accessibilityOpenRequest,
             showFloatingButton = false
         )

@@ -59,6 +59,8 @@ import com.example.aidungeonmaster.ui.accessibility.VoiceFormField
 import com.example.aidungeonmaster.ui.accessibility.VoiceFormRegistry
 import com.example.aidungeonmaster.ui.accessibility.VoiceFormScreen
 import com.example.aidungeonmaster.ui.accessibility.VoiceInputType
+import com.example.aidungeonmaster.ui.accessibility.findVoiceNamedColor
+import com.example.aidungeonmaster.ui.accessibility.guildVoiceColorHelp
 import com.example.aidungeonmaster.viewmodel.SocialViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -465,9 +467,29 @@ private fun CreateGuildDialog(
     var description by remember { mutableStateOf("") }
     var accentSlider by remember { mutableStateOf(0.58f) }
     var bannerSlider by remember { mutableStateOf(0.22f) }
+    var accentHexOverride by remember { mutableStateOf<String?>(null) }
+    var bannerHexOverride by remember { mutableStateOf<String?>(null) }
+    var lastColorVoiceFeedback by remember { mutableStateOf("") }
 
-    val accentHex = hueToColor(accentSlider).toHexColor()
-    val bannerHex = hueToColor(bannerSlider).copy(alpha = 1f).toHexColor()
+    val accentHex = accentHexOverride ?: hueToColor(accentSlider).toHexColor()
+    val bannerHex = bannerHexOverride ?: hueToColor(bannerSlider).copy(alpha = 1f).toHexColor()
+
+    fun setGuildColorByVoice(value: String, isAccent: Boolean) {
+        val color = findVoiceNamedColor(value)
+
+        if (color == null) {
+            lastColorVoiceFeedback = "No reconozco ese color. Puedes decir: ${guildVoiceColorHelp()}."
+            return
+        }
+
+        if (isAccent) {
+            accentHexOverride = color.hex
+            lastColorVoiceFeedback = "Color de acento cambiado a ${color.displayName}."
+        } else {
+            bannerHexOverride = color.hex
+            lastColorVoiceFeedback = "Color de banner cambiado a ${color.displayName}."
+        }
+    }
 
     fun submitGuild() {
         onCreate(
@@ -511,6 +533,31 @@ private fun CreateGuildDialog(
                                 description = it
                             }
                         }
+                    ),
+                    VoiceFormField(
+                        label = "color de acento",
+                        aliases = listOf(
+                            "color de acento",
+                            "color principal",
+                            "color del gremio",
+                            "acento"
+                        ),
+                        inputType = VoiceInputType.TEXT,
+                        onValue = { value -> setGuildColorByVoice(value, isAccent = true) },
+                        feedback = { lastColorVoiceFeedback }
+                    ),
+                    VoiceFormField(
+                        label = "color de banner",
+                        aliases = listOf(
+                            "color de banner",
+                            "color del banner",
+                            "color de fondo",
+                            "banner",
+                            "fondo"
+                        ),
+                        inputType = VoiceInputType.TEXT,
+                        onValue = { value -> setGuildColorByVoice(value, isAccent = false) },
+                        feedback = { lastColorVoiceFeedback }
                     )
                 ),
                 actions = listOf(
@@ -577,19 +624,25 @@ private fun CreateGuildDialog(
 
                 Slider(
                     value = accentSlider,
-                    onValueChange = { accentSlider = it }
+                    onValueChange = {
+                        accentSlider = it
+                        accentHexOverride = null
+                    }
                 )
 
-                ColorPreview(color = hueToColor(accentSlider))
+                ColorPreview(color = parseColor(accentHex))
 
                 Text("Color de banner")
 
                 Slider(
                     value = bannerSlider,
-                    onValueChange = { bannerSlider = it }
+                    onValueChange = {
+                        bannerSlider = it
+                        bannerHexOverride = null
+                    }
                 )
 
-                ColorPreview(color = hueToColor(bannerSlider))
+                ColorPreview(color = parseColor(bannerHex))
             }
         },
         confirmButton = {
