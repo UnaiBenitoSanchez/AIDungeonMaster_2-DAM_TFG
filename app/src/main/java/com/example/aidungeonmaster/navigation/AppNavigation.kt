@@ -17,6 +17,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.navArgument
 import com.example.aidungeonmaster.data.repository.CharacterDeletionRepository
+import com.example.aidungeonmaster.ui.accessibility.UsabilityAssistantOverlay
 import com.example.aidungeonmaster.ui.achievements.AchievementsScreen
 import com.example.aidungeonmaster.ui.game.ARMapScreen
 import com.example.aidungeonmaster.ui.game.BestiaryScreen
@@ -46,6 +47,7 @@ import com.example.aidungeonmaster.utils.CombatMusicEngine
 import com.example.aidungeonmaster.viewmodel.AchievementViewModel
 import com.example.aidungeonmaster.viewmodel.AuthViewModel
 import com.example.aidungeonmaster.viewmodel.GameViewModel
+import com.example.aidungeonmaster.viewmodel.HomeViewModel
 import com.example.aidungeonmaster.viewmodel.InventoryViewModel
 import com.example.aidungeonmaster.viewmodel.PersonalRoomViewModel
 import com.example.aidungeonmaster.viewmodel.RankingViewModel
@@ -56,6 +58,7 @@ import kotlinx.coroutines.launch
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -66,13 +69,20 @@ import com.example.aidungeonmaster.ui.tutorial.DragonTutorialOverlay
 import com.example.aidungeonmaster.ui.home.CharacterSheetScreen
 import com.example.aidungeonmaster.viewmodel.CombatPhase
 import com.example.aidungeonmaster.ui.theme.ColorBlindType
+import com.example.aidungeonmaster.ui.theme.LocalColorBlindType
+
+import androidx.navigation.navArgument
 
 sealed class Screen(val route: String) {
     object Login : Screen("login")
     object Register : Screen("register")
     object Home : Screen("home")
     object MyProfile : Screen("my_profile")
-    object Guilds : Screen("guilds")
+    object Guilds : Screen("guilds?openCreate={openCreate}") {
+        fun createRoute(openCreate: Boolean = false): String {
+            return "guilds?openCreate=$openCreate"
+        }
+    }
 
     object Inventory : Screen("inventory/{userId}") {
         fun createRoute(userId: String) = "inventory/${Uri.encode(userId)}"
@@ -160,6 +170,7 @@ fun AppNavigation(
 ) {
     val authViewModel: AuthViewModel = viewModel()
     val gameViewModel: GameViewModel = viewModel()
+    val homeViewModel: HomeViewModel = viewModel()
     val inventoryViewModel: InventoryViewModel = viewModel()
     val worldMapViewModel: WorldMapViewModel = viewModel()
     val achievementViewModel: AchievementViewModel = viewModel()
@@ -173,8 +184,13 @@ fun AppNavigation(
 
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
+    val characters by homeViewModel.characters.collectAsState()
+
+    var accessibilityOpenRequest by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(currentRoute) {
+        homeViewModel.fetchCharacters()
+
         if (!currentRoute.isAdventureRoute()) {
             AdventureMusicEngine.stopNow()
             CombatMusicEngine.stop()
@@ -194,8 +210,12 @@ fun AppNavigation(
 
             composable(Screen.Home.route) {
                 HomeScreen(
-                    navController       = navController,
-                    onColorBlindChanged = onColorBlindChanged
+                    navController = navController,
+                    viewModel = homeViewModel,
+                    onColorBlindChanged = onColorBlindChanged,
+                    onOpenAccessibilityOptions = {
+                        accessibilityOpenRequest++
+                    }
                 )
             }
 
@@ -571,12 +591,23 @@ fun AppNavigation(
                 )
             }
 
-            composable(Screen.Guilds.route) {
+            composable(
+                route = Screen.Guilds.route,
+                arguments = listOf(
+                    navArgument("openCreate") {
+                        type = NavType.BoolType
+                        defaultValue = false
+                    }
+                )
+            ) { backStackEntryArg ->
+                val openCreate = backStackEntryArg.arguments?.getBoolean("openCreate") ?: false
+
                 GuildsScreen(
                     onBack = { navController.popBackStack() },
                     onOpenGuildDetails = { guildId ->
                         navController.navigate("guild_details/${Uri.encode(guildId)}")
                     },
+                    autoOpenCreate = openCreate,
                     viewModel = socialViewModel
                 )
             }
@@ -636,6 +667,17 @@ fun AppNavigation(
         }
 
     }
+    UsabilityAssistantOverlay(
+        navController = navController,
+        currentRoute = currentRoute,
+        currentArguments = backStackEntry?.arguments,
+        characters = characters,
+        gameViewModel = gameViewModel,
+        currentColorBlindType = LocalColorBlindType.current,
+        onColorBlindChanged = onColorBlindChanged,
+        openSheetRequest = accessibilityOpenRequest,
+        showFloatingButton = false
+    )
 }
 
 private fun String?.isAdventureRoute(): Boolean {

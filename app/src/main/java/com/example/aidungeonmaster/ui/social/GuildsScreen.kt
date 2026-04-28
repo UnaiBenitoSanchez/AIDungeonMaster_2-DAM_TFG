@@ -66,6 +66,7 @@ private const val MAX_GUILD_MEMBERS = 15
 fun GuildsScreen(
     onBack: () -> Unit,
     onOpenGuildDetails: (String) -> Unit,
+    autoOpenCreate: Boolean = false,
     viewModel: SocialViewModel = viewModel()
 ) {
     val myGuilds by viewModel.myGuilds.collectAsState()
@@ -76,6 +77,12 @@ fun GuildsScreen(
 
     var query by remember { mutableStateOf("") }
     var showCreateDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(autoOpenCreate) {
+        if (autoOpenCreate) {
+            showCreateDialog = true
+        }
+    }
 
     val shouldShowSearchResults = query.trim().length >= 2
 

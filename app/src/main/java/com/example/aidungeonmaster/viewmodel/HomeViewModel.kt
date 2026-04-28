@@ -9,6 +9,7 @@ import com.example.aidungeonmaster.data.repository.SocialRepository
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -21,6 +22,9 @@ class HomeViewModel : ViewModel() {
     private val socialRepository = SocialRepository()
 
     private val deletionRepository = CharacterDeletionRepository()
+
+    private var charactersListener: ListenerRegistration? = null
+    private var charactersListenerUserId: String? = null
 
     private val _characters = MutableStateFlow<List<Character>>(emptyList())
     val characters = _characters.asStateFlow()
@@ -104,10 +108,25 @@ class HomeViewModel : ViewModel() {
         }
     }
 
-    fun fetchCharacters() {
-        val userId = auth.currentUser?.uid ?: return
+    fun fetchCharacters(forceRefresh: Boolean = false) {
+        val userId = auth.currentUser?.uid
 
-        db.collection("users")
+        if (userId.isNullOrBlank()) {
+            charactersListener?.remove()
+            charactersListener = null
+            charactersListenerUserId = null
+            _characters.value = emptyList()
+            return
+        }
+
+        if (!forceRefresh && charactersListenerUserId == userId && charactersListener != null) {
+            return
+        }
+
+        charactersListener?.remove()
+        charactersListenerUserId = userId
+
+        charactersListener = db.collection("users")
             .document(userId)
             .collection("characters")
             .addSnapshotListener { snapshot, error ->
@@ -210,7 +229,7 @@ class HomeViewModel : ViewModel() {
                 Log.e("APP_ERROR", "Error eliminando personaje completo: ${e.message}", e)
 
                 // Si algo falla, recargamos para no dejar la UI en estado raro.
-                fetchCharacters()
+                fetchCharacters(forceRefresh = true)
             }
         }
     }
@@ -237,6 +256,12 @@ class HomeViewModel : ViewModel() {
                 Log.e("APP_ERROR", "Error actualizando tema: ${e.message}")
             }
         }
+    }
+
+    override fun onCleared() {
+        charactersListener?.remove()
+        charactersListener = null
+        super.onCleared()
     }
 
     private suspend fun syncCharacterCount(userId: String, count: Int) {

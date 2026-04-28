@@ -88,6 +88,7 @@ import java.util.concurrent.TimeUnit
 import androidx.compose.material.icons.filled.Description
 
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.filled.AccessibilityNew
 import androidx.compose.material.icons.filled.HelpOutline
 import com.example.aidungeonmaster.ui.social.NotificationBadge
 import com.example.aidungeonmaster.viewmodel.SocialViewModel
@@ -106,7 +107,8 @@ fun HomeScreen(
     viewModel: HomeViewModel = viewModel(),
     socialViewModel: SocialViewModel = viewModel(),
     achievementViewModel: AchievementViewModel = viewModel(),
-    onColorBlindChanged: (ColorBlindType) -> Unit = {}
+    onColorBlindChanged: (ColorBlindType) -> Unit = {},
+    onOpenAccessibilityOptions: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val tutorialPrefs = remember {
@@ -142,7 +144,6 @@ fun HomeScreen(
     var showSocialSheet by remember { mutableStateOf(false) }
     var showTutorialSocialPanel by remember { mutableStateOf(false) }
 
-    var showColorBlindSheet by remember { mutableStateOf(false) }
     val currentColorBlindType = LocalColorBlindType.current
 
     val userId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
@@ -169,9 +170,9 @@ fun HomeScreen(
             )
             add(
                 TutorialStep(
-                    targetKey = "btn_colorblind",
-                    title = "Modo daltónico",
-                    description = "Pulsa aquí para activar un filtro de color adaptado a tu tipo de daltonismo. El filtro se aplica a toda la app al instante.",
+                    targetKey = "btn_accessibility",
+                    title = "Accesibilidad",
+                    description = "Pulsa aquí para abrir las opciones de accesibilidad, como el modo daltónico y el control por voz.",
                     mascotRes = R.drawable.dragon_idle
                 )
             )
@@ -376,13 +377,13 @@ fun HomeScreen(
                     },
                     actions = {
                         IconButton(
-                            onClick = { showColorBlindSheet = true },
-                            modifier = Modifier.tutorialAnchor("btn_colorblind", tutorialTargets)
+                            onClick = { onOpenAccessibilityOptions() },
+                            modifier = Modifier.tutorialAnchor("btn_accessibility", tutorialTargets)
                         ) {
                             Icon(
-                                imageVector        = Icons.Default.Palette,
-                                contentDescription = "Modo daltónico",
-                                tint               = if (currentColorBlindType != ColorBlindType.NONE)
+                                imageVector = Icons.Default.AccessibilityNew,
+                                contentDescription = "Opciones de accesibilidad",
+                                tint = if (currentColorBlindType != ColorBlindType.NONE)
                                     Color(0xFFD4AF37)
                                 else
                                     MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
@@ -637,15 +638,6 @@ fun HomeScreen(
             lockForTutorial = showTutorial && currentTargetKey.startsWith("social_"),
             pendingFriendRequestsCount = pendingFriendRequestsCount,
             unreadPrivateMessagesCount = unreadPrivateMessagesCount
-        )
-    }
-
-    // Diálogo de accesibilidad daltónica
-    if (showColorBlindSheet) {
-        ColorBlindSettingsSheet(
-            currentType    = currentColorBlindType,
-            onTypeSelected = { newType -> onColorBlindChanged(newType) },
-            onDismiss      = { showColorBlindSheet = false }
         )
     }
 
