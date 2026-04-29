@@ -140,7 +140,7 @@ fun GuildDetailsScreen(
             topBar = {
                 TopAppBar(
                     title = { Text("Gremio") },
-                    navigationIcon = { TextButton(onClick = onBack) { Text("â†") } }
+                    navigationIcon = { TextButton(onClick = onBack) { Text("←") } }
                 )
             }
         ) { padding ->
@@ -317,7 +317,7 @@ fun GuildDetailsScreen(
                         "mandar solicitud a",
                         "agregar amigo",
                         "anadir amigo",
-                        "aÃ±adir amigo"
+                        "añadir amigo"
                     ),
                     inputType = VoiceInputType.TEXT,
                     onValue = { value ->
@@ -340,7 +340,7 @@ fun GuildDetailsScreen(
                         }
 
                         if (targetMember == null) {
-                            lastGuildVoiceFeedback = "No encontrÃ© a ese miembro."
+                            lastGuildVoiceFeedback = "No encontré a ese miembro."
                         } else {
                             viewModel.sendFriendRequest(
                                 AppUser(
@@ -394,12 +394,12 @@ fun GuildDetailsScreen(
         val leaderVoiceFields = if (isOwner) {
             listOf(
                 VoiceFormField(
-                    label = "nombrar lÃ­der",
+                    label = "nombrar líder",
                     aliases = listOf(
                         "nombrar lider",
-                        "nombrar lÃ­der",
+                        "nombrar líder",
                         "hacer lider a",
-                        "hacer lÃ­der a",
+                        "hacer líder a",
                         "dar liderazgo a",
                         "transferir liderazgo a"
                     ),
@@ -423,7 +423,7 @@ fun GuildDetailsScreen(
                         }
 
                         if (targetMember == null) {
-                            lastGuildVoiceFeedback = "No encontrÃ© a ese miembro para liderazgo."
+                            lastGuildVoiceFeedback = "No encontré a ese miembro para liderazgo."
                         } else {
                             viewModel.transferLeadership(currentGuild, targetMember.uid)
                             lastGuildVoiceFeedback =
@@ -527,7 +527,7 @@ fun GuildDetailsScreen(
                         "abrir pelea del gremio"
                     ),
                     enabled = { currentGuild.joined && canJoinBattle },
-                    disabledFeedback = "La pelea no estÃ¡ disponible ahora.",
+                    disabledFeedback = "La pelea no está disponible ahora.",
                     onRun = { onOpenBossBattle(currentGuild.id) },
                     feedback = "Entrando en la pelea del gremio."
                 )
@@ -543,7 +543,7 @@ fun GuildDetailsScreen(
                             "comenzar pelea del gremio"
                         ),
                         enabled = { canStartBattle },
-                        disabledFeedback = "AÃºn no se puede empezar la pelea.",
+                        disabledFeedback = "Aún no se puede empezar la pelea.",
                         onRun = {
                             selectedTab = GuildDetailsScreenTab.JEFE_FINAL
                             viewModel.startBossBattle()
@@ -645,7 +645,7 @@ fun GuildDetailsScreen(
         val amParticipant = bossParticipants.any { it.uid == myUid }
         val amOwner = currentGuild.ownerUid == myUid
 
-        // FIX NAVEGACIÃ“N: no redirigimos si el usuario acaba de pulsar "Volver"
+        // FIX NAVEGACIÓN: no redirigimos si el usuario acaba de pulsar "Volver"
         val shouldEnterBattle =
             bossRoom?.status == "battle" &&
                     (bossRoom?.bossHpMax ?: 0) > 0 &&
@@ -675,14 +675,14 @@ fun GuildDetailsScreen(
                             overflow = TextOverflow.Ellipsis
                         )
                         Text(
-                            if (currentGuild.joined) "PÃ¡gina del gremio" else "Vista previa del gremio",
+                            if (currentGuild.joined) "Página del gremio" else "Vista previa del gremio",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 },
                 navigationIcon = {
-                    TextButton(onClick = onBack) { Text("â†") }
+                    TextButton(onClick = onBack) { Text("←") }
                 },
                 actions = {
                     when {
@@ -735,7 +735,7 @@ fun GuildDetailsScreen(
                     )
 
                     Text(
-                        currentGuild.description.ifBlank { "Sin descripciÃ³n todavÃ­a." },
+                        currentGuild.description.ifBlank { "Sin descripción todavía." },
                         color = Color.White.copy(alpha = 0.92f),
                         style = MaterialTheme.typography.bodyLarge
                     )
@@ -853,16 +853,16 @@ fun GuildDetailsScreen(
                                     value = "${currentGuild.memberCount}/$MAX_GUILD_MEMBERS"
                                 )
                                 GuildDetailsInfoPill(
-                                    label = "LÃ­der",
+                                    label = "Líder",
                                     value = currentGuild.ownerDisplayName.ifBlank { "?" }
                                 )
                             }
 
                             Text(
                                 if (currentGuild.joined) {
-                                    "Desde aquÃ­ puedes hablar con el gremio, revisar sus miembros y abrir chats privados con ellos."
+                                    "Desde aquí puedes hablar con el gremio, revisar sus miembros y abrir chats privados con ellos."
                                 } else {
-                                    "Puedes revisar el gremio y sus integrantes. Si te unes, desbloquearÃ¡s el chat del gremio y el acceso rÃ¡pido a los chats privados."
+                                    "Puedes revisar el gremio y sus integrantes. Si te unes, desbloquearás el chat del gremio y el acceso rápido a los chats privados."
                                 },
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -885,7 +885,7 @@ fun GuildDetailsScreen(
                                     CircularProgressIndicator()
                                 }
                             } else if (members.isEmpty()) {
-                                GuildDetailsEmptyBlock("No hay integrantes visibles todavÃ­a.")
+                                GuildDetailsEmptyBlock("No hay integrantes visibles todavía.")
                             } else {
                                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                                     members.take(4).forEach { member ->
@@ -941,7 +941,7 @@ fun GuildDetailsScreen(
                                         CircularProgressIndicator()
                                     }
                                 } else if (guildChatMessages.isEmpty()) {
-                                    GuildDetailsEmptyBlock("TodavÃ­a no hay mensajes. Rompe el hielo.")
+                                    GuildDetailsEmptyBlock("Todavía no hay mensajes. Rompe el hielo.")
                                 } else {
                                     LazyColumn(
                                         state = chatListState,
@@ -1012,7 +1012,7 @@ fun GuildDetailsScreen(
                             )
 
                             Text(
-                                "Pulsa sobre un miembro para abrir chat privado con Ã©l. Si eres lÃ­der, tambiÃ©n puedes transferir el liderazgo.",
+                                "Pulsa sobre un miembro para abrir chat privado con él. Si eres líder, también puedes transferir el liderazgo.",
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
 
@@ -1154,7 +1154,7 @@ fun GuildDetailsScreen(
                                 }
 
                                 Text(
-                                    "1) Elige personaje. 2) Pulsa listo. 3) El lÃ­der inicia la pelea cuando todos estÃ©n listos.",
+                                    "1) Elige personaje. 2) Pulsa listo. 3) El líder inicia la pelea cuando todos estén listos.",
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
 
@@ -1228,12 +1228,12 @@ fun GuildDetailsScreen(
                                                     }
 
                                                     Text(
-                                                        "${character.race} â€¢ ${character.characterClass}",
+                                                        "${character.race} • ${character.characterClass}",
                                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                                     )
 
                                                     Text(
-                                                        "Nivel ${character.level} â€¢ HP ${character.hpMax}",
+                                                        "Nivel ${character.level} • HP ${character.hpMax}",
                                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                                     )
                                                 }
@@ -1251,7 +1251,7 @@ fun GuildDetailsScreen(
                                 )
 
                                 if (bossParticipants.isEmpty()) {
-                                    GuildDetailsEmptyBlock("AÃºn no hay nadie en la sala.")
+                                    GuildDetailsEmptyBlock("Aún no hay nadie en la sala.")
                                 } else {
                                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                                         bossParticipants.forEach { participant ->
@@ -1282,12 +1282,12 @@ fun GuildDetailsScreen(
                                                             Text(
                                                                 buildString {
                                                                     append(participant.displayName.ifBlank { participant.username })
-                                                                    if (isMe) append(" (TÃº)")
+                                                                    if (isMe) append(" (Tú)")
                                                                 },
                                                                 fontWeight = FontWeight.SemiBold
                                                             )
                                                             Text(
-                                                                "${participant.selectedCharacterName} â€¢ ${participant.selectedCharacterClass}",
+                                                                "${participant.selectedCharacterName} • ${participant.selectedCharacterClass}",
                                                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                                                             )
                                                         }
@@ -1327,13 +1327,13 @@ fun GuildDetailsScreen(
                                     Text(
                                         when {
                                             bossRoom?.status == "finished" && canStartBattle ->
-                                                "La pelea anterior ha terminado. Todos han vuelto a pulsar Listo y el lÃ­der ya puede iniciar otra."
+                                                "La pelea anterior ha terminado. Todos han vuelto a pulsar Listo y el líder ya puede iniciar otra."
                                             bossRoom?.status == "finished" ->
                                                 "La pelea anterior ha terminado. Cada participante debe pulsar Listo otra vez para restaurar su estado."
                                             allParticipantsReady ->
-                                                "Todos los participantes estÃ¡n listos. El lÃ­der puede iniciar la pelea."
+                                                "Todos los participantes están listos. El líder puede iniciar la pelea."
                                             else ->
-                                                "TodavÃ­a no estÃ¡n todos listos."
+                                                "Todavía no están todos listos."
                                         },
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -1478,7 +1478,7 @@ private fun GuildDetailsMemberRow(
                 if (member.role.isNotBlank()) {
                     Text(
                         when (member.role.lowercase()) {
-                            "owner" -> "LÃ­der"
+                            "owner" -> "Líder"
                             else -> "Miembro"
                         },
                         style = MaterialTheme.typography.labelMedium,

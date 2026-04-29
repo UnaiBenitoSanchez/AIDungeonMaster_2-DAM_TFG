@@ -69,6 +69,7 @@ object FixedTextTranslator {
         "Seleccionado" to t("Selected", "Seleccionat", "Hautatua", "Ausgewahlt", "Selectionne"),
 
         "Tus personajes" to t("Your characters", "Els teus personatges", "Zure pertsonaiak", "Deine Charaktere", "Tes personnages"),
+        "Tus Personajes" to t("Your characters", "Els teus personatges", "Zure pertsonaiak", "Deine Charaktere", "Tes personnages"),
         "¡Bienvenido a AI Dungeon Master!" to t("Welcome to AI Dungeon Master!", "Benvingut a AI Dungeon Master!", "Ongi etorri AI Dungeon Master-era!", "Willkommen bei AI Dungeon Master!", "Bienvenue dans AI Dungeon Master !"),
         "Soy Enzo, tu guía de aventura. Te enseñaré rápidamente las zonas principales de la app para que puedas empezar sin perderte." to t("I am Enzo, your adventure guide. I will quickly show you the main areas of the app so you can start without getting lost.", "Soc l'Enzo, el teu guia d'aventura. T'ensenyare rapidament les zones principals de l'app perque puguis comencar sense perdre't.", "Enzo naiz, zure abentura-gida. Aplikazioaren gune nagusiak azkar erakutsiko dizkizut, galdu gabe hasteko.", "Ich bin Enzo, dein Abenteuerfuhrer. Ich zeige dir kurz die wichtigsten Bereiche der App, damit du direkt starten kannst.", "Je suis Enzo, ton guide d'aventure. Je vais te montrer rapidement les zones principales de l'application pour commencer sans te perdre."),
         "Accesibilidad" to t("Accessibility", "Accessibilitat", "Irisgarritasuna", "Barrierefreiheit", "Accessibilite"),
@@ -282,7 +283,61 @@ object FixedTextTranslator {
         "Semielfos" to t("Half-elves", "Semielfs", "Erdi-elfoak", "Halbelfen", "Demi-elfes"),
         "Semiorcos" to t("Half-orcs", "Semiorcs", "Erdi-orkoak", "Halborks", "Demi-orcs"),
         "Vampiro" to t("Vampire", "Vampir", "Banpiroa", "Vampir", "Vampire"),
-        "Zombie" to t("Zombie", "Zombi", "Zonbia", "Zombie", "Zombie")
+        "Zombie" to t("Zombie", "Zombi", "Zonbia", "Zombie", "Zombie"),
+        "Aarakocras" to t("Aarakocra", "Aarakocra", "Aarakocra", "Aarakocra", "Aarakocra"),
+        "Aasimar" to t("Aasimar", "Aasimar", "Aasimar", "Aasimar", "Aasimar"),
+        "Cambiantes" to t("Changelings", "Canviants", "Aldakor", "Gestaltwandler", "Changeformes"),
+        "Centauro" to t("Centaur", "Centaure", "Zentauro", "Zentaur", "Centaure"),
+        "Chico pollo" to t("Birdfolk", "Home ocell", "Hegazti-gizona", "Vogelmensch", "Homme-oiseau"),
+        "Chico Slime" to t("Slimefolk", "Slime humà", "Slime gizona", "Schleimmensch", "Humanoïde slime"),
+        "Deidad" to t("Deity", "Deïtat", "Jainkotasuna", "Gottheit", "Divinité"),
+        "Demonio" to t("Demon", "Dimoni", "Deabrua", "Dämon", "Démon"),
+        "Dracónidos" to t("Dragonborn", "Dracònids", "Drakonoideak", "Drachenblütige", "Drakéides"),
+        "Elemental" to t("Elemental", "Elemental", "Elementala", "Elementarwesen", "Élémentaire"),
+        "Elfo oscuro" to t("Dark elf", "Elf fosc", "Iratxo iluna", "Dunkelelf", "Elfe noir"),
+        "Espectro" to t("Specter", "Espectre", "Espektroa", "Gespenst", "Spectre"),
+        "Espíritu" to t("Spirit", "Esperit", "Izpiritua", "Geist", "Esprit"),
+        "Etergénito" to t("Etherborn", "Etergènit", "Eter-sortua", "Äthergeborener", "Éthéroné"),
+        "Firbolgs" to t("Firbolgs", "Firbolgs", "Firbolgak", "Firbolgs", "Firbolgs"),
+        "Forjados" to t("Warforged", "Forjats", "Forjatuak", "Kriegsgeschmiedete", "Forgeliers"),
+        "Genasi" to t("Genasi", "Genasi", "Genasi", "Genasi", "Genasi"),
+        "Gith" to t("Gith", "Gith", "Gith", "Gith", "Gith"),
+        "Goblins" to t("Goblins", "Goblins", "Goblinak", "Goblins", "Gobelins"),
+        "Golem" to t("Golem", "Gòlem", "Golema", "Golem", "Golem"),
+        "Goliats" to t("Goliaths", "Goliats", "Goliathak", "Goliaths", "Goliaths"),
+        "Grungs" to t("Grungs", "Grungs", "Grungak", "Grungs", "Grungs"),
+        "Híbridos Simic" to t("Simic hybrids", "Híbrids Simic", "Simic hibridoak", "Simic-Hybride", "Hybrides Simic"),
+        "Hobgoblins" to t("Hobgoblins", "Hobgoblins", "Hobgoblinak", "Hobgoblins", "Hobgobelins"),
+        "Hombre lobo" to t("Werewolf", "Home llop", "Otso-gizona", "Werwolf", "Loup-garou"),
+        "Hombres lagarto" to t("Lizardfolk", "Homes sargantana", "Musker-gizonak", "Echsenmenschen", "Hommes-lézards"),
+        "Huecos" to t("Hollows", "Buits", "Hutsak", "Hohle", "Creux"),
+        "Ilusión" to t("Illusion", "Il·lusió", "Ilusioa", "Illusion", "Illusion"),
+        "Kalashtar" to t("Kalashtar", "Kalashtar", "Kalashtar", "Kalashtar", "Kalashtar"),
+        "Kenkus" to t("Kenkus", "Kenkus", "Kenkua", "Kenkus", "Kenkus"),
+        "Kobolds" to t("Kobolds", "Kobolds", "Koboldak", "Kobolde", "Kobolds"),
+        "Locathah" to t("Locathah", "Locathah", "Locathah", "Locathah", "Locathah"),
+        "Loxodon" to t("Loxodon", "Loxodon", "Loxodon", "Loxodon", "Loxodon"),
+        "Medianos" to t("Halflings", "Medians", "Erdi-tamainakoak", "Halblinge", "Halfelins"),
+        "Minotauros" to t("Minotaurs", "Minotaures", "Minotauroak", "Minotauren", "Minotaures"),
+        "Mutadores" to t("Shifters", "Mutadors", "Aldatzaileak", "Wandler", "Métamorphes"),
+        "Orcos de Eberron" to t("Eberron orcs", "Orcs d'Eberron", "Eberroneko orkoak", "Orks aus Eberron", "Orcs d'Eberron"),
+        "Osgos" to t("Bugbears", "Ossos", "Bugbear-ak", "Bugbears", "Bugbears"),
+        "Polimorfo" to t("Shapeshifter", "Polimorf", "Polimorfoa", "Gestaltwandler", "Métamorphe"),
+        "Quimera" to t("Chimera", "Quimera", "Kimera", "Chimäre", "Chimère"),
+        "Rápido" to t("Swiftfolk", "Ràpid", "Azkarra", "Schnellling", "Rapide"),
+        "Sátiro" to t("Satyr", "Sàtir", "Satyroa", "Satyr", "Satyre"),
+        "Tabaxis" to t("Tabaxi", "Tabaxi", "Tabaxi", "Tabaxi", "Tabaxi"),
+        "Tiflin" to t("Tiefling", "Tiflin", "Tiefling", "Tiefling", "Tieffelin"),
+        "Tortogas" to t("Tortles", "Tortugues", "Tortleak", "Schildkrötenmenschen", "Tortues humanoïdes"),
+        "Trasgo" to t("Goblin", "Trasgo", "Iratxoa", "Goblin", "Gobelin"),
+        "Tritones" to t("Tritons", "Tritons", "Tritoiak", "Tritonen", "Tritons"),
+        "Vedalken" to t("Vedalken", "Vedalken", "Vedalken", "Vedalken", "Vedalken"),
+        "Verdan" to t("Verdan", "Verdan", "Verdan", "Verdan", "Verdan"),
+        "Yuan-Ti Purasangres" to t("Yuan-ti purebloods", "Yuan-Ti de sang pura", "Odol garbiko Yuan-Tiak", "Yuan-Ti-Reinblütige", "Yuan-Ti sang-pur"),
+        "Caballero de la Muerte" to t("Death knight", "Cavaller de la Mort", "Heriotzaren zalduna", "Todesritter", "Chevalier de la Mort"),
+        "Chamán" to t("Shaman", "Xaman", "Xamana", "Schamane", "Chaman"),
+        "Corsario" to t("Corsair", "Corsari", "Korsarioa", "Freibeuter", "Corsaire"),
+        "Exorcista" to t("Exorcist", "Exorcista", "Exorzista", "Exorzist", "Exorciste")
     )
 
     fun translate(context: Context, value: String): String {
@@ -291,8 +346,9 @@ object FixedTextTranslator {
         if (language == "es") return value
         exact[value]?.let { return it.of(language) }
         terms[value]?.let { return it.of(language) }
-        translateDynamic(language, value)?.let { return it }
-        return value
+        translateDynamic(language, value)?.let { return replaceKnownTerms(language, it) }
+        val composite = replaceKnownTerms(language, value)
+        return composite
     }
 
     private fun translateDynamic(language: String, value: String): String? {
@@ -326,6 +382,19 @@ object FixedTextTranslator {
             value.startsWith("⚡ CRÍTICO") -> value.replace("CRÍTICO", w("CRITICAL"))
             else -> null
         }
+    }
+
+    private fun replaceKnownTerms(language: String, value: String): String {
+        var translated = value
+
+        val entries = terms.entries
+            .sortedByDescending { it.key.length }
+
+        entries.forEach { (original, translation) ->
+            translated = translated.replace(original, translation.of(language))
+        }
+
+        return translated
     }
 
     private fun word(language: String, key: String): String = when (key) {

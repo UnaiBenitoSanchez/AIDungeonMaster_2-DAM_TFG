@@ -54,6 +54,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -93,8 +94,14 @@ fun UsabilityAssistantOverlay(
     showFloatingButton: Boolean = false
 ) {
     val context = LocalContext.current
+    val usabilityPrefs = remember(context) {
+        context.getSharedPreferences("usability_assistant_prefs", android.content.Context.MODE_PRIVATE)
+    }
+
     var showSheet by remember { mutableStateOf(false) }
-    var voiceEnabled by remember { mutableStateOf(false) }
+    var voiceEnabled by rememberSaveable {
+        mutableStateOf(usabilityPrefs.getBoolean("voice_enabled", false))
+    }
     var voiceState by remember { mutableStateOf(VoiceControlUiState()) }
     var permissionDeniedMessage by remember { mutableStateOf<String?>(null) }
 
@@ -146,6 +153,10 @@ fun UsabilityAssistantOverlay(
     }
 
     LaunchedEffect(voiceEnabled) {
+        usabilityPrefs.edit()
+            .putBoolean("voice_enabled", voiceEnabled)
+            .apply()
+
         AdventureMusicEngine.setVoiceControlDucking(voiceEnabled)
         CombatMusicEngine.setVoiceControlDucking(voiceEnabled)
 
