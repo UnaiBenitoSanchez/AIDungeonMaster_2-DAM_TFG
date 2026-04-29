@@ -1,5 +1,7 @@
 package com.example.aidungeonmaster.ui.game
 
+import com.example.aidungeonmaster.ui.i18n.Text
+
 import android.annotation.SuppressLint
 import android.os.Handler
 import android.os.Looper
@@ -36,7 +38,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState

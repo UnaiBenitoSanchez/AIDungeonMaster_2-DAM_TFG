@@ -1,5 +1,7 @@
 package com.example.aidungeonmaster.ui.game
 
+import com.example.aidungeonmaster.ui.i18n.Text
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.border

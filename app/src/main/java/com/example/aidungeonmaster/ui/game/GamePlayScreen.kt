@@ -1,5 +1,7 @@
 package com.example.aidungeonmaster.ui.game
 
+import com.example.aidungeonmaster.ui.i18n.Text
+
 import android.os.Build
 import android.util.Log
 import androidx.annotation.RequiresApi

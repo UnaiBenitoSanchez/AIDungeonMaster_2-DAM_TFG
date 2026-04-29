@@ -8,6 +8,7 @@ import androidx.navigation.NavHostController
 import com.example.aidungeonmaster.data.model.Character
 import com.example.aidungeonmaster.data.model.Guild
 import com.example.aidungeonmaster.navigation.Screen
+import com.example.aidungeonmaster.ui.settings.AppLanguage
 import com.example.aidungeonmaster.ui.theme.ColorBlindType
 import com.example.aidungeonmaster.viewmodel.GameViewModel
 import com.google.firebase.auth.FirebaseAuth
@@ -28,6 +29,7 @@ fun executeVoiceCommand(
     gameViewModel: GameViewModel,
     currentColorBlindType: ColorBlindType,
     onColorBlindChanged: (ColorBlindType) -> Unit,
+    onLanguageChanged: (AppLanguage) -> Unit,
     onOpenUsabilityOptions: () -> Unit,
     onStartVoiceControl: () -> Unit,
     onStopVoiceControl: () -> Unit,
@@ -140,6 +142,25 @@ fun executeVoiceCommand(
         return "Relanzando tutorial."
     }
 
+    command.requestedAppLanguage()?.let { requestedLanguage ->
+        onLanguageChanged(requestedLanguage)
+        return "Idioma cambiado a ${requestedLanguage.voiceFeedbackName()}."
+    }
+
+    if (command.containsAny(
+            "cambiar idioma",
+            "cambia idioma",
+            "cambia el idioma",
+            "cambiar el idioma",
+            "poner idioma",
+            "pon idioma",
+            "idioma de la app",
+            "lenguaje de la app"
+        )
+    ) {
+        return "Di el idioma: español, inglés, catalán, euskera, alemán o francés."
+    }
+
     if (command.containsAny(
             "desactiva modo daltonico",
             "desactiva el modo daltonico",
@@ -192,7 +213,7 @@ fun executeVoiceCommand(
     }
 
     if (command.containsAny("ayuda", "que puedo decir", "comandos", "ordenes disponibles")) {
-        return "Puedes decir: desactiva la voz, protanopía, deuteranopía, tritanopía, acromatopsia, colores normales, crear personaje, sube fuerza, abre gremios, abre chat del gremio, cambia color de acento a morado, selecciona aventura cyberpunk, descargar ficha en PDF, repetir tutorial, siguiente página del tutorial, página anterior del tutorial, ir a la página 3 del tutorial o cerrar sesión."
+        return "Puedes decir: cambia idioma a inglés, pon la app en euskera, desactiva la voz, protanopía, colores normales, crear personaje, abre gremios, abre chat del gremio, selecciona aventura cyberpunk, descargar ficha en PDF, repetir tutorial o cerrar sesión."
     }
 
     if (command.containsAny(
@@ -581,6 +602,103 @@ private fun String.requestedColorBlindType(): ColorBlindType? {
 
         else -> null
     }
+}
+
+private fun String.requestedAppLanguage(): AppLanguage? {
+    val asksForLanguage = containsAny(
+        "idioma",
+        "lenguaje",
+        "language",
+        "cambia idioma",
+        "cambiar idioma",
+        "cambia el idioma",
+        "cambiar el idioma",
+        "pon idioma",
+        "poner idioma",
+        "pon la app en",
+        "poner la app en",
+        "cambia la app a",
+        "cambiar la app a"
+    )
+
+    if (!asksForLanguage) return null
+
+    return when {
+        containsAny(
+            "español",
+            "espanol",
+            "castellano",
+            "spanish",
+            "idioma español",
+            "idioma espanol",
+            "pon la app en español",
+            "pon la app en espanol"
+        ) -> AppLanguage.SPANISH
+
+        containsAny(
+            "ingles",
+            "inglés",
+            "english",
+            "idioma ingles",
+            "idioma inglés",
+            "pon la app en ingles",
+            "pon la app en inglés"
+        ) -> AppLanguage.ENGLISH
+
+        containsAny(
+            "catalan",
+            "catalán",
+            "catala",
+            "català",
+            "idioma catalan",
+            "idioma catalán",
+            "pon la app en catalan",
+            "pon la app en catalán"
+        ) -> AppLanguage.CATALAN
+
+        containsAny(
+            "euskera",
+            "euskara",
+            "vasco",
+            "basque",
+            "idioma euskera",
+            "pon la app en euskera"
+        ) -> AppLanguage.BASQUE
+
+        containsAny(
+            "aleman",
+            "alemán",
+            "deutsch",
+            "german",
+            "idioma aleman",
+            "idioma alemán",
+            "pon la app en aleman",
+            "pon la app en alemán"
+        ) -> AppLanguage.GERMAN
+
+        containsAny(
+            "frances",
+            "francés",
+            "francais",
+            "français",
+            "french",
+            "idioma frances",
+            "idioma francés",
+            "pon la app en frances",
+            "pon la app en francés"
+        ) -> AppLanguage.FRENCH
+
+        else -> null
+    }
+}
+
+private fun AppLanguage.voiceFeedbackName(): String = when (this) {
+    AppLanguage.SPANISH -> "español"
+    AppLanguage.ENGLISH -> "inglés"
+    AppLanguage.CATALAN -> "catalán"
+    AppLanguage.BASQUE -> "euskera"
+    AppLanguage.GERMAN -> "alemán"
+    AppLanguage.FRENCH -> "francés"
 }
 
 private fun String.startsWithAny(vararg prefixes: String): Boolean {

@@ -14,6 +14,7 @@ import androidx.work.WorkManager
 import com.chaquo.python.Python
 import com.chaquo.python.android.AndroidPlatform
 import com.example.aidungeonmaster.data.repository.SocialRepository
+import com.example.aidungeonmaster.ui.settings.AppLanguageManager
 import com.example.aidungeonmaster.utils.NotificationHelper
 import com.example.aidungeonmaster.workers.InactivityWorker
 import com.example.aidungeonmaster.workers.RankingCheckWorker
@@ -44,6 +45,7 @@ class AIDungeonMasterApp : Application(), DefaultLifecycleObserver {
         super<Application>.onCreate()
 
         FirebaseApp.initializeApp(this)
+        AppLanguageManager.applySavedLanguage(this)
 
         if (!Python.isStarted()) {
             Python.start(AndroidPlatform(this))

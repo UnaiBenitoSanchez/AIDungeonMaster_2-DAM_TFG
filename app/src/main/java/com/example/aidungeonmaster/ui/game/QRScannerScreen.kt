@@ -1,5 +1,7 @@
 package com.example.aidungeonmaster.ui.game
 
+import com.example.aidungeonmaster.ui.i18n.Text
+
 import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts

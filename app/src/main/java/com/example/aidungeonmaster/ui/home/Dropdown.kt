@@ -1,5 +1,7 @@
 package com.example.aidungeonmaster.ui.home
 
+import com.example.aidungeonmaster.ui.i18n.Text
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add

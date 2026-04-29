@@ -1,5 +1,7 @@
 package com.example.aidungeonmaster
 
+import com.example.aidungeonmaster.ui.i18n.Text
+
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
@@ -18,7 +20,6 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -34,6 +35,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.navigation.compose.rememberNavController
 import com.example.aidungeonmaster.navigation.AppNavigation
+import com.example.aidungeonmaster.ui.settings.AppLanguageManager
 import com.example.aidungeonmaster.ui.theme.AIDungeonMasterTheme
 import com.example.aidungeonmaster.ui.theme.ColorBlindType
 import com.example.aidungeonmaster.ui.theme.LocalColorBlindType
@@ -56,9 +58,14 @@ class MainActivity : ComponentActivity() {
         requestNextPermissionInQueue()
     }
 
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(AppLanguageManager.wrapContext(newBase))
+    }
+
     @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        AppLanguageManager.applySavedLanguage(this)
 
         // Leer la preferencia guardada antes de componer la UI
         colorBlindType = ColorBlindPreferencesManager.load(this)

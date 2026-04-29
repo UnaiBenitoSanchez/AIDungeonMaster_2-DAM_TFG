@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="common_profile">El meu perfil</string>
+    <string name="common_search_users">Cercar usuaris</string>
+    <string name="common_friend_requests">Sol·licituds d’amistat</string>
+    <string name="common_friends_list">Llista d’amics</string>
+    <string name="common_social_area">Zona social</string>
+</resources>

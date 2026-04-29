@@ -1,5 +1,8 @@
 package com.example.aidungeonmaster.ui.register
 
+import com.example.aidungeonmaster.ui.i18n.FixedTextTranslator
+import com.example.aidungeonmaster.ui.i18n.Text
+
 import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -30,7 +33,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -91,7 +93,10 @@ fun RegisterScreen(
                 ) {
                     Toast.makeText(
                         context,
-                        "¡Revisa tu correo! Te hemos enviado un email de verificación.",
+                        FixedTextTranslator.translate(
+                            context,
+                            "¡Revisa tu correo! Te hemos enviado un email de verificación."
+                        ),
                         Toast.LENGTH_LONG
                     ).show()
                     navController.popBackStack()

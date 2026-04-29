@@ -1,5 +1,7 @@
 package com.example.aidungeonmaster.ui.achievements
 
+import com.example.aidungeonmaster.ui.i18n.Text
+
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background

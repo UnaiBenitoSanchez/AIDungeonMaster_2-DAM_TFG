@@ -1,5 +1,7 @@
 package com.example.aidungeonmaster.ui.accessibility
 
+import com.example.aidungeonmaster.ui.i18n.Text
+
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
@@ -42,7 +44,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -58,12 +59,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavHostController
 import com.example.aidungeonmaster.data.model.Character
 import com.example.aidungeonmaster.data.model.Guild
+import com.example.aidungeonmaster.ui.settings.AppLanguage
+import com.example.aidungeonmaster.ui.settings.AppLanguageManager
 import com.example.aidungeonmaster.ui.theme.ColorBlindType
 import com.example.aidungeonmaster.viewmodel.GameViewModel
 import com.example.aidungeonmaster.utils.AdventureMusicEngine
@@ -108,6 +112,9 @@ fun UsabilityAssistantOverlay(
                 gameViewModel = gameViewModel,
                 currentColorBlindType = currentColorBlindType,
                 onColorBlindChanged = onColorBlindChanged,
+                onLanguageChanged = { language ->
+                    AppLanguageManager.setLanguage(context, language)
+                },
                 onOpenUsabilityOptions = { showSheet = true },
                 onStartVoiceControl = { voiceEnabled = true },
                 onStopVoiceControl = { voiceEnabled = false },
@@ -526,7 +533,9 @@ private fun AccessibilityOptionsSheet(
     onVoiceEnabledChange: (Boolean) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val selectedLanguage = AppLanguageManager.getSavedLanguage(context)
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -572,6 +581,69 @@ private fun AccessibilityOptionsSheet(
             }
 
             Divider()
+
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                tonalElevation = 2.dp
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = "Idioma",
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    AppLanguage.entries.forEach { language ->
+                        val selected = language == selectedLanguage
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(14.dp))
+                                .border(
+                                    width = 1.dp,
+                                    color = if (selected) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)
+                                    },
+                                    shape = RoundedCornerShape(14.dp)
+                                )
+                                .background(
+                                    if (selected) {
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
+                                    } else {
+                                        Color.Transparent
+                                    }
+                                )
+                                .clickable {
+                                    if (!selected) {
+                                        AppLanguageManager.setLanguage(context, language)
+                                    }
+                                }
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = stringResource(language.labelRes),
+                                modifier = Modifier.weight(1f),
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
+                            )
+
+                            if (selected) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = "Seleccionado",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
 
             Surface(
                 modifier = Modifier
