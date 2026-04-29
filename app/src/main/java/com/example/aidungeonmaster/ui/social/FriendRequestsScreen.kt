@@ -29,6 +29,12 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.aidungeonmaster.data.model.FriendRequest
+import com.example.aidungeonmaster.ui.accessibility.VoiceFormAction
+import com.example.aidungeonmaster.ui.accessibility.VoiceFormField
+import com.example.aidungeonmaster.ui.accessibility.VoiceFormRegistry
+import com.example.aidungeonmaster.ui.accessibility.VoiceFormScreen
+import com.example.aidungeonmaster.ui.accessibility.VoiceInputType
+import com.example.aidungeonmaster.ui.accessibility.findBestVoiceOption
 import com.example.aidungeonmaster.viewmodel.SocialViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -49,6 +55,66 @@ fun FriendRequestsScreen(
         onDispose {
             viewModel.stopIncomingRequestsListener()
         }
+    }
+
+    DisposableEffect(requests) {
+        val registration = VoiceFormRegistry.register(
+            VoiceFormScreen(
+                screenName = "solicitudes de amistad",
+                fields = listOf(
+                    VoiceFormField(
+                        label = "aceptar solicitud",
+                        aliases = listOf(
+                            "aceptar solicitud",
+                            "acepta solicitud",
+                            "aceptar a",
+                            "acepta a"
+                        ),
+                        inputType = VoiceInputType.TEXT,
+                        onValue = { value ->
+                            val options = requests.flatMap { req ->
+                                listOf(
+                                    req.fromDisplayName,
+                                    req.fromUsername,
+                                    "@${req.fromUsername}"
+                                )
+                            }.distinct()
+
+                            val selected = findBestVoiceOption(value, options)
+                            val target = requests.firstOrNull { req ->
+                                listOf(req.fromDisplayName, req.fromUsername, "@${req.fromUsername}")
+                                    .any { it == selected }
+                            }
+
+                            if (target != null) {
+                                viewModel.acceptRequest(target)
+                            }
+                        },
+                        feedback = { value -> "Aceptando solicitud de $value." }
+                    )
+                ),
+                actions = listOf(
+                    VoiceFormAction(
+                        label = "aceptar solicitud",
+                        aliases = listOf(
+                            "aceptar solicitud",
+                            "acepta solicitud",
+                            "aceptar amistad"
+                        ),
+                        enabled = { requests.size == 1 },
+                        disabledFeedback = "Di el nombre de la persona. Por ejemplo: aceptar solicitud de Luna.",
+                        onRun = {
+                            requests.firstOrNull()?.let { viewModel.acceptRequest(it) }
+                        },
+                        feedback = requests.firstOrNull()?.let {
+                            "Aceptando solicitud de ${it.fromDisplayName.ifBlank { it.fromUsername }}."
+                        } ?: "No hay solicitudes pendientes."
+                    )
+                )
+            )
+        )
+
+        onDispose { registration.dispose() }
     }
 
     LaunchedEffect(message) {

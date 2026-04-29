@@ -75,6 +75,11 @@ import com.example.aidungeonmaster.utils.ImageUtils
 
 import androidx.compose.runtime.DisposableEffect
 import com.example.aidungeonmaster.utils.AdventureMusicEngine
+import com.example.aidungeonmaster.ui.accessibility.VoiceFormAction
+import com.example.aidungeonmaster.ui.accessibility.VoiceFormField
+import com.example.aidungeonmaster.ui.accessibility.VoiceFormRegistry
+import com.example.aidungeonmaster.ui.accessibility.VoiceFormScreen
+import com.example.aidungeonmaster.ui.accessibility.VoiceInputType
 
 private enum class BestiaryFilter(val label: String) {
     ALL("Todos"),
@@ -138,6 +143,71 @@ fun BestiaryScreen(
 
             matchesQuery && matchesFilter
         }
+    }
+
+    DisposableEffect(query, activeFilter, selectedEntry, filteredEntries.size) {
+        val registration = VoiceFormRegistry.register(
+            VoiceFormScreen(
+                screenName = "bestiario",
+                fields = listOf(
+                    VoiceFormField(
+                        label = "buscar bestiario",
+                        aliases = listOf("buscar", "buscar en bestiario", "filtro de texto"),
+                        inputType = VoiceInputType.TEXT,
+                        onValue = { value -> query = value },
+                        feedback = { value -> "Filtrando bestiario por $value." }
+                    )
+                ),
+                actions = listOf(
+                    VoiceFormAction(
+                        label = "filtro todos",
+                        aliases = listOf("filtro todos", "ver todos", "todos"),
+                        onRun = { activeFilter = BestiaryFilter.ALL },
+                        feedback = "Mostrando todas las entradas."
+                    ),
+                    VoiceFormAction(
+                        label = "filtro derrotados",
+                        aliases = listOf("filtro derrotados", "ver derrotados", "derrotados"),
+                        onRun = { activeFilter = BestiaryFilter.DEFEATED },
+                        feedback = "Mostrando monstruos derrotados."
+                    ),
+                    VoiceFormAction(
+                        label = "filtro con notas",
+                        aliases = listOf("filtro con notas", "ver con notas", "con notas"),
+                        onRun = { activeFilter = BestiaryFilter.WITH_NOTES },
+                        feedback = "Mostrando entradas con notas."
+                    ),
+                    VoiceFormAction(
+                        label = "filtro con loot",
+                        aliases = listOf("filtro con lut", "ver con lut", "con lut"),
+                        onRun = { activeFilter = BestiaryFilter.WITH_LOOT },
+                        feedback = "Mostrando entradas con loot."
+                    ),
+                    VoiceFormAction(
+                        label = "filtro con debilidad",
+                        aliases = listOf("filtro con debilidad", "ver debilidades", "con debilidad"),
+                        onRun = { activeFilter = BestiaryFilter.WITH_WEAKNESS },
+                        feedback = "Mostrando entradas con debilidad."
+                    ),
+                    VoiceFormAction(
+                        label = "filtro con resistencia",
+                        aliases = listOf("filtro con resistencia", "ver resistencias", "con resistencia"),
+                        onRun = { activeFilter = BestiaryFilter.WITH_RESISTANCE },
+                        feedback = "Mostrando entradas con resistencia."
+                    ),
+                    VoiceFormAction(
+                        label = "volver al listado",
+                        aliases = listOf("volver al listado", "cerrar monstruo", "volver"),
+                        enabled = { selectedEntry != null },
+                        disabledFeedback = "Ya estás en el listado.",
+                        onRun = { viewModel.selectEntry(null) },
+                        feedback = "Volviendo al listado del bestiario."
+                    )
+                )
+            )
+        )
+
+        onDispose { registration.dispose() }
     }
 
     MedievalBackground {

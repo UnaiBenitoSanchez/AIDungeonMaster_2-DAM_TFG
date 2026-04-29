@@ -6,6 +6,7 @@ import android.os.Bundle
 import androidx.annotation.RequiresApi
 import androidx.navigation.NavHostController
 import com.example.aidungeonmaster.data.model.Character
+import com.example.aidungeonmaster.data.model.Guild
 import com.example.aidungeonmaster.navigation.Screen
 import com.example.aidungeonmaster.ui.theme.ColorBlindType
 import com.example.aidungeonmaster.viewmodel.GameViewModel
@@ -23,6 +24,7 @@ fun executeVoiceCommand(
     currentRoute: String?,
     currentArguments: Bundle?,
     characters: List<Character>,
+    myGuilds: List<Guild>,
     gameViewModel: GameViewModel,
     currentColorBlindType: ColorBlindType,
     onColorBlindChanged: (ColorBlindType) -> Unit,
@@ -61,6 +63,10 @@ fun executeVoiceCommand(
             characters.size == 1 && uid.isNotBlank() -> CharacterContext(uid, characters.first().name, characters.first())
             else -> null
         }
+    }
+
+    fun myJoinedGuild(): Guild? {
+        return myGuilds.firstOrNull { it.joined } ?: myGuilds.firstOrNull()
     }
 
     if (command.containsAny(
@@ -297,8 +303,79 @@ fun executeVoiceCommand(
         return navigate(Screen.Guilds.createRoute(openCreate = true), "Abriendo creación de gremio.")
     }
 
-    if (command.containsAny("gremios", "gremio", "guilds", "clanes", "clan")) {
+    if (
+        command.containsAny("gremios", "gremio", "guilds", "clanes", "clan") &&
+        !command.containsAny(
+            "mi gremio",
+            "chat del gremio",
+            "miembros del gremio",
+            "jefe final del gremio",
+            "raid del gremio",
+            "batalla del gremio"
+        )
+    ) {
         return navigate(Screen.Guilds.createRoute(), "Abriendo gremios.")
+    }
+
+    if (command.containsAny(
+            "mi gremio",
+            "abre mi gremio",
+            "abrir mi gremio",
+            "ir a mi gremio",
+            "entra en mi gremio"
+        )
+    ) {
+        val guild = myJoinedGuild()
+            ?: return "No he encontrado tu gremio todavía. Di abre gremios para cargar la lista."
+        return navigate(Screen.GuildDetails.createRoute(guild.id), "Abriendo tu gremio.")
+    }
+
+    if (command.containsAny(
+            "abre chat del gremio",
+            "abrir chat del gremio",
+            "chat de mi gremio",
+            "abre el chat de mi gremio",
+            "ir al chat del gremio"
+        )
+    ) {
+        val guild = myJoinedGuild()
+            ?: return "No he encontrado tu gremio todavía. Di abre gremios para cargar la lista."
+        return navigate(
+            Screen.GuildDetails.createRoute(guild.id, tab = "chat"),
+            "Abriendo chat de tu gremio."
+        )
+    }
+
+    if (command.containsAny(
+            "abre miembros del gremio",
+            "abrir miembros del gremio",
+            "miembros de mi gremio",
+            "ver miembros del gremio",
+            "ir a miembros del gremio"
+        )
+    ) {
+        val guild = myJoinedGuild()
+            ?: return "No he encontrado tu gremio todavía. Di abre gremios para cargar la lista."
+        return navigate(
+            Screen.GuildDetails.createRoute(guild.id, tab = "miembros"),
+            "Abriendo miembros de tu gremio."
+        )
+    }
+
+    if (command.containsAny(
+            "abre jefe final del gremio",
+            "abrir jefe final del gremio",
+            "jefe final de mi gremio",
+            "raid del gremio",
+            "batalla del gremio"
+        )
+    ) {
+        val guild = myJoinedGuild()
+            ?: return "No he encontrado tu gremio todavía. Di abre gremios para cargar la lista."
+        return navigate(
+            Screen.GuildDetails.createRoute(guild.id, tab = "jefe_final"),
+            "Abriendo jefe final de tu gremio."
+        )
     }
 
     if (command.containsAny("inventario", "mochila", "objetos")) {

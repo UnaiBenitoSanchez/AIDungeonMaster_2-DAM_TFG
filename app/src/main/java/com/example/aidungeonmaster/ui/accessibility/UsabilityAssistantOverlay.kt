@@ -63,6 +63,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavHostController
 import com.example.aidungeonmaster.data.model.Character
+import com.example.aidungeonmaster.data.model.Guild
 import com.example.aidungeonmaster.ui.theme.ColorBlindType
 import com.example.aidungeonmaster.viewmodel.GameViewModel
 import com.example.aidungeonmaster.utils.AdventureMusicEngine
@@ -77,6 +78,7 @@ fun UsabilityAssistantOverlay(
     currentRoute: String?,
     currentArguments: android.os.Bundle?,
     characters: List<Character>,
+    myGuilds: List<Guild>,
     gameViewModel: GameViewModel,
     currentColorBlindType: ColorBlindType,
     onColorBlindChanged: (ColorBlindType) -> Unit,
@@ -102,6 +104,7 @@ fun UsabilityAssistantOverlay(
                 currentRoute = currentRoute,
                 currentArguments = currentArguments,
                 characters = characters,
+                myGuilds = myGuilds,
                 gameViewModel = gameViewModel,
                 currentColorBlindType = currentColorBlindType,
                 onColorBlindChanged = onColorBlindChanged,

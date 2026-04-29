@@ -66,6 +66,9 @@ import java.util.Locale
 
 import androidx.compose.runtime.DisposableEffect
 import com.example.aidungeonmaster.utils.AdventureMusicEngine
+import com.example.aidungeonmaster.ui.accessibility.VoiceFormAction
+import com.example.aidungeonmaster.ui.accessibility.VoiceFormRegistry
+import com.example.aidungeonmaster.ui.accessibility.VoiceFormScreen
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -137,6 +140,44 @@ fun JournalScreen(
 
     val adventureSummary = remember(pythonInput) {
         PythonJournalBridge.summarizeEntries(pythonInput)
+    }
+
+    DisposableEffect(summaryExpanded, selectedEntry, entries.size) {
+        val registration = VoiceFormRegistry.register(
+            VoiceFormScreen(
+                screenName = "diario",
+                actions = listOf(
+                    VoiceFormAction(
+                        label = "desplegar resumen",
+                        aliases = listOf("desplegar resumen", "abrir resumen", "mostrar resumen"),
+                        enabled = { selectedEntry == null && !summaryExpanded },
+                        disabledFeedback = "El resumen ya está desplegado o estás dentro de una entrada.",
+                        onRun = { summaryExpanded = true },
+                        feedback = "Desplegando resumen del diario."
+                    ),
+                    VoiceFormAction(
+                        label = "plegar resumen",
+                        aliases = listOf("plegar resumen", "ocultar resumen", "cerrar resumen"),
+                        enabled = { selectedEntry == null && summaryExpanded },
+                        disabledFeedback = "El resumen ya está plegado o estás dentro de una entrada.",
+                        onRun = { summaryExpanded = false },
+                        feedback = "Plegando resumen del diario."
+                    ),
+                    VoiceFormAction(
+                        label = "compartir diario",
+                        aliases = listOf("compartir diario", "exportar diario", "enviar diario"),
+                        enabled = { selectedEntry == null && entries.isNotEmpty() },
+                        disabledFeedback = "No hay entradas para compartir o estás dentro de una entrada.",
+                        onRun = {
+                            val exportText = buildJournalExportText(entries)
+                            shareJournal(context, exportText)
+                        },
+                        feedback = "Abriendo compartir diario."
+                    )
+                )
+            )
+        )
+        onDispose { registration.dispose() }
     }
 
     MedievalBackground {

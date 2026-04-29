@@ -1,4 +1,4 @@
-package com.example.aidungeonmaster.ui.social
+﻿package com.example.aidungeonmaster.ui.social
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
@@ -64,6 +64,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.SubcomposeAsyncImage
 import com.example.aidungeonmaster.data.model.GuildChatMessage
 import com.example.aidungeonmaster.data.model.GuildMemberSummary
+import com.example.aidungeonmaster.data.model.AppUser
 import com.example.aidungeonmaster.data.repository.GuildRaidRepository
 import com.example.aidungeonmaster.ui.accessibility.VoiceFormAction
 import com.example.aidungeonmaster.ui.accessibility.VoiceFormField
@@ -72,6 +73,7 @@ import com.example.aidungeonmaster.ui.accessibility.VoiceFormScreen
 import com.example.aidungeonmaster.ui.accessibility.VoiceInputType
 import com.example.aidungeonmaster.ui.accessibility.findVoiceNamedColor
 import com.example.aidungeonmaster.ui.accessibility.guildVoiceColorHelp
+import com.example.aidungeonmaster.ui.accessibility.findBestVoiceOption
 import com.example.aidungeonmaster.viewmodel.SocialViewModel
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -84,10 +86,20 @@ private enum class GuildDetailsScreenTab {
     RESUMEN, CHAT, MIEMBROS, JEFE_FINAL
 }
 
+private fun String.toGuildDetailsTab(): GuildDetailsScreenTab {
+    return when (trim().lowercase(Locale.getDefault())) {
+        "chat" -> GuildDetailsScreenTab.CHAT
+        "miembros" -> GuildDetailsScreenTab.MIEMBROS
+        "jefe_final", "jefe-final", "jefe final", "raid" -> GuildDetailsScreenTab.JEFE_FINAL
+        else -> GuildDetailsScreenTab.RESUMEN
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GuildDetailsScreen(
     guildId: String,
+    initialTab: String = "resumen",
     onBack: () -> Unit,
     onOpenMemberChat: (String, String, String) -> Unit,
     onOpenBossBattle: (String) -> Unit,
@@ -127,7 +139,7 @@ fun GuildDetailsScreen(
             topBar = {
                 TopAppBar(
                     title = { Text("Gremio") },
-                    navigationIcon = { TextButton(onClick = onBack) { Text("←") } }
+                    navigationIcon = { TextButton(onClick = onBack) { Text("â†") } }
                 )
             }
         ) { padding ->
@@ -160,7 +172,9 @@ fun GuildDetailsScreen(
     val isOwner = viewModel.isGuildOwner(currentGuild)
     val isFull = currentGuild.memberCount >= MAX_GUILD_MEMBERS
 
-    var selectedTab by remember(currentGuild.id) { mutableStateOf(GuildDetailsScreenTab.RESUMEN) }
+    var selectedTab by remember(currentGuild.id, initialTab) {
+        mutableStateOf(initialTab.toGuildDetailsTab())
+    }
     var messageText by remember(currentGuild.id) { mutableStateOf("") }
     val chatListState = rememberLazyListState()
     val chatScope = rememberCoroutineScope()
@@ -208,7 +222,13 @@ fun GuildDetailsScreen(
         isOwner,
         selectedTab,
         currentGuild.accentColor,
-        currentGuild.bannerColor
+        currentGuild.bannerColor,
+        messageText,
+        isSendingGuildMessage,
+        isGuildBossActing,
+        bossRoom?.status,
+        bossRoom?.bossHpMax,
+        bossParticipants.size
     ) {
         val tabActions = listOf(
             VoiceFormAction(
@@ -264,6 +284,80 @@ fun GuildDetailsScreen(
             )
         )
 
+        val chatFields = if (currentGuild.joined) {
+            listOf(
+                VoiceFormField(
+                    label = "mensaje del gremio",
+                    aliases = listOf(
+                        "mensaje",
+                        "mensaje del gremio",
+                        "chat",
+                        "escribir en chat",
+                        "enviar mensaje"
+                    ),
+                    inputType = VoiceInputType.TEXT,
+                    onValue = { value ->
+                        messageText = value
+                        lastGuildVoiceFeedback = "Mensaje preparado."
+                    },
+                    feedback = { lastGuildVoiceFeedback }
+                )
+            )
+        } else {
+            emptyList()
+        }
+
+        val memberRequestFields = if (currentGuild.joined && members.isNotEmpty()) {
+            listOf(
+                VoiceFormField(
+                    label = "solicitud de amistad",
+                    aliases = listOf(
+                        "enviar solicitud a",
+                        "mandar solicitud a",
+                        "agregar amigo",
+                        "anadir amigo",
+                        "aÃ±adir amigo"
+                    ),
+                    inputType = VoiceInputType.TEXT,
+                    onValue = { value ->
+                        val candidates = members
+                            .filter { it.uid != currentUserUid }
+                        val options = candidates.flatMap { member ->
+                            listOf(
+                                member.displayName.ifBlank { member.username },
+                                member.username,
+                                "@${member.username}"
+                            )
+                        }
+                        val selected = findBestVoiceOption(value, options)
+                        val targetMember = candidates.firstOrNull { member ->
+                            listOf(
+                                member.displayName.ifBlank { member.username },
+                                member.username,
+                                "@${member.username}"
+                            ).any { it == selected }
+                        }
+
+                        if (targetMember == null) {
+                            lastGuildVoiceFeedback = "No encontrÃ© a ese miembro."
+                        } else {
+                            viewModel.sendFriendRequest(
+                                AppUser(
+                                    uid = targetMember.uid,
+                                    displayName = targetMember.displayName.ifBlank { targetMember.username },
+                                    username = targetMember.username
+                                )
+                            )
+                            lastGuildVoiceFeedback = "Enviando solicitud a ${targetMember.displayName.ifBlank { targetMember.username }}."
+                        }
+                    },
+                    feedback = { lastGuildVoiceFeedback }
+                )
+            )
+        } else {
+            emptyList()
+        }
+
         val colorFields = if (isOwner) {
             listOf(
                 VoiceFormField(
@@ -296,11 +390,234 @@ fun GuildDetailsScreen(
             emptyList()
         }
 
+        val leaderVoiceFields = if (isOwner) {
+            listOf(
+                VoiceFormField(
+                    label = "nombrar lÃ­der",
+                    aliases = listOf(
+                        "nombrar lider",
+                        "nombrar lÃ­der",
+                        "hacer lider a",
+                        "hacer lÃ­der a",
+                        "dar liderazgo a",
+                        "transferir liderazgo a"
+                    ),
+                    inputType = VoiceInputType.TEXT,
+                    onValue = { value ->
+                        val candidates = members.filter { it.uid != currentUserUid }
+                        val options = candidates.flatMap { member ->
+                            listOf(
+                                member.displayName.ifBlank { member.username },
+                                member.username,
+                                "@${member.username}"
+                            )
+                        }
+                        val selected = findBestVoiceOption(value, options)
+                        val targetMember = candidates.firstOrNull { member ->
+                            listOf(
+                                member.displayName.ifBlank { member.username },
+                                member.username,
+                                "@${member.username}"
+                            ).any { it == selected }
+                        }
+
+                        if (targetMember == null) {
+                            lastGuildVoiceFeedback = "No encontrÃ© a ese miembro para liderazgo."
+                        } else {
+                            viewModel.transferLeadership(currentGuild, targetMember.uid)
+                            lastGuildVoiceFeedback =
+                                "Transfiriendo liderazgo a ${targetMember.displayName.ifBlank { targetMember.username }}."
+                        }
+                    },
+                    feedback = { lastGuildVoiceFeedback }
+                )
+            )
+        } else {
+            emptyList()
+        }
+
+        val myParticipant = bossParticipants.firstOrNull { it.uid == currentUserUid }
+        val canReady = currentGuild.joined && myParticipant != null && bossRoom?.status != "battle" && !isGuildBossActing
+        val canJoinBattle = bossRoom?.status == "battle" && (bossRoom?.bossHpMax ?: 0) > 0
+        val canLeaveRoom = currentGuild.joined && bossRoom?.status != "battle" && !isGuildBossActing
+        val canStartBattle = isOwner &&
+                (bossRoom?.status == "waiting" || bossRoom?.status == "finished") &&
+                bossParticipants.isNotEmpty() &&
+                bossParticipants.all {
+                    it.ready && it.alive && it.hpCurrent > 0 && it.hpCurrent == it.hpMax
+                } &&
+                !isGuildBossActing
+
+        val extendedActions = buildList {
+            addAll(tabActions)
+
+            add(
+                VoiceFormAction(
+                    label = "enviar mensaje al gremio",
+                    aliases = listOf(
+                        "enviar mensaje",
+                        "manda mensaje",
+                        "publicar mensaje",
+                        "enviar al gremio"
+                    ),
+                    enabled = {
+                        currentGuild.joined && selectedTab == GuildDetailsScreenTab.CHAT &&
+                                !isSendingGuildMessage && messageText.trim().isNotBlank()
+                    },
+                    disabledFeedback = "Primero abre el chat y dicta un mensaje.",
+                    onRun = {
+                        val text = messageText.trim()
+                        if (text.isNotBlank()) {
+                            viewModel.sendGuildMessage(text)
+                            messageText = ""
+                        }
+                    },
+                    feedback = "Mensaje enviado al gremio."
+                )
+            )
+
+            add(
+                VoiceFormAction(
+                    label = "unirme a sala de espera",
+                    aliases = listOf(
+                        "unirme a sala de espera",
+                        "unirme a la sala",
+                        "entrar a sala de espera",
+                        "ponerme listo",
+                        "listo"
+                    ),
+                    enabled = { canReady },
+                    disabledFeedback = "No puedes ponerte listo ahora mismo.",
+                    onRun = {
+                        selectedTab = GuildDetailsScreenTab.JEFE_FINAL
+                        viewModel.setBossReady(true)
+                    },
+                    feedback = "Te he puesto listo en la sala de espera."
+                )
+            )
+
+            add(
+                VoiceFormAction(
+                    label = "no listo en sala de espera",
+                    aliases = listOf(
+                        "no listo",
+                        "poner no listo",
+                        "quitar listo",
+                        "quitar el listo",
+                        "desmarcar listo",
+                        "no estoy listo"
+                    ),
+                    enabled = { canReady },
+                    disabledFeedback = "No puedes cambiar a no listo ahora mismo.",
+                    onRun = {
+                        selectedTab = GuildDetailsScreenTab.JEFE_FINAL
+                        viewModel.setBossReady(false)
+                    },
+                    feedback = "Te he marcado como no listo."
+                )
+            )
+
+            add(
+                VoiceFormAction(
+                    label = "entrar en pelea del gremio",
+                    aliases = listOf(
+                        "entrar en pelea",
+                        "unirme a la pelea",
+                        "abrir pelea del gremio"
+                    ),
+                    enabled = { currentGuild.joined && canJoinBattle },
+                    disabledFeedback = "La pelea no estÃ¡ disponible ahora.",
+                    onRun = { onOpenBossBattle(currentGuild.id) },
+                    feedback = "Entrando en la pelea del gremio."
+                )
+            )
+
+            if (isOwner) {
+                add(
+                    VoiceFormAction(
+                        label = "empezar pelea del gremio",
+                        aliases = listOf(
+                            "empezar pelea",
+                            "iniciar pelea",
+                            "comenzar pelea del gremio"
+                        ),
+                        enabled = { canStartBattle },
+                        disabledFeedback = "AÃºn no se puede empezar la pelea.",
+                        onRun = {
+                            selectedTab = GuildDetailsScreenTab.JEFE_FINAL
+                            viewModel.startBossBattle()
+                        },
+                        feedback = "Iniciando pelea del gremio."
+                    )
+                )
+            }
+
+            add(
+                VoiceFormAction(
+                    label = "salir de sala de espera",
+                    aliases = listOf(
+                        "salir de sala",
+                        "abandonar sala",
+                        "dejar sala de espera"
+                    ),
+                    enabled = { canLeaveRoom },
+                    disabledFeedback = "No puedes salir de la sala ahora mismo.",
+                    onRun = {
+                        selectedTab = GuildDetailsScreenTab.JEFE_FINAL
+                        viewModel.leaveBossRoom()
+                    },
+                    feedback = "Saliendo de la sala de espera."
+                )
+            )
+
+            if (canLeave) {
+                add(
+                    VoiceFormAction(
+                        label = "salir del gremio",
+                        aliases = listOf(
+                            "salir del gremio",
+                            "abandonar gremio",
+                            "dejar gremio"
+                        ),
+                        onRun = { viewModel.leaveGuild(currentGuild) },
+                        feedback = "Saliendo del gremio."
+                    )
+                )
+            }
+
+            add(
+                VoiceFormAction(
+                    label = "enviar solicitud de amistad",
+                    aliases = listOf(
+                        "enviar solicitud de amistad",
+                        "mandar solicitud de amistad"
+                    ),
+                    enabled = {
+                        currentGuild.joined &&
+                                selectedTab == GuildDetailsScreenTab.MIEMBROS &&
+                                members.count { it.uid != currentUserUid } == 1
+                    },
+                    disabledFeedback = "Di el nombre del miembro. Por ejemplo: enviar solicitud a Luna.",
+                    onRun = {
+                        val candidate = members.firstOrNull { it.uid != currentUserUid } ?: return@VoiceFormAction
+                        viewModel.sendFriendRequest(
+                            AppUser(
+                                uid = candidate.uid,
+                                displayName = candidate.displayName.ifBlank { candidate.username },
+                                username = candidate.username
+                            )
+                        )
+                    },
+                    feedback = "Enviando solicitud de amistad."
+                )
+            )
+        }
+
         val registration = VoiceFormRegistry.register(
             VoiceFormScreen(
                 screenName = "detalle de gremio",
-                fields = colorFields,
-                actions = tabActions
+                fields = colorFields + chatFields + memberRequestFields + leaderVoiceFields,
+                actions = extendedActions
             )
         )
 
@@ -327,7 +644,7 @@ fun GuildDetailsScreen(
         val amParticipant = bossParticipants.any { it.uid == myUid }
         val amOwner = currentGuild.ownerUid == myUid
 
-        // FIX NAVEGACIÓN: no redirigimos si el usuario acaba de pulsar "Volver"
+        // FIX NAVEGACIÃ“N: no redirigimos si el usuario acaba de pulsar "Volver"
         val shouldEnterBattle =
             bossRoom?.status == "battle" &&
                     (bossRoom?.bossHpMax ?: 0) > 0 &&
@@ -357,14 +674,14 @@ fun GuildDetailsScreen(
                             overflow = TextOverflow.Ellipsis
                         )
                         Text(
-                            if (currentGuild.joined) "Página del gremio" else "Vista previa del gremio",
+                            if (currentGuild.joined) "PÃ¡gina del gremio" else "Vista previa del gremio",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 },
                 navigationIcon = {
-                    TextButton(onClick = onBack) { Text("←") }
+                    TextButton(onClick = onBack) { Text("â†") }
                 },
                 actions = {
                     when {
@@ -417,27 +734,41 @@ fun GuildDetailsScreen(
                     )
 
                     Text(
-                        currentGuild.description.ifBlank { "Sin descripción todavía." },
+                        currentGuild.description.ifBlank { "Sin descripciÃ³n todavÃ­a." },
                         color = Color.White.copy(alpha = 0.92f),
                         style = MaterialTheme.typography.bodyLarge
                     )
 
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        GuildDetailsMiniBadge(
-                            text = "${currentGuild.memberCount}/$MAX_GUILD_MEMBERS miembros",
-                            background = Color.White.copy(alpha = 0.18f),
-                            content = Color.White
-                        )
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            GuildDetailsMiniBadge(
+                                text = "${currentGuild.memberCount}/$MAX_GUILD_MEMBERS miembros",
+                                background = Color.White.copy(alpha = 0.18f),
+                                content = Color.White
+                            )
+
+                            if (currentGuild.joined) {
+                                GuildDetailsMiniBadge(
+                                    text = "Mi gremio",
+                                    background = Color.White.copy(alpha = 0.14f),
+                                    content = Color.White
+                                )
+                            }
+                        }
+
                         GuildDetailsMiniBadge(
                             text = "Líder: ${currentGuild.ownerDisplayName.ifBlank { "?" }}",
                             background = Color.Black.copy(alpha = 0.16f),
                             content = Color.White
                         )
-                        GuildDetailsMiniBadge(
-                            text = if (currentGuild.joined) "Mi gremio" else if (isFull) "Completo" else "Explorar",
-                            background = Color.White.copy(alpha = 0.14f),
-                            content = Color.White
-                        )
+
+                        if (!currentGuild.joined) {
+                            GuildDetailsMiniBadge(
+                                text = if (isFull) "Completo" else "Explorar",
+                                background = Color.White.copy(alpha = 0.14f),
+                                content = Color.White
+                            )
+                        }
                     }
 
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -521,16 +852,16 @@ fun GuildDetailsScreen(
                                     value = "${currentGuild.memberCount}/$MAX_GUILD_MEMBERS"
                                 )
                                 GuildDetailsInfoPill(
-                                    label = "Líder",
+                                    label = "LÃ­der",
                                     value = currentGuild.ownerDisplayName.ifBlank { "?" }
                                 )
                             }
 
                             Text(
                                 if (currentGuild.joined) {
-                                    "Desde aquí puedes hablar con el gremio, revisar sus miembros y abrir chats privados con ellos."
+                                    "Desde aquÃ­ puedes hablar con el gremio, revisar sus miembros y abrir chats privados con ellos."
                                 } else {
-                                    "Puedes revisar el gremio y sus integrantes. Si te unes, desbloquearás el chat del gremio y el acceso rápido a los chats privados."
+                                    "Puedes revisar el gremio y sus integrantes. Si te unes, desbloquearÃ¡s el chat del gremio y el acceso rÃ¡pido a los chats privados."
                                 },
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -553,7 +884,7 @@ fun GuildDetailsScreen(
                                     CircularProgressIndicator()
                                 }
                             } else if (members.isEmpty()) {
-                                GuildDetailsEmptyBlock("No hay integrantes visibles todavía.")
+                                GuildDetailsEmptyBlock("No hay integrantes visibles todavÃ­a.")
                             } else {
                                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                                     members.take(4).forEach { member ->
@@ -609,7 +940,7 @@ fun GuildDetailsScreen(
                                         CircularProgressIndicator()
                                     }
                                 } else if (guildChatMessages.isEmpty()) {
-                                    GuildDetailsEmptyBlock("Todavía no hay mensajes. Rompe el hielo.")
+                                    GuildDetailsEmptyBlock("TodavÃ­a no hay mensajes. Rompe el hielo.")
                                 } else {
                                     LazyColumn(
                                         state = chatListState,
@@ -680,7 +1011,7 @@ fun GuildDetailsScreen(
                             )
 
                             Text(
-                                "Pulsa sobre un miembro para abrir chat privado con él. Si eres líder, también puedes transferir el liderazgo.",
+                                "Pulsa sobre un miembro para abrir chat privado con Ã©l. Si eres lÃ­der, tambiÃ©n puedes transferir el liderazgo.",
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
 
@@ -822,7 +1153,7 @@ fun GuildDetailsScreen(
                                 }
 
                                 Text(
-                                    "1) Elige personaje. 2) Pulsa listo. 3) El líder inicia la pelea cuando todos estén listos.",
+                                    "1) Elige personaje. 2) Pulsa listo. 3) El lÃ­der inicia la pelea cuando todos estÃ©n listos.",
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
 
@@ -896,12 +1227,12 @@ fun GuildDetailsScreen(
                                                     }
 
                                                     Text(
-                                                        "${character.race} • ${character.characterClass}",
+                                                        "${character.race} â€¢ ${character.characterClass}",
                                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                                     )
 
                                                     Text(
-                                                        "Nivel ${character.level} • HP ${character.hpMax}",
+                                                        "Nivel ${character.level} â€¢ HP ${character.hpMax}",
                                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                                     )
                                                 }
@@ -919,7 +1250,7 @@ fun GuildDetailsScreen(
                                 )
 
                                 if (bossParticipants.isEmpty()) {
-                                    GuildDetailsEmptyBlock("Aún no hay nadie en la sala.")
+                                    GuildDetailsEmptyBlock("AÃºn no hay nadie en la sala.")
                                 } else {
                                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                                         bossParticipants.forEach { participant ->
@@ -950,12 +1281,12 @@ fun GuildDetailsScreen(
                                                             Text(
                                                                 buildString {
                                                                     append(participant.displayName.ifBlank { participant.username })
-                                                                    if (isMe) append(" (Tú)")
+                                                                    if (isMe) append(" (TÃº)")
                                                                 },
                                                                 fontWeight = FontWeight.SemiBold
                                                             )
                                                             Text(
-                                                                "${participant.selectedCharacterName} • ${participant.selectedCharacterClass}",
+                                                                "${participant.selectedCharacterName} â€¢ ${participant.selectedCharacterClass}",
                                                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                                                             )
                                                         }
@@ -995,13 +1326,13 @@ fun GuildDetailsScreen(
                                     Text(
                                         when {
                                             bossRoom?.status == "finished" && canStartBattle ->
-                                                "La pelea anterior ha terminado. Todos han vuelto a pulsar Listo y el líder ya puede iniciar otra."
+                                                "La pelea anterior ha terminado. Todos han vuelto a pulsar Listo y el lÃ­der ya puede iniciar otra."
                                             bossRoom?.status == "finished" ->
                                                 "La pelea anterior ha terminado. Cada participante debe pulsar Listo otra vez para restaurar su estado."
                                             allParticipantsReady ->
-                                                "Todos los participantes están listos. El líder puede iniciar la pelea."
+                                                "Todos los participantes estÃ¡n listos. El lÃ­der puede iniciar la pelea."
                                             else ->
-                                                "Todavía no están todos listos."
+                                                "TodavÃ­a no estÃ¡n todos listos."
                                         },
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -1146,7 +1477,7 @@ private fun GuildDetailsMemberRow(
                 if (member.role.isNotBlank()) {
                     Text(
                         when (member.role.lowercase()) {
-                            "owner" -> "Líder"
+                            "owner" -> "LÃ­der"
                             else -> "Miembro"
                         },
                         style = MaterialTheme.typography.labelMedium,
@@ -1390,3 +1721,6 @@ private fun guildDetailsParseColor(value: String?): Color {
         Color(0xFF6750A4)
     }
 }
+
+
+

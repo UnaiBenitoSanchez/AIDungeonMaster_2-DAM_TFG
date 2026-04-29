@@ -27,12 +27,19 @@ import com.example.aidungeonmaster.data.model.Item
 import com.example.aidungeonmaster.viewmodel.InventoryViewModel
 import com.example.aidungeonmaster.viewmodel.ItemComparison
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 
 import com.example.aidungeonmaster.utils.AdventureMusicEngine
+import com.example.aidungeonmaster.ui.accessibility.VoiceFormAction
+import com.example.aidungeonmaster.ui.accessibility.VoiceFormField
+import com.example.aidungeonmaster.ui.accessibility.VoiceFormRegistry
+import com.example.aidungeonmaster.ui.accessibility.VoiceFormScreen
+import com.example.aidungeonmaster.ui.accessibility.VoiceInputType
+import com.example.aidungeonmaster.ui.accessibility.findBestVoiceOption
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -50,8 +57,44 @@ fun InventoryScreen(
 
     var feedbackMsg by remember { mutableStateOf<String?>(null) }
     val pagerState = rememberPagerState(pageCount = { 2 })
+    val pagerScope = rememberCoroutineScope()
 
     var pendingRingItem by remember { mutableStateOf<Item?>(null) }
+    var statsExpanded by remember { mutableStateOf(false) }
+    var lastVoiceInventoryFeedback by remember { mutableStateOf("") }
+
+    val currentCharacter = character
+    val equippableItems = remember(currentCharacter?.inventory) {
+        currentCharacter
+            ?.inventory
+            ?.filter { it.resolvedEquipSlot.isNotBlank() || it.isWeapon || it.isArmor }
+            .orEmpty()
+    }
+    val equippedSlots = remember(currentCharacter?.equipment) {
+        listOf(
+            "head" to "cabeza",
+            "chest" to "pecho",
+            "legs" to "piernas",
+            "feet" to "pies",
+            "hands" to "manos",
+            "main_hand" to "mano principal",
+            "off_hand" to "mano secundaria",
+            "ring" to "anillo",
+            "ring2" to "anillo 2",
+            "amulet" to "amuleto"
+        )
+    }
+    val equippedItems = remember(currentCharacter?.equipment) {
+        if (currentCharacter == null) {
+            emptyList()
+        } else {
+            equippedSlots.mapNotNull { (slot, spoken) ->
+                currentCharacter.equipment.itemInSlot(slot)?.let { item ->
+                    Triple(spoken, slot, item.name)
+                }
+            }
+        }
+    }
 
     LaunchedEffect(feedbackMsg) {
         if (feedbackMsg != null) {
@@ -65,6 +108,159 @@ fun InventoryScreen(
         onDispose {
             AdventureMusicEngine.releaseScreen(1200L)
         }
+    }
+
+    DisposableEffect(
+        gameId,
+        pagerState.currentPage,
+        statsExpanded,
+        currentCharacter?.id,
+        equippableItems.size
+    ) {
+        val registration = VoiceFormRegistry.register(
+            VoiceFormScreen(
+                screenName = "inventario",
+                fields = listOf(
+                    VoiceFormField(
+                        label = "equipar",
+                        aliases = listOf(
+                            "equipar",
+                            "equipar objeto",
+                            "ponte",
+                            "ponte objeto"
+                        ),
+                        inputType = VoiceInputType.TEXT,
+                        onValue = { value ->
+                            val selectedName = findBestVoiceOption(
+                                spokenValue = value,
+                                options = equippableItems.map { it.name }
+                            )
+                            val itemToEquip = equippableItems.firstOrNull { it.name == selectedName }
+
+                            if (itemToEquip == null) {
+                                lastVoiceInventoryFeedback = "No encontré ese objeto para equipar."
+                            } else if (itemToEquip.resolvedEquipSlot == "ring") {
+                                pendingRingItem = itemToEquip
+                                lastVoiceInventoryFeedback = "¿Anillo 1 o anillo 2 para ${itemToEquip.name}?"
+                            } else {
+                                viewModel.equipItem(gameId, itemToEquip) { msg ->
+                                    feedbackMsg = msg
+                                    lastVoiceInventoryFeedback = msg
+                                }
+                            }
+                        },
+                        feedback = { lastVoiceInventoryFeedback }
+                    ),
+                    VoiceFormField(
+                        label = "desequipar",
+                        aliases = listOf(
+                            "desequipar",
+                            "quitar equipo",
+                            "quitar objeto",
+                            "quitar"
+                        ),
+                        inputType = VoiceInputType.TEXT,
+                        onValue = { value ->
+                            val slotOptions = equippedSlots.map { it.second }
+                            val nameOptions = equippedItems.map { it.third }
+                            val chosenSlotName = findBestVoiceOption(value, slotOptions)
+                            val chosenItemName = findBestVoiceOption(value, nameOptions)
+
+                            val slotFromName = equippedSlots.firstOrNull { it.second == chosenSlotName }?.first
+                            val slotFromItem = equippedItems.firstOrNull { it.third == chosenItemName }?.second
+                            val slotToUnequip = slotFromName ?: slotFromItem
+
+                            if (slotToUnequip == null) {
+                                lastVoiceInventoryFeedback = "No encontré ese objeto equipado para quitar."
+                            } else {
+                                viewModel.unequipItem(gameId, slotToUnequip) { msg ->
+                                    feedbackMsg = msg
+                                    lastVoiceInventoryFeedback = msg
+                                }
+                            }
+                        },
+                        feedback = { lastVoiceInventoryFeedback }
+                    )
+                ),
+                actions = listOf(
+                    VoiceFormAction(
+                        label = "abrir equipamiento",
+                        aliases = listOf(
+                            "abrir equipamiento",
+                            "abrir equipo",
+                            "ir a equipamiento",
+                            "ir a equipo",
+                            "cambiar a equipamiento",
+                            "apartado equipamiento",
+                            "equipamiento"
+                        ),
+                        onRun = {
+                            pagerScope.launch { pagerState.animateScrollToPage(1) }
+                        },
+                        feedback = "Abriendo equipamiento."
+                    ),
+                    VoiceFormAction(
+                        label = "abrir inventario",
+                        aliases = listOf(
+                            "abrir inventario",
+                            "ir a inventario",
+                            "volver a inventario",
+                            "apartado inventario",
+                            "cambiar a inventario",
+                            "cambiar a invntario",
+                            "ir a invntario"
+                        ),
+                        onRun = {
+                            pagerScope.launch { pagerState.animateScrollToPage(0) }
+                        },
+                        feedback = "Abriendo inventario."
+                    ),
+                    VoiceFormAction(
+                        label = "desplegar stats",
+                        aliases = listOf(
+                            "desplegar stats",
+                            "mostrar stats",
+                            "ver stats",
+                            "ver estadisticas",
+                            "ver estadísticas"
+                        ),
+                        enabled = { !statsExpanded },
+                        disabledFeedback = "Los stats ya están desplegados.",
+                        onRun = { statsExpanded = true },
+                        feedback = "Desplegando stats."
+                    ),
+                    VoiceFormAction(
+                        label = "ocultar stats",
+                        aliases = listOf(
+                            "ocultar stats",
+                            "plegar stats",
+                            "cerrar stats",
+                            "ocultar estadisticas",
+                            "ocultar estadísticas",
+                            "cerrar estadisticas",
+                            "cerrar estadísticas",
+                            "quitar stats"
+                        ),
+                        enabled = { statsExpanded },
+                        disabledFeedback = "Los stats ya están ocultos.",
+                        onRun = { statsExpanded = false },
+                        feedback = "Ocultando stats."
+                    ),
+                    VoiceFormAction(
+                        label = "alternar stats",
+                        aliases = listOf(
+                            "stats",
+                            "estadisticas",
+                            "estadísticas"
+                        ),
+                        onRun = { statsExpanded = !statsExpanded },
+                        feedback = if (statsExpanded) "Ocultando stats." else "Desplegando stats."
+                    )
+                )
+            )
+        )
+
+        onDispose { registration.dispose() }
     }
 
     MedievalBackground {
@@ -126,7 +322,11 @@ fun InventoryScreen(
                                 .fillMaxSize()
                                 .padding(horizontal = 16.dp, vertical = 12.dp)
                         ) {
-                            CharacterHeaderCard(currentCharacter)
+                            CharacterHeaderCard(
+                                character = currentCharacter,
+                                statsExpanded = statsExpanded,
+                                onToggleStats = { statsExpanded = !statsExpanded }
+                            )
 
                             InventoryPagerTabs(
                                 selectedPage = pagerState.currentPage
@@ -158,6 +358,11 @@ fun InventoryScreen(
                                                 viewModel.equipItem(gameId, equippable) { msg ->
                                                     feedbackMsg = msg
                                                 }
+                                            }
+                                        },
+                                        onSell = { sellable ->
+                                            viewModel.sellItem(gameId, sellable) { msg ->
+                                                feedbackMsg = msg
                                             }
                                         }
                                     )
@@ -273,7 +478,8 @@ private fun InventoryPage(
     character: Character,
     getComparison: (Item) -> ItemComparison?,
     onUse: (Item) -> Unit,
-    onEquip: (Item) -> Unit
+    onEquip: (Item) -> Unit,
+    onSell: (Item) -> Unit
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         Spacer(Modifier.height(4.dp))
@@ -316,7 +522,8 @@ private fun InventoryPage(
                         item = item,
                         comparison = getComparison(item),
                         onUse = onUse,
-                        onEquip = onEquip
+                        onEquip = onEquip,
+                        onSell = onSell
                     )
                 }
 
@@ -378,10 +585,11 @@ private fun EquipmentPage(
 }
 
 @Composable
-private fun CharacterHeaderCard(character: Character) {
-    var statsExpanded by remember(character.id, character.lastPlayed, character.level) {
-        mutableStateOf(false)
-    }
+private fun CharacterHeaderCard(
+    character: Character,
+    statsExpanded: Boolean,
+    onToggleStats: () -> Unit
+) {
 
     Card(
         modifier = Modifier
@@ -492,7 +700,7 @@ private fun CharacterHeaderCard(character: Character) {
             Spacer(Modifier.height(10.dp))
 
             OutlinedButton(
-                onClick = { statsExpanded = !statsExpanded },
+                onClick = onToggleStats,
                 colors = ButtonDefaults.outlinedButtonColors(
                     contentColor = Color(0xFFFFD700)
                 ),
@@ -663,7 +871,8 @@ fun InventoryItemRow(
     item: Item,
     comparison: ItemComparison? = null,
     onUse: ((Item) -> Unit)? = null,
-    onEquip: ((Item) -> Unit)? = null
+    onEquip: ((Item) -> Unit)? = null,
+    onSell: ((Item) -> Unit)? = null
 ) {
     val rarityColor = when (item.rarity.lowercase()) {
         "uncommon" -> Color(0xFF7CFF7C)
@@ -796,28 +1005,42 @@ fun InventoryItemRow(
 
             Spacer(Modifier.width(10.dp))
 
-            when {
-                isActuallyEquippable && onEquip != null -> {
-                    Button(
-                        onClick = { onEquip(item) },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF2E7D32),
-                            contentColor = Color.White
-                        )
-                    ) {
-                        Text("Equipar")
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                when {
+                    isActuallyEquippable && onEquip != null -> {
+                        Button(
+                            onClick = { onEquip(item) },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF2E7D32),
+                                contentColor = Color.White
+                            )
+                        ) {
+                            Text("Equipar")
+                        }
+                    }
+
+                    !isActuallyEquippable && onUse != null -> {
+                        Button(
+                            onClick = { onUse(item) },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF1565C0),
+                                contentColor = Color.White
+                            )
+                        ) {
+                            Text("Usar")
+                        }
                     }
                 }
 
-                !isActuallyEquippable && onUse != null -> {
-                    Button(
-                        onClick = { onUse(item) },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF1565C0),
-                            contentColor = Color.White
-                        )
+                if (onSell != null) {
+                    OutlinedButton(
+                        onClick = { onSell(item) },
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = Color(0xFFFFD700)
+                        ),
+                        border = BorderStroke(1.dp, Color(0xFFFFD700))
                     ) {
-                        Text("Usar")
+                        Text("Vender")
                     }
                 }
             }

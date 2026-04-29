@@ -684,6 +684,44 @@ class InventoryViewModel : ViewModel() {
         }
     }
 
+    fun sellItem(gameId: String, item: Item, onResult: (String) -> Unit = {}) {
+        viewModelScope.launch {
+            try {
+                val char = _character.value ?: run {
+                    onResult("❌ No hay personaje cargado")
+                    return@launch
+                }
+
+                val updatedInventory = removeMatchingItem(char.inventory.toMutableList(), item)
+                if (updatedInventory.size == char.inventory.size) {
+                    onResult("❌ No encontré ${item.name} en el inventario")
+                    return@launch
+                }
+
+                val sellPrice = calculateSellPrice(item)
+                val newCoins = (char.coins + sellPrice).coerceAtLeast(0)
+
+                db.collection("partidas").document(gameId).set(
+                    mapOf(
+                        "inventory" to updatedInventory.map(::itemToMap),
+                        "coins" to newCoins
+                    ),
+                    SetOptions.merge()
+                ).await()
+
+                _character.value = char.copy(
+                    inventory = updatedInventory,
+                    coins = newCoins
+                )
+
+                onResult("💰 Vendiste ${item.name} por $sellPrice monedas")
+            } catch (e: Exception) {
+                Log.e("INVENTORY_ERROR", "sellItem: ${e.message}", e)
+                onResult("❌ No se pudo vender ${item.name}")
+            }
+        }
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // RESET PERSONAJE
     // ─────────────────────────────────────────────────────────────────────────
@@ -969,6 +1007,29 @@ class InventoryViewModel : ViewModel() {
         }
         if (index >= 0) items.removeAt(index)
         return items
+    }
+
+    private fun calculateSellPrice(item: Item): Int {
+        val rarityValue = when (item.rarity.lowercase()) {
+            "legendary" -> 80
+            "epic" -> 50
+            "rare" -> 30
+            "uncommon" -> 18
+            else -> 10
+        }
+
+        val typeBonus = when {
+            item.isWeapon -> 12
+            item.isArmor -> 10
+            item.resolvedEquipSlot == "ring" || item.resolvedEquipSlot == "ring2" -> 14
+            item.resolvedEquipSlot == "amulet" -> 16
+            item.type.contains("pocion", ignoreCase = true) -> 4
+            item.type.contains("consum", ignoreCase = true) -> 3
+            else -> 0
+        }
+
+        val enchantBonus = item.enchantments.size * 6
+        return (rarityValue + typeBonus + enchantBonus).coerceAtLeast(2)
     }
 
     private suspend fun loadStatsForCharacter(

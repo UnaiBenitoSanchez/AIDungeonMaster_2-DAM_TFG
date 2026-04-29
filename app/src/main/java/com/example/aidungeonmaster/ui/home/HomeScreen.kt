@@ -168,11 +168,37 @@ fun HomeScreen(
         }
     }
 
-    DisposableEffect(Unit) {
+    DisposableEffect(visibleCharacters) {
+        val deleteCharacterActions = visibleCharacters.map { character ->
+            VoiceFormAction(
+                label = "eliminar ${character.name}",
+                aliases = listOf(
+                    "eliminar ${character.name}",
+                    "elimina ${character.name}",
+                    "eliminar a ${character.name}",
+                    "elimina a ${character.name}",
+                    "eliminar personaje ${character.name}",
+                    "elimina personaje ${character.name}",
+                    "eliminar el personaje ${character.name}",
+                    "elimina el personaje ${character.name}",
+                    "borrar ${character.name}",
+                    "borra ${character.name}",
+                    "borrar a ${character.name}",
+                    "borra a ${character.name}",
+                    "borrar personaje ${character.name}",
+                    "borra personaje ${character.name}",
+                    "borrar el personaje ${character.name}",
+                    "borra el personaje ${character.name}"
+                ),
+                onRun = { characterToDelete = character },
+                feedback = "Abriendo confirmacion para eliminar a ${character.name}."
+            )
+        }
+
         val registration = VoiceFormRegistry.register(
             VoiceFormScreen(
                 screenName = "pantalla principal",
-                actions = listOf(
+                actions = deleteCharacterActions + listOf(
                     VoiceFormAction(
                         label = "crear personaje",
                         aliases = listOf(
@@ -188,12 +214,86 @@ fun HomeScreen(
                         ),
                         onRun = { showDialog = true },
                         feedback = "Abriendo creación de personaje."
+                    ),
+                    VoiceFormAction(
+                        label = "eliminar personaje",
+                        aliases = listOf(
+                            "eliminar personaje",
+                            "elimina personaje",
+                            "eliminar un personaje",
+                            "elimina un personaje",
+                            "borrar personaje",
+                            "borra personaje",
+                            "borrar un personaje",
+                            "borra un personaje"
+                        ),
+                        enabled = { visibleCharacters.size == 1 },
+                        disabledFeedback = "Dime el nombre del personaje. Por ejemplo: elimina personaje Aria.",
+                        onRun = { characterToDelete = visibleCharacters.firstOrNull() },
+                        feedback = visibleCharacters.firstOrNull()?.let { character ->
+                            "Abriendo confirmacion para eliminar a ${character.name}."
+                        } ?: "No hay personajes para eliminar."
                     )
                 )
             )
         )
 
         onDispose { registration.dispose() }
+    }
+
+    characterToDelete?.let { pendingCharacter ->
+        DisposableEffect(pendingCharacter.id, pendingCharacter.name) {
+            val registration = VoiceFormRegistry.register(
+                VoiceFormScreen(
+                    screenName = "confirmacion de borrado",
+                    actions = listOf(
+                        VoiceFormAction(
+                            label = "confirmar eliminacion",
+                            aliases = listOf(
+                                "confirmar",
+                                "confirma",
+                                "si",
+                                "sí",
+                                "aceptar",
+                                "acepta",
+                                "eliminar",
+                                "elimina",
+                                "borrar",
+                                "borra",
+                                "confirmar eliminacion",
+                                "confirmar eliminación",
+                                "eliminar personaje",
+                                "borrar personaje"
+                            ),
+                            onRun = {
+                                viewModel.deleteCharacter(pendingCharacter.id, pendingCharacter.name)
+                                characterToDelete = null
+                            },
+                            feedback = "${pendingCharacter.name} eliminado."
+                        ),
+                        VoiceFormAction(
+                            label = "cancelar eliminacion",
+                            aliases = listOf(
+                                "cancelar",
+                                "cancela",
+                                "no",
+                                "volver",
+                                "atras",
+                                "atrás",
+                                "no eliminar",
+                                "no borrar",
+                                "cancelar eliminacion",
+                                "cancelar eliminación"
+                            ),
+                            onRun = { characterToDelete = null },
+                            feedback = "Eliminacion cancelada."
+                        )
+                    )
+                )
+            )
+
+            onDispose { registration.dispose() }
+        }
     }
 
     val currentColorBlindType = LocalColorBlindType.current

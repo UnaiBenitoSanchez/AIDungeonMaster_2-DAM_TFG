@@ -59,6 +59,7 @@ import com.example.aidungeonmaster.ui.accessibility.VoiceFormField
 import com.example.aidungeonmaster.ui.accessibility.VoiceFormRegistry
 import com.example.aidungeonmaster.ui.accessibility.VoiceFormScreen
 import com.example.aidungeonmaster.ui.accessibility.VoiceInputType
+import com.example.aidungeonmaster.ui.accessibility.findBestVoiceOption
 import com.example.aidungeonmaster.ui.accessibility.findVoiceNamedColor
 import com.example.aidungeonmaster.ui.accessibility.guildVoiceColorHelp
 import com.example.aidungeonmaster.viewmodel.SocialViewModel
@@ -72,7 +73,7 @@ private const val MAX_GUILD_MEMBERS = 15
 @Composable
 fun GuildsScreen(
     onBack: () -> Unit,
-    onOpenGuildDetails: (String) -> Unit,
+    onOpenGuildDetails: (String, String?) -> Unit,
     autoOpenCreate: Boolean = false,
     viewModel: SocialViewModel = viewModel()
 ) {
@@ -84,6 +85,7 @@ fun GuildsScreen(
 
     var query by remember { mutableStateOf("") }
     var showCreateDialog by remember { mutableStateOf(false) }
+    var pendingJoinGuildId by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(autoOpenCreate) {
         if (autoOpenCreate) {
@@ -91,9 +93,19 @@ fun GuildsScreen(
         }
     }
 
+    LaunchedEffect(myGuilds, pendingJoinGuildId) {
+        val pendingId = pendingJoinGuildId ?: return@LaunchedEffect
+        val joinedGuild = myGuilds.firstOrNull { it.id == pendingId && it.joined } ?: return@LaunchedEffect
+
+        pendingJoinGuildId = null
+        query = ""
+        viewModel.clearGuildSearch()
+        onOpenGuildDetails(joinedGuild.id, null)
+    }
+
     val shouldShowSearchResults = query.trim().length >= 2
 
-    DisposableEffect(query, showCreateDialog) {
+    DisposableEffect(query, showCreateDialog, searchResults, myGuilds) {
         val registration = VoiceFormRegistry.register(
             VoiceFormScreen(
                 screenName = "gremios",
@@ -118,6 +130,32 @@ fun GuildsScreen(
                             }
                         },
                         feedback = { value -> "Buscando gremios por $value." }
+                    ),
+                    VoiceFormField(
+                        label = "unirme a gremio",
+                        aliases = listOf(
+                            "unirme a",
+                            "unirme al gremio",
+                            "unirme a gremio",
+                            "entrar a gremio",
+                            "entrar al gremio"
+                        ),
+                        inputType = VoiceInputType.TEXT,
+                        onValue = { value ->
+                            val candidates = searchResults
+                                .filter { !it.joined && it.memberCount < MAX_GUILD_MEMBERS } +
+                                    myGuilds.filter { !it.joined && it.memberCount < MAX_GUILD_MEMBERS }
+
+                            val options = candidates.map { it.name }.distinct()
+                            val selected = findBestVoiceOption(value, options)
+                            val target = candidates.firstOrNull { it.name == selected }
+
+                            if (target != null) {
+                                pendingJoinGuildId = target.id
+                                viewModel.joinGuild(target)
+                            }
+                        },
+                        feedback = { value -> "Intentando unirte al gremio $value." }
                     )
                 ),
                 actions = listOf(
@@ -153,6 +191,12 @@ fun GuildsScreen(
 
     LaunchedEffect(message) {
         if (!message.isNullOrBlank()) {
+            if (
+                pendingJoinGuildId != null &&
+                message!!.contains("no se pudo", ignoreCase = true)
+            ) {
+                pendingJoinGuildId = null
+            }
             snackbarHostState.showSnackbar(message!!)
             viewModel.clearMessage()
         }
@@ -199,7 +243,7 @@ fun GuildsScreen(
                             guild = guild,
                             showJoinButton = false,
                             onJoin = {},
-                            onOpenDetails = { onOpenGuildDetails(guild.id) }
+                            onOpenDetails = { onOpenGuildDetails(guild.id, null) }
                         )
                     }
                 }
@@ -230,11 +274,14 @@ fun GuildsScreen(
                         GuildCard(
                             guild = guild,
                             showJoinButton = !guild.joined,
-                            onJoin = { viewModel.joinGuild(guild) },
+                            onJoin = {
+                                pendingJoinGuildId = guild.id
+                                viewModel.joinGuild(guild)
+                            },
                             onOpenDetails = {
                                 query = ""
                                 viewModel.clearGuildSearch()
-                                onOpenGuildDetails(guild.id)
+                                onOpenGuildDetails(guild.id, null)
                             }
                         )
                     }

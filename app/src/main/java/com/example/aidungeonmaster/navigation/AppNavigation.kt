@@ -94,6 +94,17 @@ sealed class Screen(val route: String) {
         }
     }
 
+    object GuildDetails : Screen("guild_details/{guildId}?tab={tab}") {
+        fun createRoute(guildId: String, tab: String? = null): String {
+            val encodedId = Uri.encode(guildId)
+            return if (tab.isNullOrBlank()) {
+                "guild_details/$encodedId"
+            } else {
+                "guild_details/$encodedId?tab=${Uri.encode(tab)}"
+            }
+        }
+    }
+
     object Inventory : Screen("inventory/{userId}") {
         fun createRoute(userId: String) = "inventory/${Uri.encode(userId)}"
     }
@@ -195,6 +206,7 @@ fun AppNavigation(
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
     val characters by homeViewModel.characters.collectAsState()
+    val myGuilds by socialViewModel.myGuilds.collectAsState()
 
     var accessibilityOpenRequest by remember { mutableIntStateOf(0) }
     var tutorialOpenRequest by remember { mutableIntStateOf(0) }
@@ -206,6 +218,9 @@ fun AppNavigation(
             AdventureMusicEngine.stopNow()
             CombatMusicEngine.stop()
         }
+    }
+    LaunchedEffect(Unit) {
+        socialViewModel.startGuildsListener()
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -641,21 +656,34 @@ fun AppNavigation(
 
                 GuildsScreen(
                     onBack = { navController.popBackStack() },
-                    onOpenGuildDetails = { guildId ->
-                        navController.navigate("guild_details/${Uri.encode(guildId)}")
+                    onOpenGuildDetails = { guildId, tab ->
+                        navController.navigate(Screen.GuildDetails.createRoute(guildId, tab))
                     },
                     autoOpenCreate = openCreate,
                     viewModel = socialViewModel
                 )
             }
 
-            composable("guild_details/{guildId}") { backStackEntryArg ->
+            composable(
+                route = Screen.GuildDetails.route,
+                arguments = listOf(
+                    navArgument("guildId") { type = NavType.StringType },
+                    navArgument("tab") {
+                        type = NavType.StringType
+                        defaultValue = "resumen"
+                    }
+                )
+            ) { backStackEntryArg ->
                 val guildId = Uri.decode(
                     backStackEntryArg.arguments?.getString("guildId").orEmpty()
+                )
+                val initialTab = Uri.decode(
+                    backStackEntryArg.arguments?.getString("tab").orEmpty()
                 )
 
                 GuildDetailsScreen(
                     guildId = guildId,
+                    initialTab = initialTab,
                     onBack = { navController.popBackStack() },
                     onOpenMemberChat = { memberUid, memberName, _ ->
                         navController.navigate(Screen.PrivateChat.createRoute(memberUid, memberName))
@@ -708,6 +736,7 @@ fun AppNavigation(
             currentRoute = currentRoute,
             currentArguments = backStackEntry?.arguments,
             characters = characters,
+            myGuilds = myGuilds,
             gameViewModel = gameViewModel,
             currentColorBlindType = LocalColorBlindType.current,
             onColorBlindChanged = onColorBlindChanged,

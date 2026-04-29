@@ -1,4 +1,4 @@
-package com.example.aidungeonmaster.ui.social
+﻿package com.example.aidungeonmaster.ui.social
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -33,10 +33,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.aidungeonmaster.data.model.AppUser
+import com.example.aidungeonmaster.ui.accessibility.VoiceFormAction
 import com.example.aidungeonmaster.ui.accessibility.VoiceFormField
 import com.example.aidungeonmaster.ui.accessibility.VoiceFormRegistry
 import com.example.aidungeonmaster.ui.accessibility.VoiceFormScreen
 import com.example.aidungeonmaster.ui.accessibility.VoiceInputType
+import com.example.aidungeonmaster.ui.accessibility.findBestVoiceOption
 import com.example.aidungeonmaster.viewmodel.SocialViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -52,10 +54,10 @@ fun UserSearchScreen(
 
     val snackbarHostState = remember { SnackbarHostState() }
 
-    DisposableEffect(query, isSearching) {
+    DisposableEffect(query, isSearching, results) {
         val registration = VoiceFormRegistry.register(
             VoiceFormScreen(
-                screenName = "búsqueda de usuarios",
+                screenName = "busqueda de usuarios",
                 fields = listOf(
                     VoiceFormField(
                         label = "buscar usuario",
@@ -78,6 +80,52 @@ fun UserSearchScreen(
                             }
                         },
                         feedback = { value -> "Buscando usuarios por $value." }
+                    ),
+                    VoiceFormField(
+                        label = "enviar solicitud",
+                        aliases = listOf(
+                            "enviar solicitud",
+                            "mandar solicitud",
+                            "solicitud a",
+                            "agregar amigo",
+                            "anadir amigo",
+                            "añadir amigo"
+                        ),
+                        inputType = VoiceInputType.TEXT,
+                        onValue = { value ->
+                            val options = results.flatMap { user ->
+                                listOf(user.displayName, user.username, "@${user.username}")
+                            }.distinct()
+
+                            val selected = findBestVoiceOption(value, options)
+                            val target = results.firstOrNull { user ->
+                                listOf(user.displayName, user.username, "@${user.username}")
+                                    .any { it == selected }
+                            }
+
+                            if (target != null) {
+                                viewModel.sendFriendRequest(target)
+                            }
+                        },
+                        feedback = { value -> "Enviando solicitud de amistad a $value." }
+                    )
+                ),
+                actions = listOf(
+                    VoiceFormAction(
+                        label = "enviar solicitud",
+                        aliases = listOf(
+                            "enviar solicitud",
+                            "mandar solicitud",
+                            "agregar amigo"
+                        ),
+                        enabled = { results.size == 1 },
+                        disabledFeedback = "Di el nombre del usuario. Por ejemplo: enviar solicitud a Unai.",
+                        onRun = {
+                            results.firstOrNull()?.let { viewModel.sendFriendRequest(it) }
+                        },
+                        feedback = results.firstOrNull()?.let {
+                            "Enviando solicitud a ${it.displayName.ifBlank { it.username }}."
+                        } ?: "No hay usuarios para enviar solicitud."
                     )
                 )
             )
@@ -98,7 +146,7 @@ fun UserSearchScreen(
             TopAppBar(
                 title = { Text("Buscar aventureros") },
                 navigationIcon = {
-                    TextButton(onClick = onBack) { Text("←") }
+                    TextButton(onClick = onBack) { Text("<-") }
                 }
             )
         },
