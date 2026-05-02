@@ -77,11 +77,11 @@ La aplicación sigue una arquitectura modular inspirada en MVVM y se apoya en Fi
 ## Stack tecnológico
 
 ### Lenguajes
-- **Kotlin**: lenguaje principal de la aplicación.
-- **Python**: procesamiento narrativo auxiliar mediante Chaquopy.
-- **JavaScript**: renderizado 3D con Three.js.
-- **HTML**: contenido embebido para WebView.
-- **JSON**: intercambio de datos entre cliente, APIs y almacenamiento.
+- **Kotlin**: lenguaje principal de la aplicación. ![Kotlin](https://img.shields.io/badge/Kotlin-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white)
+- **Python**: procesamiento narrativo auxiliar mediante Chaquopy. ![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
+- **JavaScript**: renderizado 3D con Three.js. ![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)
+- **HTML**: contenido embebido para WebView. ![HTML5](https://img.shields.io/badge/HTML5-E34F26?style=for-the-badge&logo=html5&logoColor=white)
+- **JSON**: intercambio de datos entre cliente, APIs y almacenamiento. ![JSON](https://img.shields.io/badge/JSON-000000?style=for-the-badge&logo=json&logoColor=white)
 
 ### Frameworks y librerías
 - **Jetpack Compose**: interfaz declarativa.
@@ -380,9 +380,21 @@ Proyecto académico de TFG orientado a la exploración de:
 - refactorización adicional para separar más claramente algunos subsistemas UI/datos.
 
 ---
+ 
+## Licencia
+ 
+Este proyecto se publica **exclusivamente con fines académicos y de demostración**.
+Si deseas utilizar este proyecto, **contacta con el autor** antes de hacerlo para pedir permiso.
+ 
+---
 
 ## Autor
 
 **Unai Benito Sánchez**  
 Proyecto TFG DAM  
 AIDungeonMaster
+
+![Kotlin](https://img.shields.io/badge/Kotlin-7F52FF?style=flat-square&logo=kotlin&logoColor=white)
+![Android](https://img.shields.io/badge/Android-3DDC84?style=flat-square&logo=android&logoColor=white)
+![Firebase](https://img.shields.io/badge/Firebase-FFCA28?style=flat-square&logo=firebase&logoColor=black)
+![IA](https://img.shields.io/badge/IA%20Generativa-FF6F00?style=flat-square&logo=openai&logoColor=white)
