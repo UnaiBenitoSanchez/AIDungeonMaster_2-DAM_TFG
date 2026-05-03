@@ -23,6 +23,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import java.util.Locale
 
 import com.example.aidungeonmaster.data.repository.CharacterDeletionRepository
 
@@ -154,15 +155,15 @@ class GameViewModel : ViewModel() {
 
     @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
     fun sendPlayerAction(action: String) {
-        _messages.value = _messages.value + ("Tú" to action)
-        viewModelScope.launch { executeGroqCall("El jugador decide: $action") }
+        _messages.value = _messages.value + (playerLabel() to action)
+        viewModelScope.launch { executeGroqCall("${playerActionPrefix()} $action") }
     }
 
     @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
     fun sendCustomAction(action: String) {
         if (action.isBlank()) return
-        _messages.value = _messages.value + ("Tú" to action)
-        viewModelScope.launch { executeGroqCall("El jugador decide: $action") }
+        _messages.value = _messages.value + (playerLabel() to action)
+        viewModelScope.launch { executeGroqCall("${playerActionPrefix()} $action") }
     }
 
     @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
@@ -370,11 +371,13 @@ class GameViewModel : ViewModel() {
     private fun buildSystemPrompt(): String = """
 Eres un Dungeon Master de rol. Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional, sin bloques de código markdown, sin explicaciones. Solo el JSON.
 
+${languageInstruction()}
+
 Estructura EXACTA (respeta los nombres de campo):
 {"story":"narración aquí","options":["opción 1","opción 2","opción 3"],"damageTaken":0,"healingReceived":0,"itemFound":null,"combatStarted":false,"enemy":null,"coinsFound":0,"locationJson":null}
 
 Reglas:
-- "story": narrativa inmersiva en español, 2-4 frases.
+- "story": narrativa inmersiva en el idioma indicado arriba, 2-4 frases.
 - "options": exactamente 2-4 opciones cortas para el jugador.
 - "combatStarted": true SOLO si hay combate activo. Entonces "enemy" debe tener {"name":"...","hpMax":N,"hpCurrent":N,"attackDamage":"XdY","goldCoins":N} donde goldCoins son las monedas que suelta el enemigo al morir (entre 5 y 50 según su nivel de dificultad).
 - "damageTaken": daño recibido fuera de combate (0 si ninguno).
@@ -410,7 +413,37 @@ Reglas:
     }
 
     private fun getInitialPrompt(name: String, theme: String): String =
-        "Inicia la aventura de $theme para el héroe llamado $name. Presenta el escenario de forma épica y ofrece 3 opciones iniciales. Si el inicio tiene un lugar concreto, inclúyelo en locationJson."
+        "${languageInstruction()} Inicia la aventura de $theme para el héroe llamado $name. Presenta el escenario de forma épica y ofrece 3 opciones iniciales. Si el inicio tiene un lugar concreto, inclúyelo en locationJson."
+
+    private fun languageInstruction(): String = when (Locale.getDefault().language) {
+        "en" -> "Use English for every user-facing value: story, options, enemy names, item names, item descriptions and location descriptions. Keep JSON field names exactly as specified."
+        "ca" -> "Usa català per a tots els valors visibles: story, options, noms d'enemics, objectes, descripcions i ubicacions. Mantén els noms dels camps JSON exactament igual."
+        "eu" -> "Erabili euskara erabiltzaileak ikusiko dituen balio guztietan: story, options, etsaien izenak, objektuak, deskribapenak eta kokapenak. Mantendu JSON eremuen izenak berdin."
+        "de" -> "Verwende Deutsch für alle sichtbaren Werte: story, options, Gegnernamen, Gegenstände, Beschreibungen und Orte. Behalte die JSON-Feldnamen exakt bei."
+        "fr" -> "Utilise le français pour toutes les valeurs visibles: story, options, noms d'ennemis, objets, descriptions et lieux. Garde exactement les noms de champs JSON."
+        "gl" -> "Usa galego para todos os valores visibles: story, options, nomes de inimigos, obxectos, descricións e localizacións. Mantén exactamente os nomes dos campos JSON."
+        else -> "Usa español para todos los valores visibles: story, options, nombres de enemigos, objetos, descripciones y ubicaciones. Mantén exactamente los nombres de los campos JSON."
+    }
+
+    private fun playerActionPrefix(): String = when (Locale.getDefault().language) {
+        "en" -> "The player decides:"
+        "ca" -> "El jugador decideix:"
+        "eu" -> "Jokalariak erabaki du:"
+        "de" -> "Der Spieler entscheidet:"
+        "fr" -> "Le joueur décide :"
+        "gl" -> "O xogador decide:"
+        else -> "El jugador decide:"
+    }
+
+    private fun playerLabel(): String = when (Locale.getDefault().language) {
+        "en" -> "You"
+        "ca" -> "Tu"
+        "eu" -> "Zu"
+        "de" -> "Du"
+        "fr" -> "Toi"
+        "gl" -> "Ti"
+        else -> "Tú"
+    }
 
     // ── GUARDADO ──────────────────────────────────────────────────────────────
 

@@ -185,4 +185,5 @@
     <string name="bestiary_loot_detail_line">Category: %1$s · Highest amount seen: %2$d · Times seen: %3$d</string>
     <string name="bestiary_registered_loot">Registered loot</string>
     <string name="bestiary_no_confirmed_loot">There is no confirmed loot for this creature yet.</string>
+    <string name="language_galician">Galician</string>
 </resources>

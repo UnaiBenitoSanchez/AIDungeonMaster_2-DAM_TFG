@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">AIDungeonMaster</string>
+    <string name="language_spanish">Español</string>
+    <string name="language_english">Inglés</string>
+    <string name="language_catalan">Catalán</string>
+    <string name="language_basque">Éuscaro</string>
+    <string name="language_german">Alemán</string>
+    <string name="language_french">Francés</string>
+    <string name="language_galician">Galego</string>
+</resources>

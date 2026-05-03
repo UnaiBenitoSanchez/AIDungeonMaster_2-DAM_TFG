@@ -168,4 +168,5 @@
     <string name="bestiary_loot_detail_line">Kategorie: %1$s · Höchste beobachtete Menge: %2$d · Gesehen: %3$d mal</string>
     <string name="bestiary_registered_loot">Registrierter Loot</string>
     <string name="bestiary_no_confirmed_loot">Für diese Kreatur wurde noch kein Loot bestätigt.</string>
+    <string name="language_galician">Galicisch</string>
 </resources>

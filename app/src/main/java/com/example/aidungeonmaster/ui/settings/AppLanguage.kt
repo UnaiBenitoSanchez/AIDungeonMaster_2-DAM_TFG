@@ -18,7 +18,8 @@ enum class AppLanguage(
     CATALAN("ca", R.string.language_catalan),
     BASQUE("eu", R.string.language_basque),
     GERMAN("de", R.string.language_german),
-    FRENCH("fr", R.string.language_french);
+    FRENCH("fr", R.string.language_french),
+    GALICIAN("gl", R.string.language_galician);
 
     companion object {
         fun fromCode(code: String?): AppLanguage =

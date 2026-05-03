@@ -158,7 +158,7 @@ fun executeVoiceCommand(
             "lenguaje de la app"
         )
     ) {
-        return "Di el idioma: español, inglés, catalán, euskera, alemán o francés."
+        return "Di el idioma: español, inglés, catalán, euskera, alemán, francés o gallego."
     }
 
     if (command.containsAny(
@@ -213,7 +213,7 @@ fun executeVoiceCommand(
     }
 
     if (command.containsAny("ayuda", "que puedo decir", "comandos", "ordenes disponibles")) {
-        return "Puedes decir: cambia idioma a inglés, pon la app en euskera, desactiva la voz, protanopía, colores normales, crear personaje, abre gremios, abre chat del gremio, selecciona aventura cyberpunk, descargar ficha en PDF, repetir tutorial o cerrar sesión."
+        return "Puedes decir: cambia idioma a inglés, pon la app en gallego, desactiva la voz, protanopía, colores normales, crear personaje, abre gremios, abre chat del gremio, selecciona aventura cyberpunk, descargar ficha en PDF, repetir tutorial o cerrar sesión."
     }
 
     if (command.containsAny(
@@ -688,6 +688,16 @@ private fun String.requestedAppLanguage(): AppLanguage? {
             "pon la app en francés"
         ) -> AppLanguage.FRENCH
 
+        containsAny(
+            "gallego",
+            "galego",
+            "galician",
+            "idioma gallego",
+            "idioma galego",
+            "pon la app en gallego",
+            "pon la app en galego"
+        ) -> AppLanguage.GALICIAN
+
         else -> null
     }
 }
@@ -699,6 +709,7 @@ private fun AppLanguage.voiceFeedbackName(): String = when (this) {
     AppLanguage.BASQUE -> "euskera"
     AppLanguage.GERMAN -> "alemán"
     AppLanguage.FRENCH -> "francés"
+    AppLanguage.GALICIAN -> "gallego"
 }
 
 private fun String.startsWithAny(vararg prefixes: String): Boolean {
