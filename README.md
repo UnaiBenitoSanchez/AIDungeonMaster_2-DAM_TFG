@@ -368,24 +368,22 @@ Proyecto académico de TFG orientado a la exploración de:
 
 ## Futuras mejoras
 
-- ampliación del sistema de clases, razas y subclases;
-- mayor profundidad táctica del combate;
-- mejor equilibrio para gremios y jefe cooperativo;
-- moderación avanzada del contenido generado;
-- sincronización offline;
-- panel administrativo o backend dedicado;
-- analítica de uso;
-- ampliación del sistema de voz;
-- expansión del mapa y generación procedural avanzada;
-- refactorización adicional para separar más claramente algunos subsistemas UI/datos.
+- Movimiento del personaje por la localización 3D generada del mapa, permitiendo desplazarse e interactuar dentro del entorno renderizado.
+- Carga completa de pueblos y asentamientos al entrar en ellos, con espacios navegables que incluyan tiendas, taberna, casas y otros puntos de interés.
+- Competiciones entre gremios basadas en peleas de jefes, con clasificaciones y recompensas para los participantes.
+- Sistema de mejoras de gremio que permita desbloquear capacidades colectivas, ventajas pasivas y mejoras progresivas para los miembros.
+- Notificaciones en tiempo real completamente funcionales para eventos sociales, combates de gremio y alertas de juego.
+- Opción de cambio de contraseña desde los ajustes de cuenta del usuario.
+- Control por voz con reconocimiento adaptado al idioma seleccionado en la aplicación, respondiendo también en ese mismo idioma.
+- Detección y escaneo contextual de peluquerías y farmacias cercanas, ampliando los tipos de establecimientos reales vinculados al juego.
 
 ---
- 
+
 ## Licencia
- 
+
 Este proyecto se publica **exclusivamente con fines académicos y de demostración**.
 Si deseas utilizar este proyecto, **contacta con el autor** antes de hacerlo para pedir permiso.
- 
+
 ---
 
 ## Autor
