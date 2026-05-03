@@ -51,16 +51,20 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.SubcomposeAsyncImage
 import com.example.aidungeonmaster.data.model.GuildChatMessage
@@ -133,9 +137,9 @@ fun GuildDetailsScreen(
         viewModel.openGuildDetailsById(guildId)
     }
 
-    BackHandler { onBack() }
-
     if (guild == null) {
+        BackHandler { onBack() }
+
         Scaffold(
             topBar = {
                 TopAppBar(
@@ -182,6 +186,58 @@ fun GuildDetailsScreen(
 
     var hasNavigatedToBossBattle by rememberSaveable(currentGuild.id) { mutableStateOf(false) }
     val userExplicitlyLeftBattle by viewModel.userExplicitlyLeftBattle.collectAsState()
+    val latestBossRoomState = rememberUpdatedState(bossRoom)
+    val latestBossParticipantsState = rememberUpdatedState(bossParticipants)
+    val latestCurrentUserUidState = rememberUpdatedState(currentUserUid)
+    val latestHasNavigatedToBossBattleState = rememberUpdatedState(hasNavigatedToBossBattle)
+    val latestSelectedTabState = rememberUpdatedState(selectedTab)
+
+    fun cleanupBossWaitingRoomIfNeeded(navigatingToBattle: Boolean = false) {
+        val currentRoom = latestBossRoomState.value
+        val amParticipant = latestBossParticipantsState.value.any { it.uid == latestCurrentUserUidState.value }
+        val shouldCleanupWaitingRoom =
+            latestSelectedTabState.value == GuildDetailsScreenTab.JEFE_FINAL &&
+                    amParticipant &&
+                    currentRoom?.status != "battle" &&
+                    !navigatingToBattle &&
+                    !latestHasNavigatedToBossBattleState.value
+
+        if (shouldCleanupWaitingRoom) {
+            viewModel.leaveBossRoomSilently()
+        }
+    }
+
+    fun selectGuildDetailsTab(nextTab: GuildDetailsScreenTab) {
+        if (selectedTab == GuildDetailsScreenTab.JEFE_FINAL && nextTab != GuildDetailsScreenTab.JEFE_FINAL) {
+            cleanupBossWaitingRoomIfNeeded()
+        }
+        selectedTab = nextTab
+    }
+
+    fun openBossBattleFromGuildDetails() {
+        hasNavigatedToBossBattle = true
+        onOpenBossBattle(currentGuild.id)
+    }
+
+    fun handleGuildDetailsBack() {
+        cleanupBossWaitingRoomIfNeeded()
+        onBack()
+    }
+
+    BackHandler { handleGuildDetailsBack() }
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, currentGuild.id) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP) {
+                cleanupBossWaitingRoomIfNeeded()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     LaunchedEffect(guildChatMessages.size, selectedTab) {
         if (selectedTab == GuildDetailsScreenTab.CHAT && guildChatMessages.isNotEmpty()) {
@@ -241,7 +297,7 @@ fun GuildDetailsScreen(
                     "abre resumen",
                     "ir a resumen"
                 ),
-                onRun = { selectedTab = GuildDetailsScreenTab.RESUMEN },
+                onRun = { selectGuildDetailsTab(GuildDetailsScreenTab.RESUMEN) },
                 feedback = "Abriendo resumen del gremio."
             ),
             VoiceFormAction(
@@ -253,7 +309,7 @@ fun GuildDetailsScreen(
                     "abre chat",
                     "ir al chat"
                 ),
-                onRun = { selectedTab = GuildDetailsScreenTab.CHAT },
+                onRun = { selectGuildDetailsTab(GuildDetailsScreenTab.CHAT) },
                 feedback = "Abriendo chat del gremio."
             ),
             VoiceFormAction(
@@ -266,7 +322,7 @@ fun GuildDetailsScreen(
                     "abre integrantes",
                     "ir a miembros"
                 ),
-                onRun = { selectedTab = GuildDetailsScreenTab.MIEMBROS },
+                onRun = { selectGuildDetailsTab(GuildDetailsScreenTab.MIEMBROS) },
                 feedback = "Abriendo miembros del gremio."
             ),
             VoiceFormAction(
@@ -280,7 +336,7 @@ fun GuildDetailsScreen(
                     "raid del gremio",
                     "batalla del gremio"
                 ),
-                onRun = { selectedTab = GuildDetailsScreenTab.JEFE_FINAL },
+                onRun = { selectGuildDetailsTab(GuildDetailsScreenTab.JEFE_FINAL) },
                 feedback = "Abriendo jefe final del gremio."
             )
         )
@@ -490,7 +546,7 @@ fun GuildDetailsScreen(
                     enabled = { canReady },
                     disabledFeedback = "No puedes ponerte listo ahora mismo.",
                     onRun = {
-                        selectedTab = GuildDetailsScreenTab.JEFE_FINAL
+                        selectGuildDetailsTab(GuildDetailsScreenTab.JEFE_FINAL)
                         viewModel.setBossReady(true)
                     },
                     feedback = "Te he puesto listo en la sala de espera."
@@ -511,7 +567,7 @@ fun GuildDetailsScreen(
                     enabled = { canReady },
                     disabledFeedback = "No puedes cambiar a no listo ahora mismo.",
                     onRun = {
-                        selectedTab = GuildDetailsScreenTab.JEFE_FINAL
+                        selectGuildDetailsTab(GuildDetailsScreenTab.JEFE_FINAL)
                         viewModel.setBossReady(false)
                     },
                     feedback = "Te he marcado como no listo."
@@ -528,7 +584,7 @@ fun GuildDetailsScreen(
                     ),
                     enabled = { currentGuild.joined && canJoinBattle },
                     disabledFeedback = "La pelea no está disponible ahora.",
-                    onRun = { onOpenBossBattle(currentGuild.id) },
+                    onRun = { openBossBattleFromGuildDetails() },
                     feedback = "Entrando en la pelea del gremio."
                 )
             )
@@ -545,7 +601,7 @@ fun GuildDetailsScreen(
                         enabled = { canStartBattle },
                         disabledFeedback = "Aún no se puede empezar la pelea.",
                         onRun = {
-                            selectedTab = GuildDetailsScreenTab.JEFE_FINAL
+                            selectGuildDetailsTab(GuildDetailsScreenTab.JEFE_FINAL)
                             viewModel.startBossBattle()
                         },
                         feedback = "Iniciando pelea del gremio."
@@ -564,7 +620,7 @@ fun GuildDetailsScreen(
                     enabled = { canLeaveRoom },
                     disabledFeedback = "No puedes salir de la sala ahora mismo.",
                     onRun = {
-                        selectedTab = GuildDetailsScreenTab.JEFE_FINAL
+                        selectGuildDetailsTab(GuildDetailsScreenTab.JEFE_FINAL)
                         viewModel.leaveBossRoom()
                     },
                     feedback = "Saliendo de la sala de espera."
@@ -634,6 +690,12 @@ fun GuildDetailsScreen(
         }
     }
 
+    DisposableEffect(currentGuild.id) {
+        onDispose {
+            cleanupBossWaitingRoomIfNeeded()
+        }
+    }
+
     LaunchedEffect(
         currentGuild.id,
         bossRoom?.status,
@@ -654,7 +716,7 @@ fun GuildDetailsScreen(
 
         if (shouldEnterBattle && !hasNavigatedToBossBattle) {
             hasNavigatedToBossBattle = true
-            onOpenBossBattle(currentGuild.id)
+            openBossBattleFromGuildDetails()
         }
 
         // Limpiar flags cuando la batalla termina
@@ -682,8 +744,7 @@ fun GuildDetailsScreen(
                     }
                 },
                 navigationIcon = {
-                    TextButton(onClick = onBack) { Text("←") }
-                },
+                    TextButton(onClick = { handleGuildDetailsBack() }) { Text("←") }                },
                 actions = {
                     when {
                         !currentGuild.joined -> {
@@ -787,10 +848,10 @@ fun GuildDetailsScreen(
                                 Text(if (isFull) "Gremio completo" else "Unirme al gremio")
                             }
                         } else {
-                            OutlinedButton(onClick = { selectedTab = GuildDetailsScreenTab.CHAT }) {
+                            OutlinedButton(onClick = { selectGuildDetailsTab(GuildDetailsScreenTab.CHAT) }) {
                                 Text("Abrir chat")
                             }
-                            OutlinedButton(onClick = { selectedTab = GuildDetailsScreenTab.MIEMBROS }) {
+                            OutlinedButton(onClick = { selectGuildDetailsTab(GuildDetailsScreenTab.MIEMBROS) }) {
                                 Text("Ver miembros")
                             }
                         }
@@ -806,25 +867,25 @@ fun GuildDetailsScreen(
                     title = "Resumen",
                     selected = selectedTab == GuildDetailsScreenTab.RESUMEN,
                     accent = accent,
-                    onClick = { selectedTab = GuildDetailsScreenTab.RESUMEN }
+                    onClick = { selectGuildDetailsTab(GuildDetailsScreenTab.RESUMEN) }
                 )
                 GuildDetailsTabChip(
                     title = "Chat",
                     selected = selectedTab == GuildDetailsScreenTab.CHAT,
                     accent = accent,
-                    onClick = { selectedTab = GuildDetailsScreenTab.CHAT }
+                    onClick = { selectGuildDetailsTab(GuildDetailsScreenTab.CHAT) }
                 )
                 GuildDetailsTabChip(
                     title = "Miembros",
                     selected = selectedTab == GuildDetailsScreenTab.MIEMBROS,
                     accent = accent,
-                    onClick = { selectedTab = GuildDetailsScreenTab.MIEMBROS }
+                    onClick = { selectGuildDetailsTab(GuildDetailsScreenTab.MIEMBROS) }
                 )
                 GuildDetailsTabChip(
                     title = "Jefe final",
                     selected = selectedTab == GuildDetailsScreenTab.JEFE_FINAL,
                     accent = accent,
-                    onClick = { selectedTab = GuildDetailsScreenTab.JEFE_FINAL }
+                    onClick = { selectGuildDetailsTab(GuildDetailsScreenTab.JEFE_FINAL) }
                 )
             }
 
@@ -1376,7 +1437,7 @@ fun GuildDetailsScreen(
 
                                 if (bossRoom?.status == "battle" && (bossRoom?.bossHpMax ?: 0) > 0) {
                                     Button(
-                                        onClick = { onOpenBossBattle(currentGuild.id) },
+                                        onClick = { openBossBattleFromGuildDetails() },
                                         modifier = Modifier.fillMaxWidth()
                                     ) {
                                         Text("Entrar en pelea")

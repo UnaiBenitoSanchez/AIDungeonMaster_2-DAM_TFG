@@ -690,6 +690,15 @@ class SocialViewModel : ViewModel() {
         }
     }
 
+    fun leaveBossRoomSilently() {
+        val guildId = _selectedGuild.value?.id ?: return
+        viewModelScope.launch {
+            runCatching {
+                guildRaidRepository.leaveBossRoomIfPresent(guildId)
+            }
+        }
+    }
+
     fun resetBossRoom() {
         val guildId = _selectedGuild.value?.id ?: return
         viewModelScope.launch {

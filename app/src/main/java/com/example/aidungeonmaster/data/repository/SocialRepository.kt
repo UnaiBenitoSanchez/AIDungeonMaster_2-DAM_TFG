@@ -739,6 +739,34 @@ class SocialRepository {
             tx.delete(memberRef)
             tx.delete(userGuildRef)
         }.await()
+
+        runCatching {
+            cleanupBossRoomMembership(guild.id, myUid)
+        }
+    }
+
+    private suspend fun cleanupBossRoomMembership(guildId: String, uid: String) {
+        if (guildId.isBlank() || uid.isBlank()) return
+
+        val roomRef = db.collection("guilds")
+            .document(guildId)
+            .collection("boss_rooms")
+            .document(GuildRaidRepository.FINAL_BOSS_ROOM_ID)
+
+        val roomSnap = roomRef.get().await()
+        if (!roomSnap.exists()) return
+
+        val status = roomSnap.getString("status").orEmpty()
+        if (status == "battle") return
+
+        db.collection("guilds")
+            .document(guildId)
+            .collection("boss_rooms")
+            .document(GuildRaidRepository.FINAL_BOSS_ROOM_ID)
+            .collection("participants")
+            .document(uid)
+            .delete()
+            .await()
     }
 
     suspend fun transferGuildLeadership(guild: Guild, newLeaderUid: String) {

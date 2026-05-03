@@ -66,7 +66,7 @@ class WorldMapViewModel : ViewModel() {
 
                 if (doc.exists()) {
                     val locationsRaw = doc.get("locations") as? List<*>
-                    val locations = locationsRaw
+                    val rawLocations = locationsRaw
                         ?.mapNotNull { raw ->
                             (raw as? Map<String, Any>)?.toWorldLocation()
                         }
@@ -74,13 +74,18 @@ class WorldMapViewModel : ViewModel() {
 
                     val mapName = doc.getString("mapName") ?: "Mundo Desconocido"
                     val currentId = doc.getString("currentLocationId") ?: ""
+                    val locations = sanitizeLoadedLocations(rawLocations, currentId)
+                    val resolvedCurrentId = locations.firstOrNull { it.isCurrentLocation }?.id
+                        ?: locations.firstOrNull { it.id == stableLocationId(currentId) }?.id
+                        ?: ""
 
                     val statesRaw = doc.get("locationStates") as? Map<*, *>
                     val locationStates = statesRaw
                         ?.mapNotNull { (key, value) ->
                             val locationId = key as? String ?: return@mapNotNull null
                             val rawState = value as? Map<String, Any> ?: return@mapNotNull null
-                            locationId to rawState.toLocationLifeState(locationId)
+                            val normalizedId = stableLocationId(locationId)
+                            normalizedId to rawState.toLocationLifeState(normalizedId)
                         }
                         ?.toMap()
                         ?: emptyMap()
@@ -93,7 +98,7 @@ class WorldMapViewModel : ViewModel() {
 
                     _worldMapState.value = WorldMapState(
                         locations = locations,
-                        currentLocationId = currentId,
+                        currentLocationId = resolvedCurrentId,
                         mapName = mapName,
                         locationStates = locationStates,
                         recentWorldEvents = recentEvents,
@@ -172,15 +177,16 @@ class WorldMapViewModel : ViewModel() {
             val name = raw["name"] as? String ?: return null
             val desc = raw["description"] as? String ?: ""
             val type = normalizeLocationType(raw["type"] as? String, "$name $desc")
+            val locationId = stableLocationId(name)
 
             WorldLocation(
-                id = name.lowercase().replace(" ", "_"),
+                id = locationId,
                 name = name,
                 description = desc,
                 type = type,
                 icon = locationIcons[type] ?: "📍",
-                x = extractFloat(raw["x"]) ?: generateX(name),
-                y = extractFloat(raw["y"]) ?: generateY(name)
+                x = sanitizeCoordinate(extractFloat(raw["x"]) ?: generateX(name)),
+                y = sanitizeCoordinate(extractFloat(raw["y"]) ?: generateY(name))
             )
         } catch (_: JsonSyntaxException) {
             null
@@ -215,15 +221,16 @@ class WorldMapViewModel : ViewModel() {
             if (rawName.length < 3) continue
 
             val type = detectType(rawName, text)
+            val locationId = stableLocationId(rawName)
 
             return WorldLocation(
-                id = rawName.lowercase().replace(" ", "_"),
+                id = locationId,
                 name = rawName,
                 description = extractSentenceContaining(text, rawName),
                 type = type,
                 icon = locationIcons[type] ?: "📍",
-                x = generateX(rawName),
-                y = generateY(rawName)
+                x = sanitizeCoordinate(generateX(rawName)),
+                y = sanitizeCoordinate(generateY(rawName))
             )
         }
 
@@ -249,6 +256,50 @@ class WorldMapViewModel : ViewModel() {
     private fun generateY(name: String): Float {
         val hash = name.hashCode()
         return (((hash shr 8) and 0xFF).toFloat() / 255f) * 0.8f + 0.1f
+    }
+
+    private fun sanitizeLoadedLocations(
+        locations: List<WorldLocation>,
+        currentId: String
+    ): List<WorldLocation> {
+        if (locations.isEmpty()) return emptyList()
+
+        val normalizedCurrentId = stableLocationId(currentId)
+        val deduped = linkedMapOf<String, WorldLocation>()
+
+        locations.forEach { location ->
+            val normalizedName = location.name.trim()
+            if (normalizedName.isBlank()) return@forEach
+
+            val normalizedId = stableLocationId(location.id.ifBlank { normalizedName })
+            val normalizedType = normalizeLocationType(location.type, "$normalizedName ${location.description}")
+
+            val candidate = location.copy(
+                id = normalizedId,
+                name = normalizedName,
+                description = location.description.trim(),
+                type = normalizedType,
+                icon = locationIcons[normalizedType] ?: location.icon.ifBlank { "📍" },
+                x = sanitizeCoordinate(location.x),
+                y = sanitizeCoordinate(location.y),
+                isCurrentLocation = location.isCurrentLocation || normalizedId == normalizedCurrentId,
+                discoveredAt = location.discoveredAt.takeIf { it > 0L } ?: System.currentTimeMillis()
+            )
+
+            val previous = deduped[normalizedId]
+            deduped[normalizedId] = when {
+                previous == null -> candidate
+                candidate.isCurrentLocation && !previous.isCurrentLocation -> candidate
+                previous.isCurrentLocation && !candidate.isCurrentLocation -> previous
+                candidate.discoveredAt >= previous.discoveredAt -> candidate
+                else -> previous
+            }
+        }
+
+        val selectedId = deduped.values.firstOrNull { it.isCurrentLocation }?.id
+            ?: deduped.keys.firstOrNull()
+
+        return deduped.values.map { it.copy(isCurrentLocation = it.id == selectedId) }
     }
 
     private fun updateCurrentLocation(newLocation: WorldLocation) {
@@ -709,6 +760,18 @@ class WorldMapViewModel : ViewModel() {
 
     private fun clampStat(value: Int): Int = value.coerceIn(0, 100)
 
+    private fun sanitizeCoordinate(value: Float): Float = value.coerceIn(0.08f, 0.92f)
+
+    private fun stableLocationId(raw: String): String {
+        val normalized = Normalizer.normalize(raw.lowercase().trim(), Normalizer.Form.NFD)
+            .replace(Regex("\\p{InCombiningDiacriticalMarks}+"), "")
+            .replace(Regex("[^a-z0-9]+"), "_")
+            .replace(Regex("_+"), "_")
+            .trim('_')
+
+        return normalized.ifBlank { "lugar_${raw.hashCode().absoluteValue}" }
+    }
+
     private fun normalizeText(value: String): String =
         Normalizer.normalize(value.lowercase().trim(), Normalizer.Form.NFD)
             .replace(Regex("\\p{InCombiningDiacriticalMarks}+"), "")
@@ -773,11 +836,11 @@ class WorldMapViewModel : ViewModel() {
     )
 
     private fun Map<String, Any>.toWorldLocation(): WorldLocation = WorldLocation(
-        id = this["id"] as? String ?: "",
-        name = this["name"] as? String ?: "",
-        description = this["description"] as? String ?: "",
-        x = (this["x"] as? Number)?.toFloat() ?: 0.5f,
-        y = (this["y"] as? Number)?.toFloat() ?: 0.5f,
+        id = stableLocationId((this["id"] as? String).orEmpty().ifBlank { (this["name"] as? String).orEmpty() }),
+        name = (this["name"] as? String ?: "").trim(),
+        description = (this["description"] as? String ?: "").trim(),
+        x = sanitizeCoordinate((this["x"] as? Number)?.toFloat() ?: 0.5f),
+        y = sanitizeCoordinate((this["y"] as? Number)?.toFloat() ?: 0.5f),
         icon = this["icon"] as? String ?: "📍",
         type = normalizeLocationType(
             this["type"] as? String,

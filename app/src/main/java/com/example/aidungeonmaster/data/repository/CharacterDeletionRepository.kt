@@ -28,25 +28,22 @@ class CharacterDeletionRepository(
             userCharacterDocId = userCharacterDocId
         )
 
-        // 2. Borrar partidas relacionadas
-        deletePartidas(
+        // 2. Resolver todos los IDs de partida relacionados con el personaje.
+        //    El orden es importante: ranking y banco dependen de que la partida
+        //    aún exista por reglas de Firestore (ownsPartida(charId)).
+        val partidaIds = resolveRelatedPartidaIds(
             userId = userId,
             characterName = characterName
         )
 
-        // 3. Borrar documentos extra. No deben romper el borrado si fallan.
-        runCatching {
-            db.collection("ranking")
-                .document(charId)
-                .delete()
-                .await()
+        // 3. Borrar ranking y banco ANTES de eliminar la partida.
+        partidaIds.forEach { partidaId ->
+            deleteRankingAndBank(partidaId)
         }
 
-        runCatching {
-            db.collection("bank_accounts")
-                .document(charId)
-                .delete()
-                .await()
+        // 4. Borrar partidas relacionadas.
+        partidaIds.forEach { partidaId ->
+            deletePartidaDocument(partidaId)
         }
 
         Log.d("CHAR_DELETE", "Borrado terminado: $charId")
@@ -88,17 +85,14 @@ class CharacterDeletionRepository(
         }
     }
 
-    private suspend fun deletePartidas(
+    private suspend fun resolveRelatedPartidaIds(
         userId: String,
         characterName: String
-    ) {
+    ): Set<String> {
         val baseCharId = "${userId}_${characterName}"
         val prefix = "${baseCharId}_"
+        val ids = linkedSetOf(baseCharId)
 
-        // Documento base: partidas/{uid}_{personaje}
-        deletePartidaDocument(baseCharId)
-
-        // Documentos que tengan campos userId + characterName
         runCatching {
             val byFields = db.collection("partidas")
                 .whereEqualTo("userId", userId)
@@ -107,14 +101,10 @@ class CharacterDeletionRepository(
                 .await()
 
             byFields.documents.forEach { doc ->
-                deletePartidaDocument(doc.id)
+                ids += doc.id
             }
         }
 
-        // Fallback por ID prefijo: busca SOLO las partidas del usuario (whereEqualTo userId)
-        // y filtra client-side las que coincidan con el personaje.
-        // NOTA: requiere que la regla de Firebase sea  allow read: if resource.data.userId == request.auth.uid
-        // para que Firestore valide esta query de colección correctamente.
         runCatching {
             val myPartidas = db.collection("partidas")
                 .whereEqualTo("userId", userId)
@@ -125,9 +115,27 @@ class CharacterDeletionRepository(
                 .filter { doc ->
                     doc.id == baseCharId || doc.id.startsWith(prefix)
                 }
-                .forEach { doc ->
-                    deletePartidaDocument(doc.id)
-                }
+                .forEach { doc -> ids += doc.id }
+        }
+
+        return ids
+    }
+
+    private suspend fun deleteRankingAndBank(partidaId: String) {
+        if (partidaId.isBlank()) return
+
+        runCatching {
+            db.collection("ranking")
+                .document(partidaId)
+                .delete()
+                .await()
+        }
+
+        runCatching {
+            db.collection("bank_accounts")
+                .document(partidaId)
+                .delete()
+                .await()
         }
     }
 

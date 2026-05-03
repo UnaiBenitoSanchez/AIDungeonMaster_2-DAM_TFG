@@ -864,6 +864,17 @@ class GuildRaidRepository {
         participantsRef(guildId).document(uid).delete().await()
     }
 
+    suspend fun leaveBossRoomIfPresent(guildId: String) {
+        val uid = currentUid() ?: return
+        val room = roomRef(guildId).get().await().toObject(GuildBossRoom::class.java)
+        if (room?.status == "battle") return
+
+        val participantRef = participantsRef(guildId).document(uid)
+        if (participantRef.get().await().exists()) {
+            participantRef.delete().await()
+        }
+    }
+
     suspend fun resetBossRoom(guildId: String) {
         val uid = currentUid() ?: throw IllegalStateException("Usuario no autenticado")
         val roomSnap = roomRef(guildId).get().await()

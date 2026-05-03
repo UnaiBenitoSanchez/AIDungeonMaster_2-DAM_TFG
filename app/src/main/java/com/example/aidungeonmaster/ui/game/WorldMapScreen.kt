@@ -1,5 +1,6 @@
 package com.example.aidungeonmaster.ui.game
 
+import android.graphics.Paint as AndroidPaint
 import com.example.aidungeonmaster.ui.i18n.Text
 
 import androidx.compose.animation.core.*
@@ -23,6 +24,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontFamily
@@ -30,9 +32,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.*
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.aidungeonmaster.data.model.WorldLocation
 import com.example.aidungeonmaster.data.model.WorldMapState
+import com.example.aidungeonmaster.ui.accessibility.VoiceFormAction
+import com.example.aidungeonmaster.ui.accessibility.VoiceFormRegistry
+import com.example.aidungeonmaster.ui.accessibility.VoiceFormScreen
 import com.example.aidungeonmaster.viewmodel.WorldMapViewModel
 
 import com.example.aidungeonmaster.data.model.LocationLifeState
@@ -118,83 +125,150 @@ fun WorldMapDialog(
                 ?: mapState.locations.firstOrNull()
         )
     }
+    var detailsExpanded by remember(selectedLocation?.id) {
+        mutableStateOf(true)
+    }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        modifier         = Modifier
-            .fillMaxWidth()
-            .fillMaxHeight(0.92f),
-        containerColor   = Color(0xFF1A0F00),
-        shape            = RoundedCornerShape(16.dp),
-        title = {
-            Row(
-                verticalAlignment     = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-                modifier              = Modifier.fillMaxWidth()
-            ) {
-                Text(
-                    text       = "🗺️  ${mapState.mapName}",
-                    color      = Color(0xFFFFD700),
-                    fontSize   = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Serif,
-                    modifier   = Modifier.weight(1f)
+    DisposableEffect(selectedLocation?.id) {
+        val registration = VoiceFormRegistry.register(
+            VoiceFormScreen(
+                screenName = "mapa del mundo",
+                actions = listOf(
+                    VoiceFormAction(
+                        label = "abrir detalles de ubicacion",
+                        aliases = listOf(
+                            "abrir detalles",
+                            "abrir datos",
+                            "mostrar detalles",
+                            "mostrar datos",
+                            "desplegar detalles",
+                            "desplegar datos de ubicacion",
+                            "desplegar datos de ubicación"
+                        ),
+                        onRun = { detailsExpanded = true },
+                        feedback = "Detalles del lugar desplegados."
+                    ),
+                    VoiceFormAction(
+                        label = "cerrar detalles de ubicacion",
+                        aliases = listOf(
+                            "cerrar detalles",
+                            "ocultar detalles",
+                            "cerrar datos",
+                            "plegar detalles",
+                            "plegar datos de ubicacion",
+                            "plegar datos de ubicación"
+                        ),
+                        onRun = { detailsExpanded = false },
+                        feedback = "Detalles del lugar ocultos."
+                    ),
+                    VoiceFormAction(
+                        label = "alternar detalles de ubicacion",
+                        aliases = listOf(
+                            "alternar detalles",
+                            "cambiar detalles",
+                            "abrir o cerrar detalles"
+                        ),
+                        onRun = { detailsExpanded = !detailsExpanded },
+                        feedback = "Alternando detalles del lugar."
+                    )
                 )
-                // ── BOTÓN AR ───────────────────────────────────────
-                IconButton(
-                    onClick  = onOpenAR,
-                    modifier = Modifier.size(36.dp)
+            )
+        )
+
+        onDispose { registration.dispose() }
+    }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.98f)
+                .fillMaxHeight(0.96f),
+            color = Color(0xFF1A0F00),
+            shape = RoundedCornerShape(20.dp),
+            border = BorderStroke(1.dp, Color(0x33FFD700))
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(14.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("AR", color = Color(0xFFFFD700), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        text = "🗺️  ${mapState.mapName}",
+                        color = Color(0xFFFFD700),
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Serif,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Surface(
+                        color = Color(0x22FFD700),
+                        shape = RoundedCornerShape(999.dp),
+                        border = BorderStroke(1.dp, Color(0x44FFD700))
+                    ) {
+                        Text(
+                            text = "${mapState.locations.size} lugares",
+                            color = Color(0xFFFFE7A3),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                        )
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    IconButton(onClick = onOpenAR, modifier = Modifier.size(36.dp)) {
+                        Text("AR", color = Color(0xFFFFD700), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(Modifier.width(4.dp))
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.Close, "Cerrar", tint = Color(0xFFFFD700))
+                    }
                 }
-                Spacer(Modifier.width(4.dp))
-                // ─────────────────────────────────────────────────
-                IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.Default.Close, "Cerrar", tint = Color(0xFFFFD700))
-                }
-            }
-        },
-        text = {
-            Column(modifier = Modifier.fillMaxSize()) {
+
+                Spacer(Modifier.height(10.dp))
 
                 if (mapState.locations.isEmpty()) {
                     EmptyMapPlaceholder()
                 } else {
-                    // ── MAPA INTERACTIVO ─────────────────────────────────
                     WorldMapCanvas(
-                        mapState         = mapState,
+                        mapState = mapState,
                         selectedLocation = selectedLocation,
-                        onLocationClick  = { selectedLocation = it },
-                        modifier         = Modifier
+                        onLocationClick = { selectedLocation = it },
+                        modifier = Modifier
                             .fillMaxWidth()
-                            .weight(1f)
+                            .weight(1.35f)
                     )
 
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(10.dp))
 
-                    // ── DETALLE DEL LUGAR SELECCIONADO ───────────────────
                     selectedLocation?.let { loc ->
                         LocationDetailCard(
                             location = loc,
-                            worldState = mapState.locationStates[loc.id]
+                            worldState = mapState.locationStates[loc.id],
+                            expanded = detailsExpanded,
+                            onToggleExpand = { detailsExpanded = !detailsExpanded }
                         )
                     }
 
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(10.dp))
 
-                    // ── LEYENDA DE LUGARES VISITADOS ─────────────────────
                     LocationLegend(
                         locations = mapState.locations,
                         onLocationClick = { selectedLocation = it },
-                        modifier  = Modifier
+                        modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(max = 140.dp)
+                            .heightIn(max = 170.dp)
                     )
                 }
             }
-        },
-        confirmButton = {}
-    )
+        }
+    }
 }
 
 // ── LIENZO DEL MAPA ───────────────────────────────────────────────────────────
@@ -227,77 +301,54 @@ fun WorldMapCanvas(
         label          = "player_alpha"
     )
 
-    Box(
+    Canvas(
         modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(14.dp))
             .background(
                 Brush.verticalGradient(
                     listOf(backdrop.top, backdrop.mid, backdrop.bottom)
                 )
             )
-
             .onSizeChanged { canvasSize = it }
-            .drawBehind {
-                drawMapBackground(this, backdrop)
-                drawMapTerrainHints(this, backdrop)
-                drawMapGrid(this)
-            }
-
             .pointerInput(mapState.locations, canvasSize) {
                 detectTapGestures { tapOffset ->
-                    // Detectar si el toque está cerca de alguna ubicación
                     val tapped = mapState.locations.minByOrNull { loc ->
                         val lx = loc.x * canvasSize.width
                         val ly = loc.y * canvasSize.height
                         val dx = tapOffset.x - lx
                         val dy = tapOffset.y - ly
                         dx * dx + dy * dy
-                    }
-                    if (tapped != null) {
-                        val lx = tapped.x * canvasSize.width
-                        val ly = tapped.y * canvasSize.height
-                        val dx = tapOffset.x - lx
-                        val dy = tapOffset.y - ly
-                        val dist = Math.sqrt((dx * dx + dy * dy).toDouble())
-                        if (dist < 60) onLocationClick(tapped)
-                    }
+                    } ?: return@detectTapGestures
+
+                    val lx = tapped.x * canvasSize.width
+                    val ly = tapped.y * canvasSize.height
+                    val dx = tapOffset.x - lx
+                    val dy = tapOffset.y - ly
+                    val dist = Math.sqrt((dx * dx + dy * dy).toDouble())
+                    if (dist < 60) onLocationClick(tapped)
                 }
             }
     ) {
-        // ── LÍNEAS ENTRE UBICACIONES (CAMINOS) ───────────────────────────
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            drawLocationPaths(mapState.locations)
+        drawMapBackground(this, backdrop)
+        drawMapTerrainHints(this, backdrop)
+        drawMapGrid(this)
+        drawLocationPaths(mapState.locations)
 
-            // Pulsación del jugador
-            mapState.locations.find { it.isCurrentLocation }?.let { current ->
-                val cx = current.x * canvasSize.width
-                val cy = current.y * canvasSize.height
-                drawCircle(
-                    color  = Color(0xFFFFD700).copy(alpha = playerPulseAlpha),
-                    radius = playerPulseRadius,
-                    center = Offset(cx, cy),
-                    style  = Stroke(width = 3f)
-                )
-            }
+        mapState.locations.find { it.isCurrentLocation }?.let { current ->
+            val cx = current.x * size.width
+            val cy = current.y * size.height
+            drawCircle(
+                color = Color(0xFFFFD700).copy(alpha = playerPulseAlpha),
+                radius = playerPulseRadius,
+                center = Offset(cx, cy),
+                style = Stroke(width = 3f)
+            )
         }
 
-        // ── MARCADORES DE UBICACIONES ─────────────────────────────────────
         mapState.locations.forEach { location ->
-            val x = location.x * canvasSize.width
-            val y = location.y * canvasSize.height
-
-            LocationMarker(
-                location         = location,
-                isSelected       = selectedLocation?.id == location.id,
-                modifier         = Modifier
-                    .offset {
-                        IntOffset(
-                            (x - 20.dp.toPx()).toInt(),
-                            (y - 20.dp.toPx()).toInt()
-                        )
-                    }
-                    .size(40.dp)
-                    .clickable { onLocationClick(location) }
+            drawMapLocationMarker(
+                location = location,
+                isSelected = selectedLocation?.id == location.id
             )
         }
     }
@@ -512,6 +563,63 @@ private fun DrawScope.drawLocationPaths(locations: List<WorldLocation>) {
     }
 }
 
+private fun DrawScope.drawMapLocationMarker(
+    location: WorldLocation,
+    isSelected: Boolean
+) {
+    val normalizedType = Normalizer.normalize(location.type.lowercase().trim(), Normalizer.Form.NFD)
+        .replace(Regex("\\p{InCombiningDiacriticalMarks}+"), "")
+
+    val typeColor = when {
+        listOf("oceano", "alta mar", "mar abierto").any { it in normalizedType } -> Color(0xFF0D47A1)
+        listOf("mar", "playa", "costa", "litoral", "bahia", "puerto", "muelle").any { it in normalizedType } -> Color(0xFF0288D1)
+        listOf("lago", "rio", "laguna", "arroyo", "estanque").any { it in normalizedType } -> Color(0xFF4FC3F7)
+        listOf("bosque", "selva", "arboleda").any { it in normalizedType } -> Color(0xFF2E7D32)
+        listOf("cueva", "gruta", "caverna").any { it in normalizedType } -> Color(0xFF37474F)
+        listOf("montana", "pico", "cordillera").any { it in normalizedType } -> Color(0xFF546E7A)
+        listOf("ciudad", "metropoli", "capital").any { it in normalizedType } -> Color(0xFF1565C0)
+        else -> Color(0xFF8D6E63)
+    }
+
+    val borderColor = when {
+        location.isCurrentLocation -> Color(0xFFFFD700)
+        isSelected -> Color(0xFFFF9900)
+        else -> typeColor.copy(alpha = 0.95f)
+    }
+    val bgColor = when {
+        location.isCurrentLocation -> Color(0xCCFFD700)
+        isSelected -> typeColor.copy(alpha = 0.55f)
+        else -> typeColor.copy(alpha = 0.30f)
+    }
+
+    val center = Offset(location.x * size.width, location.y * size.height)
+    val radius = when {
+        location.isCurrentLocation -> 18f
+        isSelected -> 15f
+        else -> 11f
+    }
+
+    drawCircle(color = bgColor, radius = radius, center = center)
+    drawCircle(
+        color = borderColor,
+        radius = radius,
+        center = center,
+        style = Stroke(width = if (location.isCurrentLocation || isSelected) 3f else 2f)
+    )
+
+    if (location.isCurrentLocation || isSelected) {
+        drawIntoCanvas { canvas ->
+            val textPaint = AndroidPaint().apply {
+                color = android.graphics.Color.WHITE
+                textAlign = AndroidPaint.Align.CENTER
+                textSize = radius * 1.3f
+                isAntiAlias = true
+            }
+            canvas.nativeCanvas.drawText(location.icon, center.x, center.y + radius * 0.38f, textPaint)
+        }
+    }
+}
+
 // ── MARCADOR DE UBICACIÓN ─────────────────────────────────────────────────────
 
 @Composable
@@ -566,58 +674,87 @@ fun LocationMarker(
 @Composable
 fun LocationDetailCard(
     location: WorldLocation,
-    worldState: LocationLifeState? = null
+    worldState: LocationLifeState? = null,
+    expanded: Boolean,
+    onToggleExpand: () -> Unit
 ) {
     Surface(
         color  = Color(0xFF2A1800),
         shape  = RoundedCornerShape(10.dp),
         border = BorderStroke(1.dp, Color(0xFFFFD700).copy(alpha = 0.5f))
     ) {
-        Row(
-            modifier           = Modifier.padding(12.dp).fillMaxWidth(),
-            verticalAlignment  = Alignment.CenterVertically
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onToggleExpand() }
+                .padding(12.dp)
         ) {
-            Text(location.icon, fontSize = 28.sp, modifier = Modifier.padding(end = 12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text       = location.name,
-                        color      = Color(0xFFFFD700),
-                        fontWeight = FontWeight.Bold,
-                        fontSize   = 15.sp,
-                        fontFamily = FontFamily.Serif
-                    )
-                    if (location.isCurrentLocation) {
-                        Spacer(Modifier.width(8.dp))
-                        Surface(
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(location.icon, fontSize = 28.sp, modifier = Modifier.padding(end = 12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = location.name,
                             color = Color(0xFFFFD700),
-                            shape = RoundedCornerShape(4.dp)
-                        ) {
-                            Text(
-                                "📍 Aquí",
-                                color    = Color.Black,
-                                fontSize = 9.sp,
-                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
-                                fontWeight = FontWeight.Bold
-                            )
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp,
+                            fontFamily = FontFamily.Serif
+                        )
+                        if (location.isCurrentLocation) {
+                            Spacer(Modifier.width(8.dp))
+                            Surface(
+                                color = Color(0xFFFFD700),
+                                shape = RoundedCornerShape(4.dp)
+                            ) {
+                                Text(
+                                    "📍 Aquí",
+                                    color = Color.Black,
+                                    fontSize = 9.sp,
+                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
                     }
-                }
-                if (location.description.isNotBlank()) {
+
                     Text(
-                        text     = location.description,
-                        color    = Color(0xFFCCBBAA),
-                        fontSize = 12.sp,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(top = 4.dp)
+                        text = if (expanded) {
+                            "Pulsa o di ‘cerrar detalles’"
+                        } else {
+                            "Pulsa o di ‘abrir detalles’"
+                        },
+                        color = Color(0xFFAA9F86),
+                        fontSize = 10.sp,
+                        modifier = Modifier.padding(top = 2.dp)
                     )
                 }
                 Text(
-                    text     = location.type.replaceFirstChar { it.uppercase() },
-                    color    = Color(0xFF888877),
+                    text = if (expanded) "▲" else "▼",
+                    color = Color(0xFFFFD700),
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            if (expanded) {
+                if (location.description.isNotBlank()) {
+                    Text(
+                        text = location.description,
+                        color = Color(0xFFCCBBAA),
+                        fontSize = 12.sp,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
+                Text(
+                    text = location.type.replaceFirstChar { it.uppercase() },
+                    color = Color(0xFF888877),
                     fontSize = 10.sp,
-                    modifier = Modifier.padding(top = 2.dp)
+                    modifier = Modifier.padding(top = 4.dp)
                 )
                 worldState?.let { state ->
                     Spacer(Modifier.height(8.dp))
@@ -663,7 +800,7 @@ fun LocationDetailCard(
                                     text = state.lastEventSummary,
                                     color = Color(0xFFAAAAAA),
                                     fontSize = 10.sp,
-                                    maxLines = 2,
+                                    maxLines = 3,
                                     overflow = TextOverflow.Ellipsis
                                 )
                             }
