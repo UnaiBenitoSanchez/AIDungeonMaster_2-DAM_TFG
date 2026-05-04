@@ -13,79 +13,78 @@ class ChatRepository {
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
 
-    // Ejecuta la lógica de current uid.
+    // Devuelve el UID del usuario autenticado actual.
     fun currentUid(): String? = auth.currentUser?.uid
 
-    // Construye friendship id.
+    // Construye un identificador estable para dos usuarios.
     fun buildFriendshipId(uid1: String, uid2: String): String {
         return if (uid1 < uid2) "${uid1}_${uid2}" else "${uid2}_${uid1}"
     }
 
-    // Construye chat id.
+    // El chat privado reutiliza el mismo identificador estable entre ambos usuarios.
     fun buildChatId(uid1: String, uid2: String): String {
         return buildFriendshipId(uid1, uid2)
     }
 
-    // Obtiene or create private chat.
+    // Obtiene o crea un chat privado entre amigos o miembros del mismo gremio actual.
     suspend fun getOrCreatePrivateChat(friendUid: String, guildId: String? = null): String {
         val myUid = currentUid() ?: throw IllegalStateException("Usuario no autenticado")
         require(friendUid != myUid) { "No puedes crear un chat contigo mismo." }
 
-        val friendshipId = buildFriendshipId(myUid, friendUid)
-
-        val friendshipDoc = db.collection("friendships")
-            .document(friendshipId)
+        val isFriend = db.collection("users")
+            .document(myUid)
+            .collection("friends")
+            .document(friendUid)
             .get()
             .await()
+            .exists()
 
-        val isFriend = friendshipDoc.exists()
-
-        val allowedByGuild = guildId
-            ?.takeIf { it.isNotBlank() }
-            ?.let { areUsersInSameGuild(it, myUid, friendUid) }
-            ?: false
+        val allowedByGuild = areUsersInSameCurrentGuild(myUid, friendUid)
 
         if (!isFriend && !allowedByGuild) {
-            throw IllegalStateException("Solo puedes escribir a amigos o miembros de tu gremio.")
+            throw IllegalStateException("Solo puedes escribir a amigos o miembros de tu gremio actual.")
         }
 
         val chatId = buildChatId(myUid, friendUid)
         val chatRef = db.collection("private_chats").document(chatId)
-        val chatDoc = chatRef.get().await()
 
-        if (!chatDoc.exists()) {
-            val now = System.currentTimeMillis()
-            val contextId = if (isFriend) {
-                friendshipId
-            } else {
-                "guild:${guildId.orEmpty()}"
-            }
-
-            val chat = PrivateChat(
-                id = chatId,
-                members = listOf(myUid, friendUid).sorted(),
-                friendshipId = contextId,
-                createdAt = now,
-                lastMessage = "",
-                lastMessageAt = now,
-                lastSenderUid = myUid
-            )
-            chatRef.set(chat).await()
+        // Si el chat ya existe, no lo tocamos.
+        // Tras la primera creación ya eres miembro, así que esta lectura sí está permitida.
+        val existingChat = chatRef.get().await()
+        if (existingChat.exists()) {
+            return chatId
         }
+
+        val now = System.currentTimeMillis()
+
+        val chat = PrivateChat(
+            id = chatId,
+            members = listOf(myUid, friendUid).sorted(),
+            friendshipId = chatId,
+            createdAt = now,
+            lastMessage = "",
+            lastMessageAt = now,
+            lastSenderUid = myUid
+        )
+
+        // Solo se crea cuando no existe.
+        chatRef.set(chat).await()
 
         return chatId
     }
 
-    private suspend fun areUsersInSameGuild(guildId: String, myUid: String, otherUid: String): Boolean {
-        val guildRef = db.collection("guilds").document(guildId)
+    // Comprueba si ambos usuarios tienen el mismo gremio activo en su perfil público.
+    private suspend fun areUsersInSameCurrentGuild(myUid: String, otherUid: String): Boolean {
+        val myUser = db.collection("users").document(myUid).get().await()
+        val otherUser = db.collection("users").document(otherUid).get().await()
 
-        val myMembership = guildRef.collection("members").document(myUid).get().await()
-        val otherMembership = guildRef.collection("members").document(otherUid).get().await()
+        val myCurrentGuildId = myUser.getString("currentGuildId").orEmpty()
+        val otherCurrentGuildId = otherUser.getString("currentGuildId").orEmpty()
 
-        return myMembership.exists() && otherMembership.exists()
+        return myCurrentGuildId.isNotBlank() && myCurrentGuildId == otherCurrentGuildId
     }
 
-    // Envía message.
+    // Envía un mensaje al chat y actualiza la vista previa del último mensaje.
     suspend fun sendMessage(chatId: String, text: String) {
         val myUid = currentUid() ?: throw IllegalStateException("Usuario no autenticado")
         val cleanText = text.trim()
@@ -119,7 +118,7 @@ class ChatRepository {
         }.await()
     }
 
-    // Ejecuta la lógica de mark messages as seen.
+    // Marca como vistos los mensajes entrantes pendientes del usuario actual.
     suspend fun markMessagesAsSeen(chatId: String, messages: List<ChatMessage>) {
         val myUid = currentUid() ?: return
 
@@ -142,7 +141,7 @@ class ChatRepository {
         }.await()
     }
 
-    // Escucha messages.
+    // Escucha en tiempo real los mensajes del chat privado.
     fun listenMessages(
         chatId: String,
         onChange: (List<ChatMessage>) -> Unit,

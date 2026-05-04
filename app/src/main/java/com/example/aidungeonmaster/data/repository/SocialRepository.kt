@@ -14,6 +14,9 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.tasks.await
 import com.example.aidungeonmaster.data.model.ChatMessage
+
+import com.google.firebase.firestore.SetOptions
+
 // Repositorio que centraliza el acceso a datos de social.
 class SocialRepository {
 
@@ -220,7 +223,8 @@ class SocialRepository {
                 otherFriendMirror
             )
 
-            batch.set(db.collection("private_chats").document(chatId), chat)
+            // Si el chat ya existía por mensajería directa previa, se conservan sus metadatos no incluidos.
+            batch.set(db.collection("private_chats").document(chatId), chat, SetOptions.merge())
         }.await()
     }
 
