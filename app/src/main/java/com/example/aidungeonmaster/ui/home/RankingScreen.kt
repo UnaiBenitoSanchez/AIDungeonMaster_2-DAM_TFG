@@ -49,12 +49,14 @@ private fun medalColor(pos: Int) = when (pos) {
     2 -> Bronze
     else -> TextSecond
 }
+// Ejecuta la lógica de medal emoji.
 private fun medalEmoji(pos: Int) = when (pos) {
     0 -> "👑"; 1 -> "🥈"; 2 -> "🥉"; else -> "#${pos + 1}"
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+// Ejecuta la lógica de ranking screen.
 fun RankingScreen(
     onBack: () -> Unit,
     viewModel: RankingViewModel = viewModel()
@@ -191,6 +193,7 @@ fun RankingScreen(
 
 // ── Podio top 3 ─────────────────────────────────────────────────────────────
 @Composable
+// Ejecuta la lógica de top podium.
 private fun TopPodium(list: List<RankingEntry>, category: RankingCategory) {
     if (list.isEmpty()) return
 
@@ -225,6 +228,7 @@ private fun TopPodium(list: List<RankingEntry>, category: RankingCategory) {
 }
 
 @Composable
+// Ejecuta la lógica de podium card.
 private fun PodiumCard(position: Int, entry: RankingEntry, category: RankingCategory) {
     val medal = medalColor(position)
     val value = categoryValue(entry, category)
@@ -285,6 +289,7 @@ private fun PodiumCard(position: Int, entry: RankingEntry, category: RankingCate
 
 // ── Fila normal ──────────────────────────────────────────────────────────────
 @Composable
+// Ejecuta la lógica de ranking row.
 private fun RankingRow(position: Int, entry: RankingEntry, category: RankingCategory) {
     val value = categoryValue(entry, category)
 

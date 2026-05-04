@@ -72,6 +72,7 @@ private const val MAX_GUILD_MEMBERS = 15
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+// Ejecuta la lógica de guilds screen.
 fun GuildsScreen(
     onBack: () -> Unit,
     onOpenGuildDetails: (String, String?) -> Unit,
@@ -303,6 +304,7 @@ fun GuildsScreen(
 }
 
 @Composable
+// Ejecuta la lógica de guild card.
 private fun GuildCard(
     guild: Guild,
     showJoinButton: Boolean,
@@ -400,6 +402,7 @@ private fun GuildCard(
 }
 
 @Composable
+// Ejecuta la lógica de mini badge.
 private fun MiniBadge(
     text: String,
     background: Color,
@@ -420,6 +423,7 @@ private fun MiniBadge(
 }
 
 @Composable
+// Ejecuta la lógica de empty guild block.
 private fun EmptyGuildBlock(
     text: String
 ) {
@@ -444,6 +448,7 @@ private fun EmptyGuildBlock(
 }
 
 @Composable
+// Ejecuta la lógica de member avatar.
 private fun MemberAvatar(
     photoUrl: String,
     displayName: String,
@@ -507,6 +512,7 @@ private fun MemberAvatar(
 }
 
 @Composable
+// Ejecuta la lógica de create guild dialog.
 private fun CreateGuildDialog(
     onDismiss: () -> Unit,
     onCreate: (name: String, description: String, accent: String, banner: String) -> Unit
@@ -522,6 +528,7 @@ private fun CreateGuildDialog(
     val accentHex = accentHexOverride ?: hueToColor(accentSlider).toHexColor()
     val bannerHex = bannerHexOverride ?: hueToColor(bannerSlider).copy(alpha = 1f).toHexColor()
 
+    // Actualiza guild color by voice.
     fun setGuildColorByVoice(value: String, isAccent: Boolean) {
         val color = findVoiceNamedColor(value)
 
@@ -539,6 +546,7 @@ private fun CreateGuildDialog(
         }
     }
 
+    // Ejecuta la lógica de submit guild.
     fun submitGuild() {
         onCreate(
             name.trim(),
@@ -710,6 +718,7 @@ private fun CreateGuildDialog(
 }
 
 @Composable
+// Ejecuta la lógica de color preview.
 private fun ColorPreview(color: Color) {
     Box(
         modifier = Modifier
@@ -725,6 +734,7 @@ private fun ColorPreview(color: Color) {
     )
 }
 
+// Formatea timestamp.
 private fun formatTimestamp(timestamp: Long): String {
     if (timestamp <= 0L) return ""
 
@@ -735,6 +745,7 @@ private fun formatTimestamp(timestamp: Long): String {
     }
 }
 
+// Analiza color.
 private fun parseColor(value: String?): Color {
     return try {
         if (value.isNullOrBlank()) {
@@ -747,6 +758,7 @@ private fun parseColor(value: String?): Color {
     }
 }
 
+// Ejecuta la lógica de hue to color.
 private fun hueToColor(value: Float): Color {
     val hsv = floatArrayOf(
         value.coerceIn(0f, 1f) * 360f,
@@ -757,6 +769,7 @@ private fun hueToColor(value: Float): Color {
     return Color(android.graphics.Color.HSVToColor(hsv))
 }
 
+// Ejecuta la lógica de color.
 private fun Color.toHexColor(): String {
     val a = (alpha * 255).toInt().coerceIn(0, 255)
     val r = (red * 255).toInt().coerceIn(0, 255)

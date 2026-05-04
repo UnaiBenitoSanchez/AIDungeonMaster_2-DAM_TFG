@@ -61,6 +61,7 @@ class VoiceControlManager(
         })
     }
 
+    // Gestiona el evento de init.
     override fun onInit(status: Int) {
         ttsReady = status == TextToSpeech.SUCCESS
         if (ttsReady) {
@@ -69,6 +70,7 @@ class VoiceControlManager(
         publishState(if (active) "Control por voz preparado" else "Control por voz desactivado")
     }
 
+    // Ejecuta la lógica de start.
     fun start() {
         if (!SpeechRecognizer.isRecognitionAvailable(appContext)) {
             active = false
@@ -81,6 +83,7 @@ class VoiceControlManager(
         speak("Control por voz activado. Di ayuda para escuchar algunos comandos disponibles.")
     }
 
+    // Ejecuta la lógica de stop.
     fun stop(announce: Boolean = true) {
         active = false
         listening = false
@@ -96,6 +99,7 @@ class VoiceControlManager(
         }
     }
 
+    // Ejecuta la lógica de destroy.
     fun destroy() {
         active = false
         listening = false
@@ -108,6 +112,7 @@ class VoiceControlManager(
         textToSpeech = null
     }
 
+    // Ejecuta la lógica de ensure recognizer.
     private fun ensureRecognizer() {
         if (speechRecognizer != null) return
 
@@ -182,6 +187,7 @@ class VoiceControlManager(
         }
     }
 
+    // Inicia listening.
     private fun startListening() {
         if (!active || speaking || listening) return
         ensureRecognizer()
@@ -208,6 +214,7 @@ class VoiceControlManager(
         }
     }
 
+    // Programa listening restart.
     private fun scheduleListeningRestart(delayMillis: Long = 450L) {
         if (!active) {
             publishState("Control por voz desactivado")
@@ -216,6 +223,7 @@ class VoiceControlManager(
         mainHandler.postDelayed({ startListening() }, delayMillis)
     }
 
+    // Ejecuta la lógica de speak.
     private fun speak(message: String) {
         if (message.isBlank()) {
             scheduleListeningRestart()
@@ -241,6 +249,7 @@ class VoiceControlManager(
         textToSpeech?.speak(message, TextToSpeech.QUEUE_FLUSH, params, utteranceId)
     }
 
+    // Ejecuta la lógica de publish state.
     private fun publishState(status: String) {
         val state = VoiceControlUiState(
             active = active,
@@ -258,6 +267,7 @@ class VoiceControlManager(
     }
 }
 
+// Clase que encapsula la lógica de voice control ui state.
 data class VoiceControlUiState(
     val active: Boolean = false,
     val listening: Boolean = false,

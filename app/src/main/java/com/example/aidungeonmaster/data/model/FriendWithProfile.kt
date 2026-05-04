@@ -1,5 +1,6 @@
 package com.example.aidungeonmaster.data.model
 
+// Modelo de datos que representa friend with profile.
 data class FriendWithProfile(
     val uid: String = "",
     val displayName: String = "",

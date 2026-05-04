@@ -107,6 +107,7 @@ import com.example.aidungeonmaster.ui.accessibility.VoiceFormScreen
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+// Ejecuta la lógica de home screen.
 fun HomeScreen(
     navController: NavHostController,
     viewModel: HomeViewModel = viewModel(),
@@ -462,6 +463,7 @@ fun HomeScreen(
     val currentStep = tutorialSteps.getOrNull(tutorialStepIndex)
     val currentTargetKey = currentStep?.targetKey.orEmpty()
 
+    // Ejecuta la lógica de finish tutorial.
     fun finishTutorial() {
         tutorialPrefs.edit()
             .putBoolean("home_tutorial_completed", true)
@@ -835,6 +837,7 @@ fun HomeScreen(
 }
 
 @Composable
+// Ejecuta la lógica de character card.
 fun CharacterCard(
     character: Character,
     modifier: Modifier = Modifier,
@@ -1050,6 +1053,7 @@ fun CharacterCard(
 }
 
 @Composable
+// Ejecuta la lógica de tutorial social panel.
 private fun TutorialSocialPanel(
     modifier: Modifier = Modifier,
     tutorialTargets: androidx.compose.runtime.snapshots.SnapshotStateMap<String, Rect>,
@@ -1119,6 +1123,7 @@ private fun TutorialSocialPanel(
 }
 
 @Composable
+// Ejecuta la lógica de tutorial social option.
 private fun TutorialSocialOption(
     text: String,
     modifier: Modifier = Modifier,
@@ -1151,6 +1156,7 @@ private fun TutorialSocialOption(
     }
 }
 
+// Formatea last played.
 private fun formatLastPlayed(timestamp: Long): String {
     val now = System.currentTimeMillis()
     val diff = now - timestamp

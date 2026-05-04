@@ -1,5 +1,6 @@
 package com.example.aidungeonmaster.data.model
 
+// Modelo de datos que representa guild member summary.
 data class GuildMemberSummary(
     val uid: String = "",
     val displayName: String = "",

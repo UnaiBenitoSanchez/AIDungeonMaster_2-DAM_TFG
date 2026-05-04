@@ -11,8 +11,10 @@ import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.android.libraries.identity.googleid.GoogleIdTokenParsingException
 
+// Gestor encargado de google auth.
 class GoogleAuthManager {
 
+    // Obtiene google id token.
     suspend fun getGoogleIdToken(activity: Activity): Result<String> {
         val webClientId = BuildConfig.GOOGLE_WEB_CLIENT_ID.trim()
         if (webClientId.isBlank()) {
@@ -46,6 +48,7 @@ class GoogleAuthManager {
         }
     }
 
+    // Ejecuta la lógica de extract google id token.
     private fun extractGoogleIdToken(result: GetCredentialResponse): String {
         val credential = result.credential
         if (credential is CustomCredential && credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {

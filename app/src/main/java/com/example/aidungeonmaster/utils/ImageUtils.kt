@@ -152,6 +152,7 @@ object ImageUtils {
         "Juramento de Venganza" to "Oath of Vengeance", "Asesino" to "Assassin"
     )
 
+    // Ejecuta la lógica de call cloudflare.
     private fun callCloudflare(
         accountId: String,
         apiToken: String,
@@ -217,6 +218,7 @@ object ImageUtils {
         return Base64.encodeToString(bytes, Base64.DEFAULT)
     }
 
+    // Construye prompt.
     private fun buildPrompt(raceEn: String, clazzEn: String, physicalTraitsEn: String): String {
         val raw = "solo character portrait, single person, one character only, " +
                 "fantasy RPG $raceEn $clazzEn, " +
@@ -339,6 +341,7 @@ object ImageUtils {
         throw lastError ?: Exception("Todos los modelos de Cloudflare fallaron al generar el monstruo")
     }
 
+    // Construye monster prompt.
     private fun buildMonsterPrompt(translatedFlavorEn: String): String {
         val raw = "solo fantasy monster portrait, single creature only, no humans, no adventurers, " +
                 "dark fantasy bestiary concept art, creature design of $translatedFlavorEn, " +
@@ -348,6 +351,7 @@ object ImageUtils {
         return if (raw.length > 600) raw.take(600) else raw
     }
 
+    // Ejecuta la lógica de base64 to data url.
     fun base64ToDataUrl(base64: String, mimeType: String = "image/png"): String {
         val normalized = base64.replace("\n", "").replace("\r", "")
         return "data:$mimeType;base64,$normalized"

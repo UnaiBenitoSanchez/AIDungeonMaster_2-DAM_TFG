@@ -48,6 +48,7 @@ class SupermarketProximityWorker(
         .readTimeout(20, TimeUnit.SECONDS)
         .build()
 
+    // Ejecuta la lógica de do work.
     override suspend fun doWork(): Result {
         // ── Anti-spam: no notificar si avisamos hace menos de COOLDOWN_MS ────
         val lastNotified = prefs.getLong(KEY_LAST_NOTIFIED, 0L)
@@ -151,6 +152,7 @@ class SupermarketProximityWorker(
         }
     }
 
+    // Analiza overpass response.
     private fun parseOverpassResponse(json: String, userLocation: Location): NearbyShop? {
         return try {
             val root     = JSONObject(json)

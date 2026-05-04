@@ -33,6 +33,7 @@ object NotificationHelper {
         else -> "🏅"
     }
 
+    // Ejecuta la lógica de position name.
     private fun positionName(pos: Int) = when (pos) {
         0    -> "primer puesto"
         1    -> "segundo puesto"
@@ -229,6 +230,7 @@ object NotificationHelper {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         }
 
+    // Ejecuta la lógica de pending intent.
     private fun pendingIntent(context: Context, requestCode: Int, intent: Intent) =
         PendingIntent.getActivity(
             context,

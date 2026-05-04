@@ -1,5 +1,6 @@
 package com.example.aidungeonmaster.data.model
 
+// Clase que encapsula la lógica de friendship.
 data class Friendship(
     val id: String = "",
     val userA: String = "",

@@ -51,6 +51,7 @@ import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+// Ejecuta la lógica de private chat screen.
 fun PrivateChatScreen(
     friendUid: String,
     friendName: String,
@@ -66,6 +67,7 @@ fun PrivateChatScreen(
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
 
+    // Envía current message.
     fun sendCurrentMessage() {
         val toSend = text.trim()
 
@@ -188,6 +190,7 @@ fun PrivateChatScreen(
 }
 
 @Composable
+// Ejecuta la lógica de message bubble.
 private fun MessageBubble(
     message: ChatMessage,
     isMine: Boolean,
@@ -247,6 +250,7 @@ private fun MessageBubble(
     }
 }
 
+// Formatea message time.
 private fun formatMessageTime(timestamp: Long): String {
     return SimpleDateFormat(
         "HH:mm",

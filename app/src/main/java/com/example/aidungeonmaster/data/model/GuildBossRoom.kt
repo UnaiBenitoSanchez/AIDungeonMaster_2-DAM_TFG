@@ -1,5 +1,6 @@
 package com.example.aidungeonmaster.data.model
 
+// Modelo de datos que representa guild boss room.
 data class GuildBossRoom(
     val guildId: String = "",
     val status: String = "waiting", // waiting | battle | finished

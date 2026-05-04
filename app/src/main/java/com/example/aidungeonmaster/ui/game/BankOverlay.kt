@@ -44,6 +44,7 @@ import com.example.aidungeonmaster.viewmodel.InventoryViewModel
 import kotlinx.coroutines.launch
 
 @Composable
+// Ejecuta la lógica de bank overlay.
 fun BankOverlay(
     bankName: String,
     gameId: String,

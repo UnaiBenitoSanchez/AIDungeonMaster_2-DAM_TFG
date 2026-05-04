@@ -82,6 +82,7 @@ import com.example.aidungeonmaster.ui.accessibility.VoiceFormRegistry
 import com.example.aidungeonmaster.ui.accessibility.VoiceFormScreen
 import com.example.aidungeonmaster.ui.accessibility.VoiceInputType
 
+// Clase que encapsula la lógica de bestiary filter.
 private enum class BestiaryFilter(val label: String) {
     ALL("Todos"),
     DEFEATED("Derrotados"),
@@ -93,6 +94,7 @@ private enum class BestiaryFilter(val label: String) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+// Ejecuta la lógica de bestiary screen.
 fun BestiaryScreen(
     gameId: String,
     onBack: () -> Unit,
@@ -343,6 +345,7 @@ fun BestiaryScreen(
 }
 
 @Composable
+// Ejecuta la lógica de filter pill.
 private fun FilterPill(
     text: String,
     selected: Boolean,
@@ -364,6 +367,7 @@ private fun FilterPill(
 }
 
 @Composable
+// Ejecuta la lógica de bestiary summary card.
 private fun BestiarySummaryCard(totalEntries: Int) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -399,6 +403,7 @@ private fun BestiarySummaryCard(totalEntries: Int) {
 }
 
 @Composable
+// Ejecuta la lógica de bestiary entry card.
 private fun BestiaryEntryCard(
     entry: BestiaryEntry,
     onClick: () -> Unit
@@ -478,6 +483,7 @@ private fun BestiaryEntryCard(
 }
 
 @Composable
+// Ejecuta la lógica de monster image.
 private fun MonsterImage(
     imageUrl: String,
     name: String,
@@ -522,6 +528,7 @@ private fun MonsterImage(
 }
 
 @Composable
+// Ejecuta la lógica de bestiary mini stat.
 private fun BestiaryMiniStat(
     label: String,
     value: String
@@ -542,6 +549,7 @@ private fun BestiaryMiniStat(
 }
 
 @Composable
+// Ejecuta la lógica de bestiary detail view.
 private fun BestiaryDetailView(
     gameId: String,
     entry: BestiaryEntry,
@@ -748,6 +756,7 @@ private fun BestiaryDetailView(
 }
 
 @Composable
+// Ejecuta la lógica de editable list field.
 private fun EditableListField(
     value: String,
     label: String,
@@ -775,6 +784,7 @@ private fun EditableListField(
 }
 
 @Composable
+// Ejecuta la lógica de detailed loot section.
 private fun DetailedLootSection(
     detailedLoot: List<BestiaryLoot>,
     fallbackLoot: List<String>
@@ -825,6 +835,7 @@ private fun DetailedLootSection(
 }
 
 @Composable
+// Ejecuta la lógica de bestiary section card.
 private fun BestiarySectionCard(
     title: String,
     content: @Composable ColumnScope.() -> Unit
@@ -848,6 +859,7 @@ private fun BestiarySectionCard(
 }
 
 @Composable
+// Ejecuta la lógica de detail line.
 private fun DetailLine(
     label: String,
     value: String
@@ -867,6 +879,7 @@ private fun DetailLine(
 }
 
 @Composable
+// Ejecuta la lógica de detail list line.
 private fun DetailListLine(
     label: String,
     values: List<String>
@@ -901,6 +914,7 @@ private fun DetailListLine(
     }
 }
 
+// Formatea timestamp.
 private fun formatTimestamp(timestamp: Long): String {
     if (timestamp <= 0L) return "Desconocido"
     return try {
@@ -911,6 +925,7 @@ private fun formatTimestamp(timestamp: Long): String {
     }
 }
 
+// Ejecuta la lógica de monster emoji.
 private fun monsterEmoji(name: String): String = when {
     name.contains("dragón", true) || name.contains("dragon", true) -> "🐉"
     name.contains("esqueleto", true) || name.contains("skeleton", true) -> "💀"

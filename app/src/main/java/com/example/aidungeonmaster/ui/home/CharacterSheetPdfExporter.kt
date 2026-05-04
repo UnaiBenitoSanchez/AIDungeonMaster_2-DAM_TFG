@@ -17,8 +17,10 @@ import java.util.Date
 import java.util.Locale
 import kotlin.math.floor
 
+// Clase que encapsula la lógica de character sheet pdf exporter.
 object CharacterSheetPdfExporter {
 
+    // Exporta character sheet.
     fun exportCharacterSheet(
         context: Context,
         uri: Uri,
@@ -46,6 +48,7 @@ object CharacterSheetPdfExporter {
         }
     }
 
+    // Ejecuta la lógica de draw sheet.
     private fun drawSheet(
         canvas: Canvas,
         pageWidth: Int,
@@ -351,6 +354,7 @@ object CharacterSheetPdfExporter {
         paint.textAlign = Paint.Align.CENTER
     }
 
+    // Ejecuta la lógica de draw title.
     private fun drawTitle(canvas: Canvas, text: String, x: Float, y: Float, color: Int) {
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
         paint.color = color
@@ -360,6 +364,7 @@ object CharacterSheetPdfExporter {
         canvas.drawText(text, x, y, paint)
     }
 
+    // Ejecuta la lógica de draw subtitle.
     private fun drawSubtitle(canvas: Canvas, text: String, x: Float, y: Float, color: Int) {
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
         paint.color = color
@@ -369,6 +374,7 @@ object CharacterSheetPdfExporter {
         canvas.drawText(text.ifBlank { "—" }, x, y, paint)
     }
 
+    // Ejecuta la lógica de draw section frame.
     private fun drawSectionFrame(
         canvas: Canvas,
         x: Float,
@@ -401,6 +407,7 @@ object CharacterSheetPdfExporter {
         canvas.drawText(title, x + 26f, y + 7f, paint)
     }
 
+    // Ejecuta la lógica de draw portrait.
     private fun drawPortrait(
         canvas: Canvas,
         character: Character,
@@ -439,6 +446,7 @@ object CharacterSheetPdfExporter {
         canvas.drawRoundRect(RectF(x, y, x + w, y + h), 14f, 14f, paint)
     }
 
+    // Ejecuta la lógica de draw label value.
     private fun drawLabelValue(
         canvas: Canvas,
         label: String,
@@ -469,6 +477,7 @@ object CharacterSheetPdfExporter {
         paint.style = Paint.Style.FILL
     }
 
+    // Ejecuta la lógica de draw big stat.
     private fun drawBigStat(
         canvas: Canvas,
         label: String,
@@ -503,6 +512,7 @@ object CharacterSheetPdfExporter {
         canvas.drawText(fitText(value, paint, w - 16f), x + w / 2f, y + 45f, paint)
     }
 
+    // Ejecuta la lógica de draw progress bar.
     private fun drawProgressBar(
         canvas: Canvas,
         x: Float,
@@ -524,6 +534,7 @@ object CharacterSheetPdfExporter {
         canvas.drawRoundRect(RectF(x, y, x + fillW, y + h), h / 2f, h / 2f, paint)
     }
 
+    // Ejecuta la lógica de draw attribute box.
     private fun drawAttributeBox(
         canvas: Canvas,
         label: String,
@@ -592,6 +603,7 @@ object CharacterSheetPdfExporter {
         )
     }
 
+    // Ejecuta la lógica de draw small card.
     private fun drawSmallCard(
         canvas: Canvas,
         label: String,
@@ -637,6 +649,7 @@ object CharacterSheetPdfExporter {
         )
     }
 
+    // Ejecuta la lógica de decode portrait.
     private fun decodePortrait(portraitUrl: String): Bitmap? {
         if (portraitUrl.isBlank()) return null
 
@@ -654,6 +667,7 @@ object CharacterSheetPdfExporter {
         }.getOrNull()
     }
 
+    // Ejecuta la lógica de fit text.
     private fun fitText(
         text: String,
         paint: Paint,
@@ -668,14 +682,17 @@ object CharacterSheetPdfExporter {
         return "$result…"
     }
 
+    // Ejecuta la lógica de ability modifier.
     private fun abilityModifier(score: Int): Int {
         return floor((score - 10) / 2.0).toInt()
     }
 
+    // Ejecuta la lógica de signed.
     private fun signed(value: Int): String {
         return if (value >= 0) "+$value" else value.toString()
     }
 
+    // Formatea last played pdf.
     private fun formatLastPlayedPdf(timestamp: Long): String {
         if (timestamp <= 0L) return "Sin partidas"
         return SimpleDateFormat("dd/MM/yy HH:mm", Locale.getDefault()).format(Date(timestamp))

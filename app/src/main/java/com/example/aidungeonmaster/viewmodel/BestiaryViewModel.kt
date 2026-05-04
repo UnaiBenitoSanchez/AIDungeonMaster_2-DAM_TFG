@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
+// ViewModel que coordina el estado y la lógica de bestiary.
 class BestiaryViewModel : ViewModel() {
 
     private val db = FirebaseFirestore.getInstance()
@@ -29,10 +30,12 @@ class BestiaryViewModel : ViewModel() {
     private val _imageGenerationMonsterId = MutableStateFlow<String?>(null)
     val imageGenerationMonsterId: MutableStateFlow<String?> = _imageGenerationMonsterId
 
+    // Selecciona entry.
     fun selectEntry(entry: BestiaryEntry?) {
         _selectedEntry.value = entry
     }
 
+    // Carga bestiary.
     fun loadBestiary(gameId: String) {
         viewModelScope.launch {
             _isLoading.value = true
@@ -60,6 +63,7 @@ class BestiaryViewModel : ViewModel() {
         }
     }
 
+    // Registra encounter.
     fun registerEncounter(
         gameId: String,
         monsterId: String,
@@ -156,6 +160,7 @@ class BestiaryViewModel : ViewModel() {
         }
     }
 
+    // Registra defeat.
     fun registerDefeat(
         gameId: String,
         monsterId: String,
@@ -192,6 +197,7 @@ class BestiaryViewModel : ViewModel() {
         }
     }
 
+    // Ejecuta la lógica de regenerate monster image.
     fun regenerateMonsterImage(gameId: String, entry: BestiaryEntry) {
         viewModelScope.launch {
             generateAndPersistMonsterImage(
@@ -205,6 +211,7 @@ class BestiaryViewModel : ViewModel() {
         }
     }
 
+    // Guarda monster notes.
     fun saveMonsterNotes(gameId: String, monsterId: String, notes: String) {
         viewModelScope.launch {
             try {
@@ -220,6 +227,7 @@ class BestiaryViewModel : ViewModel() {
         }
     }
 
+    // Guarda monster field list.
     fun saveMonsterFieldList(gameId: String, monsterId: String, field: BestiaryEditableListField, rawValue: String) {
         viewModelScope.launch {
             try {
@@ -293,6 +301,7 @@ class BestiaryViewModel : ViewModel() {
         }
     }
 
+    // Analiza bestiary entry.
     private fun parseBestiaryEntry(monsterId: String, data: Map<*, *>): BestiaryEntry? {
         return try {
             val statsMap = data["lastObservedStats"] as? Map<*, *>
@@ -332,6 +341,7 @@ class BestiaryViewModel : ViewModel() {
         }
     }
 
+    // Ejecuta la lógica de bestiary entry to map.
     private fun bestiaryEntryToMap(entry: BestiaryEntry): Map<String, Any> = mapOf(
         "name" to entry.name,
         "description" to entry.description,
@@ -363,6 +373,7 @@ class BestiaryViewModel : ViewModel() {
         "notes" to entry.notes
     )
 
+    // Analiza detailed loot.
     private fun parseDetailedLoot(raw: Any?, fallbackStrings: List<String>): List<BestiaryLoot> {
         val fromMaps = (raw as? List<*>)
             ?.mapNotNull { item ->
@@ -396,6 +407,7 @@ class BestiaryViewModel : ViewModel() {
         }
     }
 
+    // Ejecuta la lógica de merge loot.
     private fun mergeLoot(current: List<BestiaryLoot>, incoming: List<BestiaryLoot>): List<BestiaryLoot> {
         if (incoming.isEmpty()) return current.distinctBy { it.name.lowercase() }
 
@@ -417,6 +429,7 @@ class BestiaryViewModel : ViewModel() {
         return merged.values.sortedBy { it.name.lowercase() }
     }
 
+    // Ejecuta la lógica de classify loot category.
     private fun classifyLootCategory(value: String): String {
         val normalized = value.lowercase()
         return when {
@@ -430,6 +443,7 @@ class BestiaryViewModel : ViewModel() {
         }
     }
 
+    // Ejecuta la lógica de infer weaknesses.
     private fun inferWeaknesses(name: String, tags: List<String>): List<String> {
         val basis = (listOf(name) + tags).joinToString(" ").lowercase()
         val detected = mutableListOf<String>()
@@ -441,6 +455,7 @@ class BestiaryViewModel : ViewModel() {
         return detected.distinct().sorted()
     }
 
+    // Ejecuta la lógica de infer resistances.
     private fun inferResistances(name: String, tags: List<String>): List<String> {
         val basis = (listOf(name) + tags).joinToString(" ").lowercase()
         val detected = mutableListOf<String>()
@@ -452,6 +467,7 @@ class BestiaryViewModel : ViewModel() {
         return detected.distinct().sorted()
     }
 
+    // Ejecuta la lógica de merge distinct.
     private fun mergeDistinct(vararg lists: List<String>): List<String> {
         return lists.flatMap { it }
             .map { it.trim() }
@@ -460,6 +476,7 @@ class BestiaryViewModel : ViewModel() {
             .sortedBy { it.lowercase() }
     }
 
+    // Ejecuta la lógica de pick longer.
     private fun pickLonger(current: String, candidate: String): String = when {
         candidate.isBlank() -> current
         current.isBlank() -> candidate
@@ -467,6 +484,7 @@ class BestiaryViewModel : ViewModel() {
         else -> current
     }
 
+    // Ejecuta la lógica de string.
     private fun String.toDisplayMonsterName(): String = replace('_', ' ')
         .replace('-', ' ')
         .split(' ')
@@ -476,6 +494,7 @@ class BestiaryViewModel : ViewModel() {
         }
 }
 
+// Clase que encapsula la lógica de bestiary editable list field.
 enum class BestiaryEditableListField(val firebaseKey: String) {
     WEAKNESSES("observedWeaknesses"),
     RESISTANCES("observedResistances")

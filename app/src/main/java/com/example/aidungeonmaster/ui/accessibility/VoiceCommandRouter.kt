@@ -19,6 +19,7 @@ import java.util.Locale
  * Traduce lenguaje natural sencillo a acciones de navegación o acciones de juego.
  */
 @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
+// Ejecuta la lógica de execute voice command.
 fun executeVoiceCommand(
     rawCommand: String,
     navController: NavHostController,
@@ -39,11 +40,13 @@ fun executeVoiceCommand(
     val command = rawCommand.normalizedForVoice()
     if (command.isBlank()) return "No he entendido la orden."
 
+    // Ejecuta la lógica de navigate.
     fun navigate(route: String, feedback: String): String {
         navController.navigate(route) { launchSingleTop = true }
         return feedback
     }
 
+    // Ejecuta la lógica de current game context.
     fun currentGameContext(): CharacterContext? {
         val userId = Uri.decode(currentArguments?.getString("userId").orEmpty())
         val characterName = Uri.decode(currentArguments?.getString("characterName").orEmpty())
@@ -54,6 +57,7 @@ fun executeVoiceCommand(
         }
     }
 
+    // Ejecuta la lógica de matched character context.
     fun matchedCharacterContext(): CharacterContext? {
         val current = currentGameContext()
         val matched = characters.bestVoiceMatch(command)
@@ -67,6 +71,7 @@ fun executeVoiceCommand(
         }
     }
 
+    // Ejecuta la lógica de my joined guild.
     fun myJoinedGuild(): Guild? {
         return myGuilds.firstOrNull { it.joined } ?: myGuilds.firstOrNull()
     }
@@ -514,6 +519,7 @@ fun executeVoiceCommand(
     return "No he reconocido esa orden. Di ayuda para escuchar ejemplos de comandos."
 }
 
+// Clase que encapsula la lógica de character context.
 private data class CharacterContext(
     val userId: String,
     val characterName: String,
@@ -522,6 +528,7 @@ private data class CharacterContext(
     val charId: String = "${userId}_${characterName}"
 }
 
+// Ejecuta la lógica de list.
 private fun List<Character>.bestVoiceMatch(command: String): Character? {
     return this
         .filter { character ->
@@ -531,10 +538,12 @@ private fun List<Character>.bestVoiceMatch(command: String): Character? {
         .maxByOrNull { it.name.length }
 }
 
+// Ejecuta la lógica de string.
 private fun String.containsAny(vararg candidates: String): Boolean {
     return candidates.any { candidate -> contains(candidate.normalizedForVoice()) }
 }
 
+// Ejecuta la lógica de string.
 private fun String.normalizedForVoice(): String {
     val withoutAccents = Normalizer.normalize(this, Normalizer.Form.NFD)
         .replace("\\p{Mn}+".toRegex(), "")
@@ -547,6 +556,7 @@ private fun String.normalizedForVoice(): String {
 }
 
 
+// Ejecuta la lógica de string.
 private fun String.requestedColorBlindType(): ColorBlindType? {
     return when {
         containsAny(
@@ -604,6 +614,7 @@ private fun String.requestedColorBlindType(): ColorBlindType? {
     }
 }
 
+// Ejecuta la lógica de string.
 private fun String.requestedAppLanguage(): AppLanguage? {
     val asksForLanguage = containsAny(
         "idioma",
@@ -702,6 +713,7 @@ private fun String.requestedAppLanguage(): AppLanguage? {
     }
 }
 
+// Ejecuta la lógica de app language.
 private fun AppLanguage.voiceFeedbackName(): String = when (this) {
     AppLanguage.SPANISH -> "español"
     AppLanguage.ENGLISH -> "inglés"
@@ -712,6 +724,7 @@ private fun AppLanguage.voiceFeedbackName(): String = when (this) {
     AppLanguage.GALICIAN -> "gallego"
 }
 
+// Ejecuta la lógica de string.
 private fun String.startsWithAny(vararg prefixes: String): Boolean {
     return prefixes.any { this.startsWith(it.normalizedForVoice()) }
 }

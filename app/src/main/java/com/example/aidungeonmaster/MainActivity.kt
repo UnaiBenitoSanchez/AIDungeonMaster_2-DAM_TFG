@@ -42,6 +42,7 @@ import com.example.aidungeonmaster.ui.theme.LocalColorBlindType
 import com.example.aidungeonmaster.ui.theme.colorMatrixForType
 import com.example.aidungeonmaster.utils.ColorBlindPreferencesManager
 
+// Clase que encapsula la lógica de main activity.
 class MainActivity : ComponentActivity() {
 
     private val pendingPermissions = ArrayDeque<String>()
@@ -58,11 +59,13 @@ class MainActivity : ComponentActivity() {
         requestNextPermissionInQueue()
     }
 
+    // Ejecuta la lógica de attach base context.
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(AppLanguageManager.wrapContext(newBase))
     }
 
     @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
+    // Gestiona el evento de create.
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         AppLanguageManager.applySavedLanguage(this)
@@ -161,6 +164,7 @@ class MainActivity : ComponentActivity() {
         prefs.edit().putBoolean("done", true).apply()
     }
 
+    // Construye initial permission queue.
     private fun buildInitialPermissionQueue() {
         pendingPermissions.clear()
 
@@ -185,6 +189,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    // Ejecuta la lógica de request next permission in queue.
     private fun requestNextPermissionInQueue() {
         while (pendingPermissions.isNotEmpty()) {
             val nextPermission = pendingPermissions.removeFirst()
@@ -201,6 +206,7 @@ class MainActivity : ComponentActivity() {
         currentPermission = null
     }
 
+    // Comprueba si permission.
     private fun hasPermission(permission: String): Boolean {
         return ContextCompat.checkSelfPermission(this, permission) ==
                 PackageManager.PERMISSION_GRANTED
@@ -208,6 +214,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
+// Ejecuta la lógica de permission rationale dialog.
 private fun PermissionRationaleDialog(
     permission: String?,
     onConfirm: () -> Unit,

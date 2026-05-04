@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.sp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+// Ejecuta la lógica de dropdown.
 fun Dropdown(
     label: String,
     options: List<String>,
@@ -51,6 +52,7 @@ fun Dropdown(
  * Cuando hay dados muestra los resultados en pequeño con el menor tachado.
  */
 @Composable
+// Ejecuta la lógica de stat row.
 fun StatRow(
     name: String,
     value: Int,

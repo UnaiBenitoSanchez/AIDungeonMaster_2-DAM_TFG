@@ -86,6 +86,7 @@ import com.example.aidungeonmaster.ui.accessibility.VoiceInputType
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+// Ejecuta la lógica de login screen.
 fun LoginScreen(
     navController: NavController,
     modifier: Modifier = Modifier,
@@ -101,6 +102,7 @@ fun LoginScreen(
     val coroutineScope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
 
+    // Ejecuta la lógica de submit login.
     fun submitLogin() {
         viewModel.login(email, password) {
             navController.navigate(Screen.Home.createRoute()) {
@@ -109,6 +111,7 @@ fun LoginScreen(
         }
     }
 
+    // Inicia google login.
     fun startGoogleLogin() {
         val activity = context as? Activity
         if (activity == null) {

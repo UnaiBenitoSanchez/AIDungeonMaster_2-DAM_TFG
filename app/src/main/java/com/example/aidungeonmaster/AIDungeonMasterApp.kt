@@ -27,6 +27,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
 
+// Aplicación principal que inicializa aidungeon master.
 class AIDungeonMasterApp : Application(), DefaultLifecycleObserver {
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -41,6 +42,7 @@ class AIDungeonMasterApp : Application(), DefaultLifecycleObserver {
         }
     }
 
+    // Gestiona el evento de create.
     override fun onCreate() {
         super<Application>.onCreate()
 
@@ -66,6 +68,7 @@ class AIDungeonMasterApp : Application(), DefaultLifecycleObserver {
         scheduleProximityCheck()
     }
 
+    // Gestiona el evento de start.
     override fun onStart(owner: LifecycleOwner) {
         if (::socialRepository.isInitialized) {
             appScope.launch {
@@ -74,6 +77,7 @@ class AIDungeonMasterApp : Application(), DefaultLifecycleObserver {
         }
     }
 
+    // Gestiona el evento de stop.
     override fun onStop(owner: LifecycleOwner) {
         if (::socialRepository.isInitialized) {
             appScope.launch {
@@ -82,6 +86,7 @@ class AIDungeonMasterApp : Application(), DefaultLifecycleObserver {
         }
     }
 
+    // Gestiona el evento de terminate.
     override fun onTerminate() {
         if (::auth.isInitialized) {
             auth.removeAuthStateListener(authListener)
@@ -89,6 +94,7 @@ class AIDungeonMasterApp : Application(), DefaultLifecycleObserver {
         super.onTerminate()
     }
 
+    // Programa ranking check.
     private fun scheduleRankingCheck() {
         val request = PeriodicWorkRequestBuilder<RankingCheckWorker>(15, TimeUnit.MINUTES).build()
         WorkManager.getInstance(this).enqueueUniquePeriodicWork(
@@ -98,6 +104,7 @@ class AIDungeonMasterApp : Application(), DefaultLifecycleObserver {
         )
     }
 
+    // Programa inactivity reminder.
     private fun scheduleInactivityReminder() {
         val request = PeriodicWorkRequestBuilder<InactivityWorker>(1, TimeUnit.HOURS)
             .setConstraints(
@@ -115,6 +122,7 @@ class AIDungeonMasterApp : Application(), DefaultLifecycleObserver {
         )
     }
 
+    // Programa proximity check.
     private fun scheduleProximityCheck() {
         val request = PeriodicWorkRequestBuilder<SupermarketProximityWorker>(30, TimeUnit.MINUTES)
             .setConstraints(

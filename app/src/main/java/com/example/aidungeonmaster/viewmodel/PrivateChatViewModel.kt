@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+// ViewModel que coordina el estado y la lógica de private chat.
 class PrivateChatViewModel : ViewModel() {
 
     private val repository = ChatRepository()
@@ -26,6 +27,7 @@ class PrivateChatViewModel : ViewModel() {
     private val _message = MutableStateFlow<String?>(null)
     val message = _message.asStateFlow()
 
+    // Abre chat.
     fun openChat(friendUid: String, guildId: String? = null) {
         viewModelScope.launch {
             try {
@@ -50,6 +52,7 @@ class PrivateChatViewModel : ViewModel() {
         }
     }
 
+    // Envía message.
     fun sendMessage(text: String) {
         val currentChatId = _chatId.value ?: return
 
@@ -62,6 +65,7 @@ class PrivateChatViewModel : ViewModel() {
         }
     }
 
+    // Ejecuta la lógica de mark incoming messages as seen.
     fun markIncomingMessagesAsSeen() {
         val currentChatId = _chatId.value ?: return
         val currentMessages = _messages.value
@@ -74,10 +78,12 @@ class PrivateChatViewModel : ViewModel() {
         }
     }
 
+    // Limpia message.
     fun clearMessage() {
         _message.value = null
     }
 
+    // Gestiona el evento de cleared.
     override fun onCleared() {
         messagesListener?.remove()
         super.onCleared()

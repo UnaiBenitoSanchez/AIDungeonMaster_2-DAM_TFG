@@ -12,6 +12,7 @@ import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
 import kotlinx.coroutines.launch
 
+// ViewModel que coordina el estado y la lógica de auth.
 class AuthViewModel : ViewModel() {
 
     private val repository = AuthRepository()
@@ -22,10 +23,12 @@ class AuthViewModel : ViewModel() {
 
     var errorMessage by mutableStateOf<String?>(null)
 
+    // Comprueba si user logged in.
     fun isUserLoggedIn(): Boolean {
         return canAccessApp(com.google.firebase.auth.FirebaseAuth.getInstance().currentUser)
     }
 
+    // Ejecuta la lógica de login.
     fun login(email: String, pass: String, onSuccess: () -> Unit) {
         isLoading = true
         errorMessage = null
@@ -53,6 +56,7 @@ class AuthViewModel : ViewModel() {
         )
     }
 
+    // Ejecuta la lógica de login with google.
     fun loginWithGoogle(idToken: String, onSuccess: () -> Unit) {
         isLoading = true
         errorMessage = null
@@ -76,6 +80,7 @@ class AuthViewModel : ViewModel() {
         }
     }
 
+    // Ejecuta la lógica de register.
     fun register(
         email: String,
         pass: String,
@@ -102,10 +107,12 @@ class AuthViewModel : ViewModel() {
         )
     }
 
+    // Limpia error.
     fun clearError() {
         errorMessage = null
     }
 
+    // Comprueba si access app.
     private fun canAccessApp(user: FirebaseUser?): Boolean {
         if (user == null) return false
 

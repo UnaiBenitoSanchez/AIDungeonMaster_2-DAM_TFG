@@ -73,6 +73,7 @@ import com.example.aidungeonmaster.ui.accessibility.VoiceFormScreen
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+// Ejecuta la lógica de journal screen.
 fun JournalScreen(
     charId: String,
     onBack: () -> Unit,
@@ -313,6 +314,7 @@ fun JournalScreen(
 }
 
 @Composable
+// Ejecuta la lógica de journal summary card.
 private fun JournalSummaryCard(totalEntries: Int) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -348,6 +350,7 @@ private fun JournalSummaryCard(totalEntries: Int) {
 }
 
 @Composable
+// Ejecuta la lógica de collapsible adventure summary card.
 private fun CollapsibleAdventureSummaryCard(
     chapterTitle: String,
     summary: String,
@@ -407,6 +410,7 @@ private fun CollapsibleAdventureSummaryCard(
 }
 
 @Composable
+// Ejecuta la lógica de journal entry card.
 private fun JournalEntryCard(
     entry: JournalEntry,
     onClick: () -> Unit
@@ -480,6 +484,7 @@ private fun JournalEntryCard(
 }
 
 @Composable
+// Ejecuta la lógica de journal mini stat.
 private fun JournalMiniStat(
     label: String,
     value: String
@@ -500,6 +505,7 @@ private fun JournalMiniStat(
 }
 
 @Composable
+// Ejecuta la lógica de journal detail view.
 private fun JournalDetailView(
     charId: String,
     entry: JournalEntry,
@@ -632,6 +638,7 @@ private fun JournalDetailView(
 }
 
 @Composable
+// Ejecuta la lógica de journal action button.
 private fun JournalActionButton(
     text: String,
     onClick: () -> Unit
@@ -658,6 +665,7 @@ private fun JournalActionButton(
 }
 
 @Composable
+// Ejecuta la lógica de journal section card.
 private fun JournalSectionCard(
     title: String,
     content: @Composable ColumnScope.() -> Unit
@@ -681,6 +689,7 @@ private fun JournalSectionCard(
 }
 
 @Composable
+// Ejecuta la lógica de detail line.
 private fun DetailLine(
     label: String,
     value: String
@@ -700,6 +709,7 @@ private fun DetailLine(
 }
 
 @Composable
+// Ejecuta la lógica de detail list line.
 private fun DetailListLine(
     label: String,
     values: List<String>
@@ -732,6 +742,7 @@ private fun DetailListLine(
     }
 }
 
+// Formatea signed.
 private fun formatSigned(value: Int): String {
     return when {
         value > 0 -> "+$value"
@@ -740,6 +751,7 @@ private fun formatSigned(value: Int): String {
     }
 }
 
+// Formatea journal timestamp.
 private fun formatJournalTimestamp(timestamp: Long): String {
     if (timestamp <= 0L) return "Desconocido"
     return try {
@@ -749,6 +761,7 @@ private fun formatJournalTimestamp(timestamp: Long): String {
     }
 }
 
+// Formatea journal timestamp short.
 private fun formatJournalTimestampShort(timestamp: Long): String {
     if (timestamp <= 0L) return "?"
     return try {
@@ -758,6 +771,7 @@ private fun formatJournalTimestampShort(timestamp: Long): String {
     }
 }
 
+// Construye journal export text.
 private fun buildJournalExportText(entries: List<JournalEntry>): String {
     return buildString {
         appendLine("DIARIO DE AVENTURA")
@@ -793,6 +807,7 @@ private fun buildJournalExportText(entries: List<JournalEntry>): String {
     }
 }
 
+// Ejecuta la lógica de share journal.
 private fun shareJournal(context: Context, text: String) {
     val intent = Intent(Intent.ACTION_SEND).apply {
         type = "text/plain"

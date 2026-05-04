@@ -51,6 +51,7 @@ class SupermarketProximityManager(private val context: Context) {
     private var lastShopName   = ""
 
     private val locationCallback = object : LocationCallback() {
+        // Gestiona el evento de location result.
         override fun onLocationResult(result: LocationResult) {
             val location = result.lastLocation ?: return
             Log.d(TAG, "Ubicación recibida: ${location.latitude}, ${location.longitude}")
@@ -61,6 +62,7 @@ class SupermarketProximityManager(private val context: Context) {
     // ── API pública ───────────────────────────────────────────────────────────
 
     @SuppressLint("MissingPermission")
+    // Ejecuta la lógica de start.
     fun start() {
         val request = LocationRequest.Builder(
             Priority.PRIORITY_BALANCED_POWER_ACCURACY,
@@ -74,6 +76,7 @@ class SupermarketProximityManager(private val context: Context) {
         Log.d(TAG, "SupermarketProximityManager iniciado.")
     }
 
+    // Ejecuta la lógica de stop.
     fun stop() {
         fusedClient.removeLocationUpdates(locationCallback)
         scope.cancel()
@@ -150,6 +153,7 @@ class SupermarketProximityManager(private val context: Context) {
         }
     }
 
+    // Analiza overpass response.
     private fun parseOverpassResponse(json: String, userLocation: Location): NearbyShop? {
         return try {
             val elements = JSONObject(json).getJSONArray("elements")
@@ -210,6 +214,7 @@ class SupermarketProximityManager(private val context: Context) {
         }
     }
 
+    // Ejecuta la lógica de supermarket specialty.
     private fun supermarketSpecialty(name: String): String = when {
         "mercadona" in name.lowercase() -> "🧪 Pociones y suministros curativos"
         "lidl"      in name.lowercase() -> "🎲 Artículos misteriosos con descuento"
@@ -223,6 +228,7 @@ class SupermarketProximityManager(private val context: Context) {
         else                            -> "🛒 Suministros generales de aventura"
     }
 
+    // Ejecuta la lógica de haversine meters.
     private fun haversineMeters(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
         val r    = 6_371_000.0
         val dLat = Math.toRadians(lat2 - lat1)
@@ -232,6 +238,7 @@ class SupermarketProximityManager(private val context: Context) {
         return r * 2 * asin(sqrt(a))
     }
 
+    // Clase que encapsula la lógica de nearby shop.
     private data class NearbyShop(val name: String, val distanceMeters: Int)
 
     companion object {

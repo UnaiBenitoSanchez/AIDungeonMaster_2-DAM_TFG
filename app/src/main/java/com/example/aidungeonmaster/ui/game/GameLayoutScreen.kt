@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.aidungeonmaster.R
 @Composable
+// Ejecuta la lógica de medieval background.
 fun MedievalBackground(content: @Composable () -> Unit) {
     Box(modifier = Modifier.fillMaxSize().background(Color(0xFF2B2B2B))) {
         // IMAGEN DE FONDO (Requiere que añadas una imagen de pergamino a res/drawable)
@@ -37,6 +38,7 @@ fun MedievalBackground(content: @Composable () -> Unit) {
 
 // Componente para Títulos con estética de D&D
 @Composable
+// Ejecuta la lógica de medieval title.
 fun MedievalTitle(text: String, modifier: Modifier = Modifier) {
     Text(
         text = text,

@@ -1,5 +1,6 @@
 package com.example.aidungeonmaster.data.model
 
+// Modelo de datos que representa guild chat message.
 data class GuildChatMessage(
     val id: String = "",
     val senderUid: String = "",

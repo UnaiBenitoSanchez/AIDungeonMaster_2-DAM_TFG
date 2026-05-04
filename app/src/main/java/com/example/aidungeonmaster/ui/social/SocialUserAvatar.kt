@@ -25,6 +25,7 @@ import coil.compose.SubcomposeAsyncImage
 import com.example.aidungeonmaster.utils.ImageUtils
 
 @Composable
+// Ejecuta la lógica de social user avatar.
 fun SocialUserAvatar(
     photoUrl: String,
     displayName: String,
@@ -93,6 +94,7 @@ fun SocialUserAvatar(
 }
 
 @Composable
+// Ejecuta la lógica de avatar fallback.
 private fun AvatarFallback(
     initial: String,
     accent: Color

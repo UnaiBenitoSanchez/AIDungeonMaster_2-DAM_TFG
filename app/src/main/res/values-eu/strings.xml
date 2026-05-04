@@ -6,7 +6,6 @@
     <string name="language_basque">Euskera</string>
     <string name="language_german">Deutsch</string>
     <string name="language_french">Français</string>
-    <string name="language_galician">Galiziera</string>
     <string name="common_back">Itzuli</string>
     <string name="common_close">Itxi</string>
     <string name="common_cancel">Utzi</string>
@@ -30,6 +29,12 @@
     <string name="common_you">Zu</string>
     <string name="common_unknown">Ezezaguna</string>
     <string name="common_no_data">Daturik ez</string>
+    <string name="common_explore">Esploratu</string>
+    <string name="common_profile">Nire profila</string>
+    <string name="common_search_users">Bilatu erabiltzaileak</string>
+    <string name="common_friend_requests">Adiskidetasun eskaerak</string>
+    <string name="common_friends_list">Lagunen zerrenda</string>
+    <string name="common_social_area">Gune soziala</string>
     <string name="home_title_characters">Zure pertsonaiak</string>
     <string name="home_more_options">Aukera gehiago</string>
     <string name="home_view_tutorial">Ikusi tutoriala</string>
@@ -116,6 +121,10 @@
     <string name="guild_details_member">Kidea</string>
     <string name="guild_details_lead">Lideratu</string>
     <string name="guild_details_knocked_out">KO</string>
+    <string name="guild_details_overview">Ikuspegi orokorra</string>
+    <string name="guild_details_leader_badge">Buruzagia: %1$s</string>
+    <string name="guild_details_guild_full">Gremioa beteta</string>
+    <string name="guild_details_join_guild">Sartu gremioan</string>
     <string name="bestiary_title">Bestiarioa</string>
     <string name="bestiary_filter_all">Guztiak</string>
     <string name="bestiary_filter_defeated">Garaituak</string>
@@ -169,4 +178,5 @@
     <string name="bestiary_loot_detail_line">Kategoria: %1$s · Ikusitako gehieneko kopurua: %2$d · Ikusitako aldiz: %3$d</string>
     <string name="bestiary_registered_loot">Erregistratutako loot-a</string>
     <string name="bestiary_no_confirmed_loot">Oraindik ez dago izaki honentzako baieztatutako botinik.</string>
+    <string name="language_galician">Galiziera</string>
 </resources>

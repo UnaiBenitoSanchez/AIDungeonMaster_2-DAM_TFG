@@ -47,6 +47,7 @@ private val OrangeProgress = Color(0xFFFF9800)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+// Ejecuta la lógica de achievements screen.
 fun AchievementsScreen(
     viewModel: AchievementViewModel,
     onBack: () -> Unit
@@ -136,6 +137,7 @@ fun AchievementsScreen(
 // ── Stats header ──────────────────────────────────────────────────────────────
 
 @Composable
+// Ejecuta la lógica de achievement stats header.
 private fun AchievementStatsHeader(
     unlockedCount: Int,
     totalCount: Int,
@@ -157,6 +159,7 @@ private fun AchievementStatsHeader(
 }
 
 @Composable
+// Ejecuta la lógica de stat pill.
 private fun StatPill(emoji: String, label: String, value: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(emoji, fontSize = 22.sp)
@@ -168,6 +171,7 @@ private fun StatPill(emoji: String, label: String, value: String) {
 // ── Pestaña Logros ────────────────────────────────────────────────────────────
 
 @Composable
+// Ejecuta la lógica de achievements tab.
 private fun AchievementsTab(
     achievements: List<Achievement>,
     selectedCategory: AchievementCategory?,
@@ -221,6 +225,7 @@ private fun AchievementsTab(
 }
 
 @Composable
+// Ejecuta la lógica de achievement card.
 private fun AchievementCard(achievement: Achievement) {
     val bgColor by animateColorAsState(
         targetValue = if (achievement.isUnlocked) CardUnlocked else CardLocked,
@@ -312,6 +317,7 @@ private fun AchievementCard(achievement: Achievement) {
 // ── Pestaña Misiones ──────────────────────────────────────────────────────────
 
 @Composable
+// Ejecuta la lógica de quests tab.
 private fun QuestsTab(quests: List<Quest>, onAccept: (String) -> Unit) {
     val inProgress = quests.filter { it.status == QuestStatus.IN_PROGRESS }
     val available  = quests.filter { it.status == QuestStatus.AVAILABLE }
@@ -348,6 +354,7 @@ private fun QuestsTab(quests: List<Quest>, onAccept: (String) -> Unit) {
 }
 
 @Composable
+// Ejecuta la lógica de section header.
 private fun SectionHeader(title: String, color: Color) {
     Text(
         title,
@@ -359,6 +366,7 @@ private fun SectionHeader(title: String, color: Color) {
 }
 
 @Composable
+// Ejecuta la lógica de quest card.
 private fun QuestCard(quest: Quest, onAccept: (String) -> Unit) {
     val isCompleted  = quest.status == QuestStatus.COMPLETED
     val isInProgress = quest.status == QuestStatus.IN_PROGRESS
@@ -434,6 +442,7 @@ private fun QuestCard(quest: Quest, onAccept: (String) -> Unit) {
 }
 
 @Composable
+// Ejecuta la lógica de objective row.
 private fun ObjectiveRow(description: String, current: Int, target: Int, done: Boolean) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(

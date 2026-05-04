@@ -78,6 +78,7 @@ import com.example.aidungeonmaster.ui.settings.ColorBlindSettingsSheet
 
 @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
 @Composable
+// Ejecuta la lógica de usability assistant overlay.
 fun UsabilityAssistantOverlay(
     navController: NavHostController,
     currentRoute: String?,
@@ -257,6 +258,7 @@ fun UsabilityAssistantOverlay(
 }
 
 @Composable
+// Ejecuta la lógica de voice status pill.
 private fun VoiceStatusPill(
     state: VoiceControlUiState,
     modifier: Modifier = Modifier
@@ -291,6 +293,7 @@ private fun VoiceStatusPill(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+// Ejecuta la lógica de usability settings sheet.
 private fun UsabilitySettingsSheet(
     currentColorBlindType: ColorBlindType,
     voiceEnabled: Boolean,
@@ -483,6 +486,7 @@ private fun UsabilitySettingsSheet(
 }
 
 @Composable
+// Ejecuta la lógica de color blind choice row.
 private fun ColorBlindChoiceRow(
     type: ColorBlindType,
     selected: Boolean,
@@ -535,6 +539,7 @@ private fun ColorBlindChoiceRow(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+// Ejecuta la lógica de accessibility options sheet.
 private fun AccessibilityOptionsSheet(
     currentColorBlindType: ColorBlindType,
     voiceEnabled: Boolean,

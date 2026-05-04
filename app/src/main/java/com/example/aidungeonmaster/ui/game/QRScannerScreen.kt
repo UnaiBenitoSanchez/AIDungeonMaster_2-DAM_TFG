@@ -90,6 +90,7 @@ private val BANK_KEYWORDS = mapOf(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+// Ejecuta la lógica de qrscanner screen.
 fun QRScannerScreen(
     gameId: String,
     onBack: () -> Unit,
@@ -394,6 +395,7 @@ fun QRScannerScreen(
 // ── ANALIZADOR DE FRAMES COMBINADO (QR + TEXTO) ───────────────────────────────
 
 @androidx.annotation.OptIn(ExperimentalGetImage::class)
+// Ejecuta la lógica de analyze frame.
 private fun analyzeFrame(
     proxy: ImageProxy,
     onQrFound: (String) -> Unit,
@@ -408,6 +410,7 @@ private fun analyzeFrame(
     val image = InputImage.fromMediaImage(mediaImage, proxy.imageInfo.rotationDegrees)
 
     var pending = 2
+    // Ejecuta la lógica de try close.
     fun tryClose() {
         if (--pending <= 0) proxy.close()
     }
@@ -510,6 +513,7 @@ private fun parseQrToItem(content: String): Item? {
     }
 }
 
+// Ejecuta la lógica de normalize item type.
 private fun normalizeItemType(raw: String): String = when (raw.lowercase().trim()) {
     "pocion", "poción", "potion", "bebida", "elixir" -> "pocion"
     "arma", "weapon", "espada", "hacha", "daga", "arco", "lanza" -> "arma"
@@ -522,6 +526,7 @@ private fun normalizeItemType(raw: String): String = when (raw.lowercase().trim(
     else -> "consumible"
 }
 
+// Ejecuta la lógica de default effect for type.
 private fun defaultEffectForType(type: String): String = when (type) {
     "pocion" -> "cura:1d8+2"
     "arma" -> "daño:1d6"
@@ -535,6 +540,7 @@ private fun defaultEffectForType(type: String): String = when (type) {
 // ── DIÁLOGO DE BOTÍN ──────────────────────────────────────────────────────────
 
 @Composable
+// Ejecuta la lógica de botin encontrado dialog.
 fun BotinEncontradoDialog(
     item: Item,
     isSaving: Boolean,

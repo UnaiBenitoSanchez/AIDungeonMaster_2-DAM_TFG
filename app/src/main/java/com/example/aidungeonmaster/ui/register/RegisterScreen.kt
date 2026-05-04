@@ -67,6 +67,7 @@ import com.example.aidungeonmaster.viewmodel.AuthViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+// Ejecuta la lógica de register screen.
 fun RegisterScreen(
     navController: NavController,
     viewModel: AuthViewModel = viewModel()
@@ -79,6 +80,7 @@ fun RegisterScreen(
 
     val context = LocalContext.current
 
+    // Ejecuta la lógica de submit register.
     fun submitRegister() {
         when {
             displayName.isBlank() -> viewModel.errorMessage = "Introduce un nombre visible."

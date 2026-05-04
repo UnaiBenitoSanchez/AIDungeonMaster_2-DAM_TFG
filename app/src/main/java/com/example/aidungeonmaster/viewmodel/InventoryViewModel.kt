@@ -18,6 +18,7 @@ import kotlinx.coroutines.tasks.await
 import com.example.aidungeonmaster.data.model.ItemEnchantment
 import com.example.aidungeonmaster.data.model.normalizeEquipSlot
 import com.example.aidungeonmaster.data.model.LocationLifeState
+// Clase que encapsula la lógica de stat comparison line.
 data class StatComparisonLine(
     val label: String,
     val current: Int,
@@ -26,6 +27,7 @@ data class StatComparisonLine(
     val delta: Int get() = projected - current
 }
 
+// Clase que encapsula la lógica de item comparison.
 data class ItemComparison(
     val slot: String,
     val replacedItemName: String?,
@@ -34,6 +36,7 @@ data class ItemComparison(
     val lines: List<StatComparisonLine>
 )
 
+// ViewModel que coordina el estado y la lógica de inventory.
 class InventoryViewModel : ViewModel() {
     private val db = FirebaseFirestore.getInstance()
 
@@ -46,6 +49,7 @@ class InventoryViewModel : ViewModel() {
     private val _levelUpEvent = MutableSharedFlow<Int>(replay = 0, extraBufferCapacity = 1)
     val levelUpEvent = _levelUpEvent.asSharedFlow()
 
+    // Obtiene item comparison.
     fun getItemComparison(item: Item): ItemComparison? {
         val char = _character.value ?: return null
         if (!item.isEquippable) return null
@@ -77,6 +81,7 @@ class InventoryViewModel : ViewModel() {
         )
     }
 
+    // Ejecuta la lógica de resolve actual equip slot.
     private fun resolveActualEquipSlot(char: Character, item: Item): String {
         return when (item.resolvedEquipSlot) {
             "ring" -> {
@@ -90,6 +95,7 @@ class InventoryViewModel : ViewModel() {
         }
     }
 
+    // Ejecuta la lógica de project character with item.
     private fun projectCharacterWithItem(char: Character, item: Item): Character {
 
         val slot = resolveActualEquipSlot(char, item)
@@ -253,6 +259,7 @@ class InventoryViewModel : ViewModel() {
         }
     }
 
+    // Ejecuta la lógica de unequip item.
     fun unequipItem(gameId: String, slot: String, onResult: (String) -> Unit = {}) {
         viewModelScope.launch {
             try {
@@ -429,6 +436,7 @@ class InventoryViewModel : ViewModel() {
         }
     }
 
+    // Carga current location life state.
     suspend fun loadCurrentLocationLifeState(gameId: String): LocationLifeState? {
         return try {
             val doc = db.collection("partidas")
@@ -451,6 +459,7 @@ class InventoryViewModel : ViewModel() {
         }
     }
 
+    // Ejecuta la lógica de map.
     private fun Map<String, Any>.toLocationLifeState(locationId: String): LocationLifeState =
         LocationLifeState(
             locationId = this["locationId"] as? String ?: locationId,
@@ -463,6 +472,7 @@ class InventoryViewModel : ViewModel() {
             lastEventSummary = this["lastEventSummary"] as? String ?: "",
             lastUpdatedAt = (this["lastUpdatedAt"] as? Number)?.toLong() ?: System.currentTimeMillis()
         )
+    // Ejecuta la lógica de add shop reputation.
     suspend fun addShopReputation(gameId: String, shopKey: String, points: Int = 10): Int {
         return try {
             val snap = db.collection("partidas").document(gameId).get().await()
@@ -501,6 +511,7 @@ class InventoryViewModel : ViewModel() {
         }
     }
 
+    // Registra bank pin.
     suspend fun registerBankPin(gameId: String, pin: String): Boolean {
         if (!pin.matches(Regex("""\d{4}"""))) return false
         return try {
@@ -524,6 +535,7 @@ class InventoryViewModel : ViewModel() {
         }
     }
 
+    // Ejecuta la lógica de verify bank pin.
     suspend fun verifyBankPin(gameId: String, pin: String): Boolean {
         return try {
             val snap = db.collection("bank_accounts").document(gameId).get().await()
@@ -534,6 +546,7 @@ class InventoryViewModel : ViewModel() {
         }
     }
 
+    // Ejecuta la lógica de deposit to bank.
     suspend fun depositToBank(gameId: String, amount: Int): Boolean {
         if (amount <= 0) return false
         return try {
@@ -568,6 +581,7 @@ class InventoryViewModel : ViewModel() {
         }
     }
 
+    // Ejecuta la lógica de withdraw from bank.
     suspend fun withdrawFromBank(gameId: String, amount: Int): Boolean {
         if (amount <= 0) return false
         return try {
@@ -602,6 +616,7 @@ class InventoryViewModel : ViewModel() {
         }
     }
 
+    // Ejecuta la lógica de spend coins.
     suspend fun spendCoins(gameId: String, amount: Int): Boolean {
         return try {
             val snap = FirebaseFirestore.getInstance()
@@ -684,6 +699,7 @@ class InventoryViewModel : ViewModel() {
         }
     }
 
+    // Ejecuta la lógica de sell item.
     fun sellItem(gameId: String, item: Item, onResult: (String) -> Unit = {}) {
         viewModelScope.launch {
             try {
@@ -831,9 +847,11 @@ class InventoryViewModel : ViewModel() {
         }
     }
 
+    // Analiza equipped items.
     private fun parseEquippedItems(raw: Any?): EquippedItems {
         val map = raw as? Map<*, *> ?: return EquippedItems()
 
+        // Analiza slot.
         fun parseSlot(vararg keys: String): Item? {
             val rawItem = keys
                 .asSequence()
@@ -856,6 +874,7 @@ class InventoryViewModel : ViewModel() {
         )
     }
 
+    // Analiza item map.
     private fun parseItemMap(m: Map<*, *>): Item {
         val statBonusesRaw = m["statBonuses"] as? Map<*, *>
         val statBonuses = statBonusesRaw
@@ -912,6 +931,7 @@ class InventoryViewModel : ViewModel() {
         )
     }
 
+    // Ejecuta la lógica de enchantment to map.
     private fun enchantmentToMap(enchantment: ItemEnchantment): Map<String, Any> {
         val out = mutableMapOf<String, Any>(
             "id" to enchantment.id,
@@ -927,6 +947,7 @@ class InventoryViewModel : ViewModel() {
         return out
     }
 
+    // Ejecuta la lógica de item to map.
     private fun itemToMap(item: Item): Map<String, Any> {
         val out = mutableMapOf<String, Any>(
             "id" to item.id.ifBlank { System.currentTimeMillis().toString() },
@@ -955,6 +976,7 @@ class InventoryViewModel : ViewModel() {
         return out
     }
 
+    // Ejecuta la lógica de equipped items to map.
     private fun equippedItemsToMap(equipment: EquippedItems): Map<String, Any> {
         val out = mutableMapOf<String, Any>()
 
@@ -997,6 +1019,7 @@ class InventoryViewModel : ViewModel() {
         ).await()
     }
 
+    // Elimina matching item.
     private fun removeMatchingItem(
         items: MutableList<Item>,
         target: Item
@@ -1009,6 +1032,7 @@ class InventoryViewModel : ViewModel() {
         return items
     }
 
+    // Calcula sell price.
     private fun calculateSellPrice(item: Item): Int {
         val rarityValue = when (item.rarity.lowercase()) {
             "legendary" -> 80
@@ -1071,6 +1095,7 @@ class InventoryViewModel : ViewModel() {
         }
     }
 
+    // Mapea from any.
     private fun mapFromAny(raw: Any?): Map<String, Int> {
         val map = raw as? Map<*, *> ?: return emptyMap()
         return map.mapNotNull { (k, v) ->
@@ -1080,6 +1105,7 @@ class InventoryViewModel : ViewModel() {
         }.toMap()
     }
 
+    // Ejecuta la lógica de normalize stats.
     private fun normalizeStats(raw: Map<String, Int>): Map<String, Int> {
         return buildMap {
             put("Fuerza", raw["Fuerza"] ?: raw["fuerza"] ?: 10)
@@ -1097,6 +1123,7 @@ class InventoryViewModel : ViewModel() {
         }
     }
 
+    // Ejecuta la lógica de friendly slot name.
     private fun friendlySlotName(slot: String): String = when (slot.lowercase()) {
         "head" -> "cabeza"
         "chest" -> "pecho"
@@ -1110,6 +1137,7 @@ class InventoryViewModel : ViewModel() {
         else -> slot
     }
 
+    // Ejecuta la lógica de extract healing expression.
     private fun extractHealingExpression(item: Item): String {
         val candidates = listOf(item.effect, item.description, item.name)
         val diceRegex = Regex("""(\d*d\d+(?:\+\d+)?)""", RegexOption.IGNORE_CASE)

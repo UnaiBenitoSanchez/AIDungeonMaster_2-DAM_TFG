@@ -29,6 +29,12 @@
     <string name="common_you">Du</string>
     <string name="common_unknown">Unbekannt</string>
     <string name="common_no_data">Keine Daten</string>
+    <string name="common_explore">Erkunden</string>
+    <string name="common_profile">Mein Profil</string>
+    <string name="common_search_users">Benutzer suchen</string>
+    <string name="common_friend_requests">Freundschaftsanfragen</string>
+    <string name="common_friends_list">Freundesliste</string>
+    <string name="common_social_area">Sozialbereich</string>
     <string name="home_title_characters">Deine Charaktere</string>
     <string name="home_more_options">Mehr Optionen</string>
     <string name="home_view_tutorial">Tutorial ansehen</string>
@@ -115,6 +121,10 @@
     <string name="guild_details_member">Mitglied</string>
     <string name="guild_details_lead">Ernennen</string>
     <string name="guild_details_knocked_out">KO</string>
+    <string name="guild_details_overview">Überblick</string>
+    <string name="guild_details_leader_badge">Anführer: %1$s</string>
+    <string name="guild_details_guild_full">Gilde voll</string>
+    <string name="guild_details_join_guild">Gilde beitreten</string>
     <string name="bestiary_title">Bestiarium</string>
     <string name="bestiary_filter_all">Alle</string>
     <string name="bestiary_filter_defeated">Besiegt</string>

@@ -74,6 +74,7 @@ private val GreenSuccess = Color(0xFF4CAF50)
 private val DarkGreen = Color(0xFF102814)
 
 @Composable
+// Ejecuta la lógica de achievement toast.
 fun AchievementToast(
     achievement: Achievement?,
     onDismiss: () -> Unit
@@ -100,6 +101,7 @@ fun AchievementToast(
 }
 
 @Composable
+// Ejecuta la lógica de achievement unlocked overlay.
 private fun AchievementUnlockedOverlay(
     visible: Boolean,
     animationKey: Int,
@@ -276,6 +278,7 @@ private fun AchievementUnlockedOverlay(
 }
 
 @Composable
+// Ejecuta la lógica de achievement icon.
 private fun AchievementIcon(
     emoji: String,
     glow: Float,
@@ -324,6 +327,7 @@ private fun AchievementIcon(
 }
 
 @Composable
+// Ejecuta la lógica de reward pill.
 private fun RewardPill(
     xpReward: Int
 ) {
@@ -354,6 +358,7 @@ private fun RewardPill(
 }
 
 @Composable
+// Ejecuta la lógica de shine band.
 private fun ShineBand(
     progress: Float,
     modifier: Modifier = Modifier
@@ -379,6 +384,7 @@ private fun ShineBand(
 }
 
 @Composable
+// Ejecuta la lógica de confetti layer.
 private fun ConfettiLayer(
     key: Int,
     modifier: Modifier = Modifier
@@ -444,6 +450,7 @@ private fun ConfettiLayer(
     }
 }
 
+// Clase que encapsula la lógica de confetti piece.
 private data class ConfettiPiece(
     val x: Float,
     val y: Float,
@@ -456,6 +463,7 @@ private data class ConfettiPiece(
  * Toast similar para misiones completadas, con estilo mejorado.
  */
 @Composable
+// Ejecuta la lógica de quest completed toast.
 fun QuestCompletedToast(
     quest: Quest?,
     onDismiss: () -> Unit

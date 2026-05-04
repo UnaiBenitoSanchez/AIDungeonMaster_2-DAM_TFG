@@ -1,5 +1,6 @@
 package com.example.aidungeonmaster.data.model
 
+// Modelo de datos que representa app user.
 data class AppUser(
     val uid: String = "",
     val email: String = "",

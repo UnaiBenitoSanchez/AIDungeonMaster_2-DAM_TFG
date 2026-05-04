@@ -48,6 +48,7 @@ import java.text.Normalizer
 import java.util.Locale
 import kotlin.math.roundToInt
 
+// Clase que encapsula la lógica de tutorial step.
 data class TutorialStep(
     val targetKey: String,
     val title: String,
@@ -55,6 +56,7 @@ data class TutorialStep(
     @DrawableRes val mascotRes: Int
 )
 
+// Ejecuta la lógica de modifier.
 fun Modifier.tutorialAnchor(
     key: String,
     targets: SnapshotStateMap<String, Rect>
@@ -65,6 +67,7 @@ fun Modifier.tutorialAnchor(
 )
 
 @Composable
+// Ejecuta la lógica de dragon tutorial overlay.
 fun DragonTutorialOverlay(
     visible: Boolean,
     steps: List<TutorialStep>,
@@ -218,6 +221,7 @@ fun DragonTutorialOverlay(
         val screenWidthPx = with(density) { maxWidth.toPx() }
         val screenHeightPx = with(density) { maxHeight.toPx() }
 
+        // Ejecuta la lógica de safe coerce.
         fun safeCoerce(value: Float, min: Float, max: Float): Float {
             return if (max < min) min else value.coerceIn(min, max)
         }
@@ -548,6 +552,7 @@ fun DragonTutorialOverlay(
     }
 }
 
+// Ejecuta la lógica de string.
 private fun String.normalizedForTutorialVoice(): String {
     val withoutAccents = Normalizer.normalize(this, Normalizer.Form.NFD)
         .replace("\\p{Mn}+".toRegex(), "")
@@ -559,14 +564,17 @@ private fun String.normalizedForTutorialVoice(): String {
         .trim()
 }
 
+// Ejecuta la lógica de string.
 private fun String.containsAnyTutorial(vararg candidates: String): Boolean {
     return candidates.any { candidate -> contains(candidate.normalizedForTutorialVoice()) }
 }
 
+// Ejecuta la lógica de string.
 private fun String.startsWithAnyTutorial(vararg prefixes: String): Boolean {
     return prefixes.any { prefix -> startsWith(prefix.normalizedForTutorialVoice()) }
 }
 
+// Ejecuta la lógica de string.
 private fun String.extractTutorialPageNumber(): Int? {
     Regex("""\b(\d{1,2})\b""").find(this)?.groupValues?.getOrNull(1)?.toIntOrNull()?.let {
         return it

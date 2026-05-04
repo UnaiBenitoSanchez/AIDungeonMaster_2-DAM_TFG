@@ -44,6 +44,7 @@ import com.example.aidungeonmaster.viewmodel.SocialViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+// Ejecuta la lógica de user search screen.
 fun UserSearchScreen(
     onBack: () -> Unit,
     viewModel: SocialViewModel = viewModel()
@@ -212,6 +213,7 @@ fun UserSearchScreen(
 }
 
 @Composable
+// Ejecuta la lógica de user result card.
 private fun UserResultCard(
     user: AppUser,
     onSendRequest: () -> Unit

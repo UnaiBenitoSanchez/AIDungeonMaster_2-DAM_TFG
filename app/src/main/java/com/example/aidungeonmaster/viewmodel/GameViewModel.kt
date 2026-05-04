@@ -37,6 +37,7 @@ data class Enemy(
     val goldCoins: Int = 0   // Monedas que suelta al ser derrotado
 )
 
+// Clase que encapsula la lógica de adventure step.
 data class AdventureStep(
     val story: String = "",
     val options: List<String> = emptyList(),
@@ -99,6 +100,7 @@ class GameViewModel : ViewModel() {
     // ── INICIO / CARGA ────────────────────────────────────────────────────────
 
     @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
+    // Inicia story.
     fun startStory(userId: String, characterName: String, theme: String) {
         currentUserId        = userId
         currentCharacterName = characterName
@@ -135,6 +137,7 @@ class GameViewModel : ViewModel() {
     }
 
     @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
+    // Reinicia story.
     fun resetStory() {
         viewModelScope.launch {
             try {
@@ -154,12 +157,14 @@ class GameViewModel : ViewModel() {
     // ── ACCIONES DEL JUGADOR ─────────────────────────────────────────────────
 
     @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
+    // Envía player action.
     fun sendPlayerAction(action: String) {
         _messages.value = _messages.value + (playerLabel() to action)
         viewModelScope.launch { executeGroqCall("${playerActionPrefix()} $action") }
     }
 
     @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
+    // Envía custom action.
     fun sendCustomAction(action: String) {
         if (action.isBlank()) return
         _messages.value = _messages.value + (playerLabel() to action)
@@ -167,6 +172,7 @@ class GameViewModel : ViewModel() {
     }
 
     @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
+    // Ejecuta la lógica de notify combat end.
     fun notifyCombatEnd(victory: Boolean, enemyName: String) {
         val msg = if (victory)
             "He derrotado a $enemyName en combate épico."
@@ -177,6 +183,7 @@ class GameViewModel : ViewModel() {
             ?.copy(combatStarted = false, enemy = null)
     }
 
+    // Elimina current character after death.
     fun deleteCurrentCharacterAfterDeath(
         onDeleted: () -> Unit,
         onError: (String) -> Unit
@@ -214,6 +221,7 @@ class GameViewModel : ViewModel() {
     }
 
     @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
+    // Ejecuta la lógica de notify combat fled.
     fun notifyCombatFled(enemyName: String) {
         val msg = "He logrado huir del combate contra $enemyName. Continúa la historia desde mi estado actual, teniendo en cuenta que escapé malherido o con prisa."
         sendPlayerAction(msg)
@@ -301,6 +309,7 @@ class GameViewModel : ViewModel() {
         } catch (e: Exception) { null }
     }
 
+    // Ejecuta la lógica de extract json object.
     private fun extractJsonObject(text: String): String? {
         val start = text.indexOf('{')
         if (start == -1) return null
@@ -318,6 +327,7 @@ class GameViewModel : ViewModel() {
         return null
     }
 
+    // Ejecuta la lógica de repair json.
     private fun repairJson(raw: String): String {
         var s = raw.trim()
         if (!s.startsWith("{")) s = "{$s"
@@ -326,6 +336,7 @@ class GameViewModel : ViewModel() {
         return s
     }
 
+    // Ejecuta la lógica de extract story fallback.
     private fun extractStoryFallback(raw: String): AdventureStep {
         val storyRegex = Regex(""""story"\s*:\s*"((?:[^"\\]|\\.)*)"""")
         val storyMatch = storyRegex.find(raw)
@@ -353,6 +364,7 @@ class GameViewModel : ViewModel() {
         }
     }
 
+    // Ejecuta la lógica de show error.
     private fun showError(msg: String) {
         _messages.value = _messages.value + ("DM" to msg)
     }
@@ -412,9 +424,11 @@ Reglas:
         }
     }
 
+    // Obtiene initial prompt.
     private fun getInitialPrompt(name: String, theme: String): String =
         "${languageInstruction()} Inicia la aventura de $theme para el héroe llamado $name. Presenta el escenario de forma épica y ofrece 3 opciones iniciales. Si el inicio tiene un lugar concreto, inclúyelo en locationJson."
 
+    // Ejecuta la lógica de language instruction.
     private fun languageInstruction(): String = when (Locale.getDefault().language) {
         "en" -> "Use English for every user-facing value: story, options, enemy names, item names, item descriptions and location descriptions. Keep JSON field names exactly as specified."
         "ca" -> "Usa català per a tots els valors visibles: story, options, noms d'enemics, objectes, descripcions i ubicacions. Mantén els noms dels camps JSON exactament igual."
@@ -425,6 +439,7 @@ Reglas:
         else -> "Usa español para todos los valores visibles: story, options, nombres de enemigos, objetos, descripciones y ubicaciones. Mantén exactamente los nombres de los campos JSON."
     }
 
+    // Ejecuta la lógica de player action prefix.
     private fun playerActionPrefix(): String = when (Locale.getDefault().language) {
         "en" -> "The player decides:"
         "ca" -> "El jugador decideix:"
@@ -435,6 +450,7 @@ Reglas:
         else -> "El jugador decide:"
     }
 
+    // Ejecuta la lógica de player label.
     private fun playerLabel(): String = when (Locale.getDefault().language) {
         "en" -> "You"
         "ca" -> "Tu"
@@ -475,6 +491,8 @@ Reglas:
 
     private val _pendingXp = MutableStateFlow(0)
     val pendingXp = _pendingXp.asStateFlow()
+    // Ejecuta la lógica de add pending xp.
     fun addPendingXp(xp: Int) { _pendingXp.value += xp }
+    // Ejecuta la lógica de consume pending xp.
     fun consumePendingXp() { _pendingXp.value = 0 }
 }

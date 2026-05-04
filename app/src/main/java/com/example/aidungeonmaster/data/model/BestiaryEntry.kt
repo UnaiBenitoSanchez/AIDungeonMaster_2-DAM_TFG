@@ -1,5 +1,6 @@
 package com.example.aidungeonmaster.data.model
 
+// Clase que encapsula la lógica de monster stat snapshot.
 data class MonsterStatSnapshot(
     val hpMaxObserved: Int = 0,
     val armorClassObserved: Int? = null,
@@ -7,6 +8,7 @@ data class MonsterStatSnapshot(
     val abilitiesSeen: List<String> = emptyList()
 )
 
+// Clase que encapsula la lógica de bestiary loot.
 data class BestiaryLoot(
     val name: String = "",
     val category: String = "desconocido",
@@ -15,6 +17,7 @@ data class BestiaryLoot(
     val timesDropped: Int = 1
 )
 
+// Modelo de datos que representa bestiary entry.
 data class BestiaryEntry(
     val monsterId: String = "",
     val name: String = "",

@@ -48,6 +48,7 @@ import java.text.Normalizer
 // ── BOTÓN FLOTANTE PARA ABRIR EL MAPA ────────────────────────────────────────
 
 @Composable
+// Ejecuta la lógica de world map fab.
 fun WorldMapFab(
     mapViewModel: WorldMapViewModel = viewModel(),
     onOpenAR: () -> Unit = {},
@@ -113,6 +114,7 @@ fun WorldMapFab(
 // ── DIALOG DEL MAPA ───────────────────────────────────────────────────────────
 
 @Composable
+// Ejecuta la lógica de world map dialog.
 fun WorldMapDialog(
     mapState: WorldMapState,
     onDismiss: () -> Unit,
@@ -274,6 +276,7 @@ fun WorldMapDialog(
 // ── LIENZO DEL MAPA ───────────────────────────────────────────────────────────
 
 @Composable
+// Ejecuta la lógica de world map canvas.
 fun WorldMapCanvas(
     mapState: WorldMapState,
     selectedLocation: WorldLocation?,
@@ -354,6 +357,7 @@ fun WorldMapCanvas(
     }
 }
 
+// Clase que encapsula la lógica de map backdrop palette.
 private data class MapBackdropPalette(
     val top: Color,
     val mid: Color,
@@ -362,6 +366,7 @@ private data class MapBackdropPalette(
     val terrainType: String
 )
 
+// Ejecuta la lógica de resolve map backdrop.
 private fun resolveMapBackdrop(locations: List<WorldLocation>): MapBackdropPalette {
     val current = locations.find { it.isCurrentLocation }?.type?.normalizeBiome()
     val dominant = current ?: locations
@@ -431,6 +436,7 @@ private fun resolveMapBackdrop(locations: List<WorldLocation>): MapBackdropPalet
     }
 }
 
+// Ejecuta la lógica de string.
 private fun String.normalizeBiome(): String {
     val normalized = Normalizer.normalize(lowercase().trim(), Normalizer.Form.NFD)
         .replace(Regex("\\p{InCombiningDiacriticalMarks}+"), "")
@@ -449,6 +455,7 @@ private fun String.normalizeBiome(): String {
 }
 
 
+// Ejecuta la lógica de draw scope.
 private fun DrawScope.drawMapBackground(scope: DrawScope, palette: MapBackdropPalette) {
     val vignette = Brush.radialGradient(
         colorStops = arrayOf(
@@ -461,6 +468,7 @@ private fun DrawScope.drawMapBackground(scope: DrawScope, palette: MapBackdropPa
 }
 
 
+// Ejecuta la lógica de draw scope.
 private fun DrawScope.drawMapTerrainHints(scope: DrawScope, palette: MapBackdropPalette) {
     when (palette.terrainType) {
         "waves", "lake" -> {
@@ -531,6 +539,7 @@ private fun DrawScope.drawMapTerrainHints(scope: DrawScope, palette: MapBackdrop
     }
 }
 
+// Ejecuta la lógica de draw scope.
 private fun DrawScope.drawMapGrid(scope: DrawScope) {
     val gridColor = Color(0x15FFFFFF)
     val step = size.width / 8f
@@ -547,6 +556,7 @@ private fun DrawScope.drawMapGrid(scope: DrawScope) {
     }
 }
 
+// Ejecuta la lógica de draw scope.
 private fun DrawScope.drawLocationPaths(locations: List<WorldLocation>) {
     if (locations.size < 2) return
     val pathColor = Color(0x40FFD700)
@@ -563,6 +573,7 @@ private fun DrawScope.drawLocationPaths(locations: List<WorldLocation>) {
     }
 }
 
+// Ejecuta la lógica de draw scope.
 private fun DrawScope.drawMapLocationMarker(
     location: WorldLocation,
     isSelected: Boolean
@@ -623,6 +634,7 @@ private fun DrawScope.drawMapLocationMarker(
 // ── MARCADOR DE UBICACIÓN ─────────────────────────────────────────────────────
 
 @Composable
+// Ejecuta la lógica de location marker.
 fun LocationMarker(
     location: WorldLocation,
     isSelected: Boolean,
@@ -672,6 +684,7 @@ fun LocationMarker(
 // ── DETALLE DEL LUGAR SELECCIONADO ───────────────────────────────────────────
 
 @Composable
+// Ejecuta la lógica de location detail card.
 fun LocationDetailCard(
     location: WorldLocation,
     worldState: LocationLifeState? = null,
@@ -815,6 +828,7 @@ fun LocationDetailCard(
 // ── LEYENDA ───────────────────────────────────────────────────────────────────
 
 @Composable
+// Ejecuta la lógica de location legend.
 fun LocationLegend(
     locations: List<WorldLocation>,
     onLocationClick: (WorldLocation) -> Unit,
@@ -864,6 +878,7 @@ fun LocationLegend(
 // ── PLACEHOLDER CUANDO NO HAY LUGARES ────────────────────────────────────────
 
 @Composable
+// Ejecuta la lógica de empty map placeholder.
 fun EmptyMapPlaceholder() {
     Box(
         modifier         = Modifier.fillMaxSize(),

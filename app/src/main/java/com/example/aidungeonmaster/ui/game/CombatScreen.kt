@@ -49,6 +49,7 @@ private val AbilityBg = Color(0xFF1A1A2E)
 private val WeaponBg = Color(0xFF2A1010)
 
 @Composable
+// Ejecuta la lógica de combat screen.
 fun CombatScreen(
     gameViewModel: GameViewModel,
     inventoryViewModel: InventoryViewModel,
@@ -94,6 +95,7 @@ fun CombatScreen(
 }
 
 @Composable
+// Ejecuta la lógica de combat screen ready.
 private fun CombatScreenReady(
     enemy: Enemy,
     character: com.example.aidungeonmaster.data.model.Character,
@@ -124,6 +126,7 @@ private fun CombatScreenReady(
 }
 
 @Composable
+// Ejecuta la lógica de combat content.
 private fun CombatContent(
     combatVm: CombatViewModel,
     enemyHpMax: Int,
@@ -238,6 +241,7 @@ private fun CombatContent(
 }
 
 @Composable
+// Ejecuta la lógica de enemy zone.
 private fun EnemyZone(
     enemyName: String,
     imageUrl: String,
@@ -337,6 +341,7 @@ private fun EnemyZone(
     }
 }
 
+// Ejecuta la lógica de enemy emoji.
 private fun enemyEmoji(name: String): String = when {
     name.contains("dragón", true) || name.contains("dragon", true) -> "🐉"
     name.contains("esqueleto", true) || name.contains("skeleton", true) -> "💀"
@@ -352,6 +357,7 @@ private fun enemyEmoji(name: String): String = when {
 }
 
 @Composable
+// Ejecuta la lógica de combat log panel.
 private fun CombatLogPanel(entries: List<CombatLogEntry>, modifier: Modifier = Modifier) {
     val listState = rememberLazyListState()
 
@@ -378,6 +384,7 @@ private fun CombatLogPanel(entries: List<CombatLogEntry>, modifier: Modifier = M
 }
 
 @Composable
+// Ejecuta la lógica de combat log line.
 private fun CombatLogLine(entry: CombatLogEntry) {
     val color = when (entry.type) {
         LogType.PLAYER_HIT -> Color(0xFF88FF88)
@@ -400,6 +407,7 @@ private fun CombatLogLine(entry: CombatLogEntry) {
 }
 
 @Composable
+// Ejecuta la lógica de player zone.
 private fun PlayerZone(
     hpCurrent: Int,
     hpMax: Int,
@@ -490,6 +498,7 @@ private fun PlayerZone(
 }
 
 @Composable
+// Ejecuta la lógica de weapon button.
 private fun WeaponButton(
     weapon: com.example.aidungeonmaster.data.model.Item,
     enabled: Boolean,
@@ -537,6 +546,7 @@ private fun WeaponButton(
 }
 
 @Composable
+// Ejecuta la lógica de ability button.
 private fun AbilityButton(
     ability: ClassAbility,
     cooldown: Int,
@@ -595,6 +605,7 @@ private fun AbilityButton(
 }
 
 @Composable
+// Ejecuta la lógica de combat hp bar.
 private fun CombatHpBar(
     hpCurrent: Int,
     hpMax: Int,
@@ -636,6 +647,7 @@ private fun CombatHpBar(
 }
 
 @Composable
+// Ejecuta la lógica de dice overlay.
 private fun DiceOverlay(dice: DiceAnimState) {
     val inf = rememberInfiniteTransition(label = "d_anim")
     val rot by inf.animateFloat(
@@ -727,6 +739,7 @@ private fun DiceOverlay(dice: DiceAnimState) {
 }
 
 @Composable
+// Ejecuta la lógica de combat end overlay.
 private fun CombatEndOverlay(
     phase: CombatPhase
 ) {
@@ -790,6 +803,7 @@ private fun CombatEndOverlay(
 }
 
 @Composable
+// Ejecuta la lógica de turn indicator.
 private fun TurnIndicator(phase: CombatPhase, modifier: Modifier = Modifier) {
     val (lbl, col) = when (phase) {
         CombatPhase.PLAYER_TURN -> "TU TURNO" to PlayerGreen
@@ -828,6 +842,7 @@ private fun TurnIndicator(phase: CombatPhase, modifier: Modifier = Modifier) {
 }
 
 @Composable
+// Ejecuta la lógica de pixel transition overlay.
 fun PixelTransitionOverlay(onComplete: () -> Unit) {
     val progress = remember { Animatable(0f) }
 

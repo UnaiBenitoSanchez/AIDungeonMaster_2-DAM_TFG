@@ -3,10 +3,12 @@ package com.example.aidungeonmaster.python
 import com.chaquo.python.Python
 import com.google.gson.Gson
 
+// Puente de integración para python journal.
 object PythonJournalBridge {
 
     private val gson = Gson()
 
+    // Ejecuta la lógica de summarize entries.
     fun summarizeEntries(entries: List<Map<String, Any?>>): String {
         return runCatching {
             val py = Python.getInstance()
@@ -18,6 +20,7 @@ object PythonJournalBridge {
         }
     }
 
+    // Ejecuta la lógica de summarize entries by chapter.
     fun summarizeEntriesByChapter(entries: List<Map<String, Any?>>): String {
         return runCatching {
             val py = Python.getInstance()
@@ -29,6 +32,7 @@ object PythonJournalBridge {
         }
     }
 
+    // Ejecuta la lógica de make chapter title.
     fun makeChapterTitle(entries: List<Map<String, Any?>>): String {
         return runCatching {
             val py = Python.getInstance()
@@ -40,6 +44,7 @@ object PythonJournalBridge {
         }
     }
 
+    // Ejecuta la lógica de rewrite epic.
     fun rewriteEpic(entry: Map<String, Any?>): String {
         return runCatching {
             val py = Python.getInstance()
@@ -51,6 +56,7 @@ object PythonJournalBridge {
         }
     }
 
+    // Construye repeat group key.
     fun buildRepeatGroupKey(entry: Map<String, Any?>): String {
         return runCatching {
             val py = Python.getInstance()

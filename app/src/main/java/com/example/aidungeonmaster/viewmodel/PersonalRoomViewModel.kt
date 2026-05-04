@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
+// ViewModel que coordina el estado y la lógica de personal room.
 class PersonalRoomViewModel : ViewModel() {
 
     private val db = FirebaseFirestore.getInstance()
@@ -23,6 +24,7 @@ class PersonalRoomViewModel : ViewModel() {
 
     private var currentCharId: String = ""
 
+    // Carga room.
     fun loadRoom(charId: String) {
         currentCharId = charId
         viewModelScope.launch {
@@ -68,6 +70,7 @@ class PersonalRoomViewModel : ViewModel() {
         }
     }
 
+    // Ejecuta la lógica de buy decoration.
     fun buyDecoration(
         charId: String,
         decorationId: String,
@@ -108,6 +111,7 @@ class PersonalRoomViewModel : ViewModel() {
         }
     }
 
+    // Ejecuta la lógica de place decoration.
     fun placeDecoration(
         decorationId: String,
         slotId: String,
@@ -176,6 +180,7 @@ class PersonalRoomViewModel : ViewModel() {
         )
     }
 
+    // Elimina decoration.
     fun removeDecoration(decorationId: String, onResult: (String) -> Unit = {}) {
         val state = _roomState.value
         val decoration = personalRoomDecorationById(decorationId)
@@ -197,6 +202,7 @@ class PersonalRoomViewModel : ViewModel() {
         onResult("↩️ ${decoration?.name ?: "Decoración"} retirada de $slotName.")
     }
 
+    // Elimina decoration from slot.
     fun removeDecorationFromSlot(slotId: String, onResult: (String) -> Unit = {}) {
         val placed = _roomState.value.placedDecorations.firstOrNull { it.slotId == slotId }
         if (placed == null) {
@@ -206,6 +212,7 @@ class PersonalRoomViewModel : ViewModel() {
         removeDecoration(placed.decorationId, onResult)
     }
 
+    // Ejecuta la lógica de persist current room.
     private fun persistCurrentRoom() {
         if (currentCharId.isBlank()) return
         viewModelScope.launch {

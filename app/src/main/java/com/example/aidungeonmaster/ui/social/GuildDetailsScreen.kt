@@ -87,10 +87,12 @@ import java.util.Locale
 
 private const val MAX_GUILD_MEMBERS = 15
 
+// Clase que encapsula la lógica de guild details screen tab.
 private enum class GuildDetailsScreenTab {
     RESUMEN, CHAT, MIEMBROS, JEFE_FINAL
 }
 
+// Ejecuta la lógica de string.
 private fun String.toGuildDetailsTab(): GuildDetailsScreenTab {
     return when (trim().lowercase(Locale.getDefault())) {
         "chat" -> GuildDetailsScreenTab.CHAT
@@ -102,6 +104,7 @@ private fun String.toGuildDetailsTab(): GuildDetailsScreenTab {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+// Ejecuta la lógica de guild details screen.
 fun GuildDetailsScreen(
     guildId: String,
     initialTab: String = "resumen",
@@ -192,6 +195,7 @@ fun GuildDetailsScreen(
     val latestHasNavigatedToBossBattleState = rememberUpdatedState(hasNavigatedToBossBattle)
     val latestSelectedTabState = rememberUpdatedState(selectedTab)
 
+    // Ejecuta la lógica de cleanup boss waiting room if needed.
     fun cleanupBossWaitingRoomIfNeeded(navigatingToBattle: Boolean = false) {
         val currentRoom = latestBossRoomState.value
         val amParticipant = latestBossParticipantsState.value.any { it.uid == latestCurrentUserUidState.value }
@@ -207,6 +211,7 @@ fun GuildDetailsScreen(
         }
     }
 
+    // Selecciona guild details tab.
     fun selectGuildDetailsTab(nextTab: GuildDetailsScreenTab) {
         if (selectedTab == GuildDetailsScreenTab.JEFE_FINAL && nextTab != GuildDetailsScreenTab.JEFE_FINAL) {
             cleanupBossWaitingRoomIfNeeded()
@@ -214,11 +219,13 @@ fun GuildDetailsScreen(
         selectedTab = nextTab
     }
 
+    // Abre boss battle from guild details.
     fun openBossBattleFromGuildDetails() {
         hasNavigatedToBossBattle = true
         onOpenBossBattle(currentGuild.id)
     }
 
+    // Gestiona guild details back.
     fun handleGuildDetailsBack() {
         cleanupBossWaitingRoomIfNeeded()
         onBack()
@@ -249,6 +256,7 @@ fun GuildDetailsScreen(
 
     var lastGuildVoiceFeedback by remember(currentGuild.id) { mutableStateOf("") }
 
+    // Actualiza guild color by voice.
     fun setGuildColorByVoice(value: String, isAccent: Boolean) {
         val color = findVoiceNamedColor(value)
 
@@ -1497,6 +1505,7 @@ fun GuildDetailsScreen(
 }
 
 @Composable
+// Ejecuta la lógica de guild details member row.
 private fun GuildDetailsMemberRow(
     member: GuildMemberSummary,
     accentColor: Color,
@@ -1565,6 +1574,7 @@ private fun GuildDetailsMemberRow(
 }
 
 @Composable
+// Ejecuta la lógica de guild details chat bubble.
 private fun GuildDetailsChatBubble(
     message: GuildChatMessage,
     isMine: Boolean
@@ -1651,6 +1661,7 @@ private fun GuildDetailsChatBubble(
 }
 
 @Composable
+// Ejecuta la lógica de guild details tab chip.
 private fun GuildDetailsTabChip(
     title: String,
     selected: Boolean,
@@ -1682,6 +1693,7 @@ private fun GuildDetailsTabChip(
 }
 
 @Composable
+// Ejecuta la lógica de guild details mini badge.
 private fun GuildDetailsMiniBadge(
     text: String,
     background: Color,
@@ -1702,6 +1714,7 @@ private fun GuildDetailsMiniBadge(
 }
 
 @Composable
+// Ejecuta la lógica de guild details info pill.
 private fun GuildDetailsInfoPill(
     label: String,
     value: String
@@ -1728,6 +1741,7 @@ private fun GuildDetailsInfoPill(
 }
 
 @Composable
+// Ejecuta la lógica de guild details empty block.
 private fun GuildDetailsEmptyBlock(
     text: String
 ) {
@@ -1752,6 +1766,7 @@ private fun GuildDetailsEmptyBlock(
 }
 
 @Composable
+// Ejecuta la lógica de guild details member avatar.
 private fun GuildDetailsMemberAvatar(
     photoUrl: String,
     displayName: String,
@@ -1766,6 +1781,7 @@ private fun GuildDetailsMemberAvatar(
     )
 }
 
+// Ejecuta la lógica de guild details format timestamp.
 private fun guildDetailsFormatTimestamp(timestamp: Long): String {
     if (timestamp <= 0L) return ""
     return try {
@@ -1775,6 +1791,7 @@ private fun guildDetailsFormatTimestamp(timestamp: Long): String {
     }
 }
 
+// Ejecuta la lógica de guild details parse color.
 private fun guildDetailsParseColor(value: String?): Color {
     return try {
         if (value.isNullOrBlank()) Color(0xFF6750A4)

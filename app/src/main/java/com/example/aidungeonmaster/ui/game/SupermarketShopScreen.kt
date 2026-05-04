@@ -53,6 +53,7 @@ enum class ReputationTier(
     VENERADO    ("Venerado",     "🤩", 200, 30, Color(0xFFFFD700));
 
     companion object {
+        // Ejecuta la lógica de from points.
         fun fromPoints(points: Int) = entries.lastOrNull { points >= it.minPoints }
             ?: DESCONOCIDO
     }
@@ -227,6 +228,7 @@ private val GENERIC_EXTRA = listOf(
     )
 )
 
+// Ejecuta la lógica de catalog for shop.
 fun catalogForShop(shopName: String): List<ShopItem> {
     val key = shopName.uppercase()
     val specialty = SPECIALTY_CATALOGS.entries
@@ -242,6 +244,7 @@ fun shopReputationKey(shopName: String): String =
 fun finalPrice(basePrice: Int, tier: ReputationTier): Int =
     (basePrice * (100 - tier.discountPct) / 100).coerceAtLeast(1)
 
+// Clase que encapsula la lógica de world shop modifiers.
 data class WorldShopModifiers(
     val state: LocationLifeState? = null,
     val priceMultiplier: Float = 1f,
@@ -249,6 +252,7 @@ data class WorldShopModifiers(
     val flavorText: String = ""
 )
 
+// Construye world shop modifiers.
 fun buildWorldShopModifiers(state: LocationLifeState?): WorldShopModifiers {
     if (state == null) {
         return WorldShopModifiers(flavorText = "La economía local está en equilibrio.")
@@ -307,6 +311,7 @@ fun buildWorldShopModifiers(state: LocationLifeState?): WorldShopModifiers {
     )
 }
 
+// Ejecuta la lógica de final world price.
 fun finalWorldPrice(
     basePrice: Int,
     tier: ReputationTier,
@@ -316,6 +321,7 @@ fun finalWorldPrice(
     return (repAdjusted * modifiers.priceMultiplier).roundToInt().coerceAtLeast(1)
 }
 
+// Aplica world stock rules.
 fun applyWorldStockRules(
     catalog: List<ShopItem>,
     modifiers: WorldShopModifiers
@@ -337,6 +343,7 @@ fun applyWorldStockRules(
 // ══════════════════════════════════════════════════════════════════════════════
 
 @Composable
+// Ejecuta la lógica de supermarket shop overlay.
 fun SupermarketShopOverlay(
     supermarketName: String,
     gameId: String,
@@ -542,6 +549,7 @@ fun SupermarketShopOverlay(
 // ── CABECERA ──────────────────────────────────────────────────────────────────
 
 @Composable
+// Ejecuta la lógica de shop header.
 private fun ShopHeader(
     supermarketName: String,
     coins: Int,
@@ -606,6 +614,7 @@ private fun ShopHeader(
 // ── BANNER DE REPUTACIÓN ──────────────────────────────────────────────────────
 
 @Composable
+// Ejecuta la lógica de reputation banner.
 private fun ReputationBanner(tier: ReputationTier, points: Int, shopName: String) {
     val nextTier = ReputationTier.entries.firstOrNull { it.ordinal == tier.ordinal + 1 }
     val progress = if (nextTier != null) {
@@ -665,6 +674,7 @@ private fun ReputationBanner(tier: ReputationTier, points: Int, shopName: String
 // ── TARJETA DE ARTÍCULO ───────────────────────────────────────────────────────
 
 @Composable
+// Ejecuta la lógica de shop item card.
 private fun ShopItemCard(
     shopItem: ShopItem,
     finalPrice: Int,

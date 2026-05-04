@@ -71,13 +71,18 @@ import com.example.aidungeonmaster.viewmodel.CombatPhase
 import com.example.aidungeonmaster.ui.theme.ColorBlindType
 import com.example.aidungeonmaster.ui.theme.LocalColorBlindType
 
+// Pantalla que representa screen.
 sealed class Screen(val route: String) {
+    // Clase que encapsula la lógica de login.
     object Login : Screen("login")
+    // Clase que encapsula la lógica de register.
     object Register : Screen("register")
 
+    // Clase que encapsula la lógica de home.
     object Home : Screen("home") {
         const val openCreateRoute = "home?openCreateCharacter={openCreateCharacter}"
 
+        // Crea route.
         fun createRoute(openCreateCharacter: Boolean = false): String {
             return if (openCreateCharacter) {
                 "home?openCreateCharacter=true"
@@ -87,14 +92,19 @@ sealed class Screen(val route: String) {
         }
     }
 
+    // Modelo de datos que representa my profile.
     object MyProfile : Screen("my_profile")
+    // Clase que encapsula la lógica de guilds.
     object Guilds : Screen("guilds?openCreate={openCreate}") {
+        // Crea route.
         fun createRoute(openCreate: Boolean = false): String {
             return "guilds?openCreate=$openCreate"
         }
     }
 
+    // Clase que encapsula la lógica de guild details.
     object GuildDetails : Screen("guild_details/{guildId}?tab={tab}") {
+        // Crea route.
         fun createRoute(guildId: String, tab: String? = null): String {
             val encodedId = Uri.encode(guildId)
             return if (tab.isNullOrBlank()) {
@@ -105,71 +115,101 @@ sealed class Screen(val route: String) {
         }
     }
 
+    // Clase que encapsula la lógica de inventory.
     object Inventory : Screen("inventory/{userId}") {
+        // Crea route.
         fun createRoute(userId: String) = "inventory/${Uri.encode(userId)}"
     }
 
+    // Clase que encapsula la lógica de character sheet.
     object CharacterSheet : Screen("character_sheet/{userId}/{characterName}") {
+        // Crea route.
         fun createRoute(userId: String, characterName: String): String {
             val encodedName = Uri.encode(characterName)
             return "character_sheet/$userId/$encodedName"
         }
     }
 
+    // Clase que encapsula la lógica de qrscanner.
     object QRScanner : Screen("qr_scanner")
 
+    // Clase que encapsula la lógica de game setup.
     object GameSetup : Screen("game_setup/{userId}/{characterName}") {
+        // Crea route.
         fun createRoute(userId: String, characterName: String) =
             "game_setup/${Uri.encode(userId)}/${Uri.encode(characterName)}"
     }
 
+    // Clase que encapsula la lógica de ranking.
     object Ranking : Screen("ranking")
+    // Clase que encapsula la lógica de achievements.
     object Achievements : Screen("achievements")
 
+    // Clase que encapsula la lógica de game play.
     object GamePlay : Screen("game_play/{userId}/{characterName}/{theme}") {
+        // Crea route.
         fun createRoute(userId: String, characterName: String, theme: String) =
             "game_play/${Uri.encode(userId)}/${Uri.encode(characterName)}/${Uri.encode(theme)}"
     }
 
+    // Clase que encapsula la lógica de armap.
     object ARMap : Screen("ar_map/{charId}") {
+        // Crea route.
         fun createRoute(charId: String) = "ar_map/${Uri.encode(charId)}"
     }
 
+    // Clase que encapsula la lógica de locations gallery.
     object LocationsGallery : Screen("locations_gallery/{charId}/{characterName}") {
+        // Crea route.
         fun createRoute(charId: String, characterName: String) =
             "locations_gallery/${Uri.encode(charId)}/${Uri.encode(characterName)}"
     }
 
+    // Modelo de datos que representa death summary.
     object DeathSummary : Screen("death_summary/{xpGained}/{coinsGained}") {
+        // Crea route.
         fun createRoute(xpGained: Int, coinsGained: Int) =
             "death_summary/$xpGained/$coinsGained"
     }
 
+    // Clase que encapsula la lógica de journal.
     object Journal : Screen("journal/{charId}") {
+        // Crea route.
         fun createRoute(charId: String) = "journal/${Uri.encode(charId)}"
     }
 
+    // Modelo de datos que representa personal room.
     object PersonalRoom : Screen("personal_room/{charId}/{characterName}") {
+        // Crea route.
         fun createRoute(charId: String, characterName: String) =
             "personal_room/${Uri.encode(charId)}/${Uri.encode(characterName)}"
     }
 
+    // Clase que encapsula la lógica de user search.
     object UserSearch : Screen("user_search")
+    // Clase que encapsula la lógica de friend requests.
     object FriendRequests : Screen("friend_requests")
+    // Clase que encapsula la lógica de friends list.
     object FriendsList : Screen("friends_list")
 
+    // Modelo de datos que representa friend profile.
     object FriendProfile : Screen("friend_profile/{friendUid}") {
+        // Crea route.
         fun createRoute(friendUid: String): String =
             "friend_profile/${Uri.encode(friendUid)}"
     }
 
+    // Modelo de datos que representa friend personal room.
     object FriendPersonalRoom : Screen("friend_personal_room/{friendUid}/{characterId}/{characterName}") {
+        // Crea route.
         fun createRoute(friendUid: String, characterId: String, characterName: String): String {
             return "friend_personal_room/${Uri.encode(friendUid)}/${Uri.encode(characterId)}/${Uri.encode(characterName)}"
         }
     }
 
+    // Clase que encapsula la lógica de private chat.
     object PrivateChat : Screen("private_chat/{friendUid}/{friendName}") {
+        // Crea route.
         fun createRoute(friendUid: String, friendName: String): String {
             val encodedUid = Uri.encode(friendUid)
             val encodedName = Uri.encode(friendName)
@@ -177,7 +217,9 @@ sealed class Screen(val route: String) {
         }
     }
 
+    // Clase que encapsula la lógica de guild boss battle.
     object GuildBossBattle : Screen("guild_boss_battle/{guildId}") {
+        // Crea route.
         fun createRoute(guildId: String): String =
             "guild_boss_battle/${Uri.encode(guildId)}"
     }
@@ -185,6 +227,7 @@ sealed class Screen(val route: String) {
 
 @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
 @Composable
+// Ejecuta la lógica de app navigation.
 fun AppNavigation(
     navController: NavHostController,
     onColorBlindChanged: (ColorBlindType) -> Unit = {}
@@ -760,6 +803,7 @@ fun AppNavigation(
 
 }
 
+// Ejecuta la lógica de string.
 private fun String?.isAdventureRoute(): Boolean {
     val route = this?.lowercase().orEmpty()
 

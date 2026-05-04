@@ -40,6 +40,7 @@ import com.example.aidungeonmaster.viewmodel.SocialViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+// Ejecuta la lógica de friend requests screen.
 fun FriendRequestsScreen(
     onBack: () -> Unit,
     viewModel: SocialViewModel = viewModel()
@@ -169,6 +170,7 @@ fun FriendRequestsScreen(
 }
 
 @Composable
+// Ejecuta la lógica de friend request card.
 private fun FriendRequestCard(
     request: FriendRequest,
     onAccept: () -> Unit,

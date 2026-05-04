@@ -32,6 +32,7 @@ private val LightColorScheme = lightColorScheme(
 )
 
 @Composable
+// Ejecuta la lógica de aidungeon master theme.
 fun AIDungeonMasterTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit

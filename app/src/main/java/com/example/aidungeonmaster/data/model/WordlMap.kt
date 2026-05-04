@@ -1,5 +1,6 @@
 package com.example.aidungeonmaster.data.model
 
+// Clase que encapsula la lógica de world location.
 data class WorldLocation(
     val id: String = "",
     val name: String = "",
@@ -12,6 +13,7 @@ data class WorldLocation(
     val discoveredAt: Long = System.currentTimeMillis()
 )
 
+// Clase que encapsula la lógica de location life state.
 data class LocationLifeState(
     val locationId: String = "",
     val prosperity: Int = 50,
@@ -24,6 +26,7 @@ data class LocationLifeState(
     val lastUpdatedAt: Long = System.currentTimeMillis()
 )
 
+// Clase que encapsula la lógica de world map state.
 data class WorldMapState(
     val locations: List<WorldLocation> = emptyList(),
     val currentLocationId: String = "",

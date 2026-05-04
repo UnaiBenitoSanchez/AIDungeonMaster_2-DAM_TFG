@@ -1,5 +1,6 @@
 package com.example.aidungeonmaster.data.model
 
+// Clase que encapsula la lógica de guild boss ability type.
 enum class GuildBossAbilityType {
     DAMAGE,
     HEAL,
@@ -8,6 +9,7 @@ enum class GuildBossAbilityType {
     SPECIAL_FLEE
 }
 
+// Clase que encapsula la lógica de guild boss ability.
 data class GuildBossAbility(
     val id: String,
     val name: String,
@@ -18,6 +20,7 @@ data class GuildBossAbility(
     val cooldownTurns: Int = 0
 )
 
+// Ejecuta la lógica de guild boss abilities for class.
 fun guildBossAbilitiesForClass(charClass: String): List<GuildBossAbility> =
     when (charClass.lowercase().trim()) {
         "guerrero", "fighter", "luchador" -> listOf(
@@ -118,6 +121,7 @@ fun guildBossAbilitiesForClass(charClass: String): List<GuildBossAbility> =
         )
     }
 
+// Comprueba si boss battle consumable.
 fun isBossBattleConsumable(item: Item): Boolean {
     val effect = item.effect.lowercase().trim()
 

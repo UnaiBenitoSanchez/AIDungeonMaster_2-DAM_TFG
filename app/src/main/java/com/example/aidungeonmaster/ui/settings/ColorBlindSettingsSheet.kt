@@ -64,6 +64,7 @@ import com.example.aidungeonmaster.ui.theme.colorMatrixForType
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+// Ejecuta la lógica de color blind settings sheet.
 fun ColorBlindSettingsSheet(
     currentType: ColorBlindType,
     onTypeSelected: (ColorBlindType) -> Unit,
@@ -163,6 +164,7 @@ fun ColorBlindSettingsSheet(
 // directamente sin interferencias.
 
 @Composable
+// Ejecuta la lógica de color preview row.
 private fun ColorPreviewRow(type: ColorBlindType) {
     val sampleColors = listOf(
         Color(0xFFE53935), // rojo
@@ -236,6 +238,7 @@ private fun ColorPreviewRow(type: ColorBlindType) {
 // ─── Elemento de opción individual ──────────────────────────────────────────
 
 @Composable
+// Ejecuta la lógica de color blind option item.
 private fun ColorBlindOptionItem(
     type: ColorBlindType,
     isSelected: Boolean,

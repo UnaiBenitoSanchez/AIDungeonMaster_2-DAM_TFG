@@ -56,6 +56,7 @@ private const val SPHERE_HEIGHT = 0.05f
 
 // ── PANTALLA PRINCIPAL DE AR ──────────────────────────────────────────────────
 @Composable
+// Ejecuta la lógica de armap screen.
 fun ARMapScreen(
     mapState: WorldMapState,
     onBack: () -> Unit,
@@ -356,6 +357,7 @@ private fun getLocationAccentColor(location: WorldLocation): Color =
         else                  -> Color(0xFFFFFFFF)
     }
 
+// Ejecuta la lógica de normalize location type.
 private fun normalizeLocationType(rawType: String): String {
     val normalized = java.text.Normalizer.normalize(rawType.lowercase().trim(), java.text.Normalizer.Form.NFD)
         .replace(Regex("\\p{InCombiningDiacriticalMarks}+"), "")
@@ -384,6 +386,7 @@ operator fun LocationStyle.component4() = roughness
 // ── COMPONENTES UI ────────────────────────────────────────────────────────────
 
 @Composable
+// Ejecuta la lógica de artop bar.
 private fun ARTopBar(
     title:                String,
     isMapPlaced:          Boolean,
@@ -457,6 +460,7 @@ private fun ARTopBar(
 }
 
 @Composable
+// Ejecuta la lógica de arscanning hint.
 private fun ARScanningHint(
     trackingFailureReason: TrackingFailureReason?,
     hasLocations:          Boolean,
@@ -493,6 +497,7 @@ private fun ARScanningHint(
 }
 
 @Composable
+// Ejecuta la lógica de arlegend.
 private fun ARLegend(
     locations: List<WorldLocation>,
     modifier:  Modifier = Modifier
@@ -528,6 +533,7 @@ private fun ARLegend(
 }
 
 @Composable
+// Ejecuta la lógica de legend row.
 private fun LegendRow(color: Color, label: String, accentColor: Color? = null) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -549,6 +555,7 @@ private fun LegendRow(color: Color, label: String, accentColor: Color? = null) {
 }
 
 @Composable
+// Ejecuta la lógica de arlocation detail.
 private fun ARLocationDetail(
     location: WorldLocation,
     onDismiss: () -> Unit,

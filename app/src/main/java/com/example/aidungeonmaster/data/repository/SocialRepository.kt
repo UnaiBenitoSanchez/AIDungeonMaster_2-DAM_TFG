@@ -14,11 +14,13 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.tasks.await
 import com.example.aidungeonmaster.data.model.ChatMessage
+// Repositorio que centraliza el acceso a datos de social.
 class SocialRepository {
 
     companion object {
         private const val MAX_GUILD_MEMBERS = 15
 
+        // Construye friendship id.
         fun buildFriendshipId(uid1: String, uid2: String): String {
             return if (uid1 < uid2) "${uid1}_${uid2}" else "${uid2}_${uid1}"
         }
@@ -29,8 +31,10 @@ class SocialRepository {
     private val friendProfileListeners = mutableListOf<ListenerRegistration>()
     private val friendUnreadListeners = mutableListOf<ListenerRegistration>()
 
+    // Ejecuta la lógica de current uid.
     fun currentUid(): String? = auth.currentUser?.uid
 
+    // Ejecuta la lógica de search users.
     suspend fun searchUsers(query: String): List<AppUser> {
         val myUid = currentUid() ?: return emptyList()
         val q = query.trim().lowercase()
@@ -61,6 +65,7 @@ class SocialRepository {
             .sortedBy { it.usernameLower }
     }
 
+    // Envía friend request.
     suspend fun sendFriendRequest(targetUser: AppUser) {
         val myUid = currentUid() ?: throw IllegalStateException("Usuario no autenticado")
         require(targetUser.uid != myUid) { "No puedes enviarte una solicitud a ti mismo." }
@@ -108,6 +113,7 @@ class SocialRepository {
         db.collection("friend_requests").add(payload).await()
     }
 
+    // Escucha incoming requests.
     fun listenIncomingRequests(
         onChange: (List<FriendRequest>) -> Unit,
         onError: (String) -> Unit
@@ -133,6 +139,7 @@ class SocialRepository {
             }
     }
 
+    // Ejecuta la lógica de accept friend request.
     suspend fun acceptFriendRequest(request: FriendRequest) {
         val myUid = currentUid() ?: throw IllegalStateException("Usuario no autenticado")
         require(request.toUid == myUid) { "Solo el receptor puede aceptar la solicitud." }
@@ -217,6 +224,7 @@ class SocialRepository {
         }.await()
     }
 
+    // Ejecuta la lógica de reject friend request.
     suspend fun rejectFriendRequest(request: FriendRequest) {
         val myUid = currentUid() ?: throw IllegalStateException("Usuario no autenticado")
         require(request.toUid == myUid) { "Solo el receptor puede rechazar la solicitud." }
@@ -232,6 +240,7 @@ class SocialRepository {
             .await()
     }
 
+    // Escucha friends.
     fun listenFriends(
         onChange: (List<FriendWithProfile>) -> Unit,
         onError: (String) -> Unit
@@ -339,12 +348,14 @@ class SocialRepository {
             }
     }
 
+    // Obtiene user profile.
     suspend fun getUserProfile(userUid: String): AppUser {
         val snap = db.collection("users").document(userUid).get().await()
         return snap.toAppUser()
             ?: throw IllegalStateException("No se pudo cargar el perfil.")
     }
 
+    // Obtiene user characters.
     suspend fun getUserCharacters(userUid: String): List<Character> {
         if (userUid.isBlank()) return emptyList()
 
@@ -360,6 +371,7 @@ class SocialRepository {
             .sortedBy { it.name.lowercase() }
     }
 
+    // Actualiza my profile.
     suspend fun updateMyProfile(
         displayName: String,
         bio: String,
@@ -387,6 +399,7 @@ class SocialRepository {
             .await()
     }
 
+    // Actualiza presence.
     suspend fun updatePresence(isOnline: Boolean) {
         val uid = auth.currentUser?.uid ?: return
         val now = System.currentTimeMillis()
@@ -403,6 +416,7 @@ class SocialRepository {
             .await()
     }
 
+    // Actualiza my profile photo.
     suspend fun updateMyProfilePhoto(context: Context, uri: Uri) {
         val myUid = currentUid() ?: throw IllegalStateException("Usuario no autenticado")
 
@@ -457,6 +471,7 @@ class SocialRepository {
             .await()
     }
 
+    // Crea guild.
     suspend fun createGuild(
         name: String,
         description: String,
@@ -525,6 +540,7 @@ class SocialRepository {
         }.await()
     }
 
+    // Ejecuta la lógica de search guilds.
     suspend fun searchGuilds(query: String): List<Guild> {
         val q = query.trim().lowercase()
         if (q.isBlank()) return emptyList()
@@ -557,6 +573,7 @@ class SocialRepository {
             .sortedBy { it.nameLower }
     }
 
+    // Obtiene guild by id.
     suspend fun getGuildById(guildId: String): Guild? {
         val currentUid = auth.currentUser?.uid.orEmpty()
         val guildSnap = db.collection("guilds").document(guildId).get().await()
@@ -579,6 +596,7 @@ class SocialRepository {
         return guild.copy(joined = joined)
     }
 
+    // Actualiza guild colors.
     suspend fun updateGuildColors(
         guildId: String,
         accentColor: String,
@@ -606,6 +624,7 @@ class SocialRepository {
         ).await()
     }
 
+    // Gestiona la unión a guild.
     suspend fun joinGuild(guild: Guild) {
         val myUid = auth.currentUser?.uid ?: throw IllegalStateException("Usuario no autenticado")
         val me = getUserProfile(myUid)
@@ -691,6 +710,7 @@ class SocialRepository {
         }.await()
     }
 
+    // Gestiona la salida de guild.
     suspend fun leaveGuild(guild: Guild) {
         val myUid = currentUid() ?: throw IllegalStateException("Usuario no autenticado")
 
@@ -769,6 +789,7 @@ class SocialRepository {
             .await()
     }
 
+    // Ejecuta la lógica de transfer guild leadership.
     suspend fun transferGuildLeadership(guild: Guild, newLeaderUid: String) {
         val myUid = currentUid() ?: throw IllegalStateException("Usuario no autenticado")
 
@@ -826,6 +847,7 @@ class SocialRepository {
         }.await()
     }
 
+    // Escucha my guilds.
     fun listenMyGuilds(
         onChange: (List<Guild>) -> Unit,
         onError: (String) -> Unit
@@ -893,21 +915,25 @@ class SocialRepository {
             }
     }
 
+    // Limpia friend profile listeners.
     private fun clearFriendProfileListeners() {
         friendProfileListeners.forEach { it.remove() }
         friendProfileListeners.clear()
     }
 
+    // Limpia friend unread listeners.
     private fun clearFriendUnreadListeners() {
         friendUnreadListeners.forEach { it.remove() }
         friendUnreadListeners.clear()
     }
 
+    // Limpia friend listeners.
     fun clearFriendListeners() {
         clearFriendProfileListeners()
         clearFriendUnreadListeners()
     }
 
+    // Ejecuta la lógica de document snapshot.
     private fun DocumentSnapshot.toAppUser(): AppUser? {
         if (!exists()) return null
 

@@ -1,10 +1,12 @@
 package com.example.aidungeonmaster.data.model
 
+// Clase que encapsula la lógica de personal room placed decoration.
 data class PersonalRoomPlacedDecoration(
     val decorationId: String = "",
     val slotId: String = ""
 )
 
+// Clase que encapsula la lógica de personal room state.
 data class PersonalRoomState(
     val ownedDecorationIds: List<String> = emptyList(),
     val placedDecorations: List<PersonalRoomPlacedDecoration> = emptyList(),
@@ -12,6 +14,7 @@ data class PersonalRoomState(
     val updatedAt: Long = System.currentTimeMillis()
 )
 
+// Clase que encapsula la lógica de personal room decoration.
 data class PersonalRoomDecoration(
     val id: String,
     val name: String,
@@ -21,6 +24,7 @@ data class PersonalRoomDecoration(
     val allowedSlots: List<String>
 )
 
+// Clase que encapsula la lógica de personal room slot.
 data class PersonalRoomSlot(
     val id: String,
     val label: String,
@@ -231,8 +235,10 @@ val PERSONAL_ROOM_CATALOG = listOf(
     )
 )
 
+// Ejecuta la lógica de personal room decoration by id.
 fun personalRoomDecorationById(id: String): PersonalRoomDecoration? =
     PERSONAL_ROOM_CATALOG.firstOrNull { it.id == id }
 
+// Ejecuta la lógica de personal room slot by id.
 fun personalRoomSlotById(id: String): PersonalRoomSlot? =
     PERSONAL_ROOM_SLOTS.firstOrNull { it.id == id }

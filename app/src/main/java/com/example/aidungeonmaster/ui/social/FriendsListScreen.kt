@@ -44,6 +44,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+// Ejecuta la lógica de friends list screen.
 fun FriendsListScreen(
     onBack: () -> Unit,
     onOpenProfile: (String) -> Unit,
@@ -87,6 +88,7 @@ fun FriendsListScreen(
 }
 
 @Composable
+// Ejecuta la lógica de friend card.
 private fun FriendCard(
     friend: FriendWithProfile,
     onOpenProfile: () -> Unit,
@@ -159,11 +161,13 @@ private fun FriendCard(
     }
 }
 
+// Formatea last seen.
 private fun formatLastSeen(timestamp: Long): String {
     if (timestamp <= 0L) return "sin datos"
     return SimpleDateFormat("dd/MM HH:mm", Locale.getDefault()).format(Date(timestamp))
 }
 
+// Ejecuta la lógica de friends parse color.
 private fun friendsParseColor(hex: String): Color = runCatching {
     Color(android.graphics.Color.parseColor(hex))
 }.getOrDefault(Color(0xFFD4AF37))

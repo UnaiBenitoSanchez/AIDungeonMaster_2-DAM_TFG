@@ -125,6 +125,7 @@ object CombatMusicEngine {
         job = scope.launch(Dispatchers.Default) { runMusicLoop() }
     }
 
+    // Ejecuta la lógica de stop.
     fun stop() {
         isPlaying = false
         job?.cancel(); job = null
@@ -136,6 +137,7 @@ object CombatMusicEngine {
         Log.d(TAG, "■ Música detenida")
     }
 
+    // Ejecuta la lógica de fade out and stop.
     fun fadeOutAndStop(scope: CoroutineScope) {
         scope.launch(Dispatchers.Default) {
             for (v in 10 downTo 0) {
@@ -146,6 +148,7 @@ object CombatMusicEngine {
         }
     }
 
+    // Actualiza voice control ducking.
     fun setVoiceControlDucking(enabled: Boolean) {
         voiceControlDuckingEnabled = enabled
     }

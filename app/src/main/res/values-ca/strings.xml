@@ -6,7 +6,6 @@
     <string name="language_basque">Euskera</string>
     <string name="language_german">Deutsch</string>
     <string name="language_french">Français</string>
-    <string name="language_galician">Gallec</string>
     <string name="common_back">Tornar</string>
     <string name="common_close">Tancar</string>
     <string name="common_cancel">Cancel·lar</string>
@@ -30,6 +29,7 @@
     <string name="common_you">Tu</string>
     <string name="common_unknown">Desconegut</string>
     <string name="common_no_data">Sense dades</string>
+    <string name="common_explore">Explorar</string>
     <string name="home_title_characters">Els teus personatges</string>
     <string name="home_more_options">Més opcions</string>
     <string name="home_view_tutorial">Veure tutorial</string>
@@ -116,6 +116,10 @@
     <string name="guild_details_member">Membre</string>
     <string name="guild_details_lead">Liderar</string>
     <string name="guild_details_knocked_out">KO</string>
+    <string name="guild_details_overview">Visió general</string>
+    <string name="guild_details_leader_badge">Líder: %1$s</string>
+    <string name="guild_details_guild_full">Gremi complet</string>
+    <string name="guild_details_join_guild">Unir-me al gremi</string>
     <string name="bestiary_title">Bestiari</string>
     <string name="bestiary_filter_all">Tots</string>
     <string name="bestiary_filter_defeated">Derrotats</string>
@@ -169,4 +173,5 @@
     <string name="bestiary_loot_detail_line">Categoria: %1$s · Quantitat màxima observada: %2$d · Vegades vist: %3$d</string>
     <string name="bestiary_registered_loot">Loot registrat</string>
     <string name="bestiary_no_confirmed_loot">Encara no hi ha botí confirmat per a aquesta criatura.</string>
+    <string name="language_galician">Gallec</string>
 </resources>

@@ -52,12 +52,14 @@ class AchievementViewModel : ViewModel() {
     private val _pendingAchievementXp = MutableStateFlow(0)
     val pendingAchievementXp = _pendingAchievementXp.asStateFlow()
 
+    // Ejecuta la lógica de consume achievement xp.
     fun consumeAchievementXp() { _pendingAchievementXp.value = 0 }
 
     // Monedas pendientes de conceder por misiones completadas
     private val _pendingAchievementCoins = MutableStateFlow(0)
     val pendingAchievementCoins = _pendingAchievementCoins.asStateFlow()
 
+    // Ejecuta la lógica de consume achievement coins.
     fun consumeAchievementCoins() { _pendingAchievementCoins.value = 0 }
 
     // ── Carga inicial ─────────────────────────────────────────────────────────
@@ -201,26 +203,32 @@ class AchievementViewModel : ViewModel() {
     /** Llamar cuando el jugador escanea un QR */
     fun onQrScanned() = checkAchievement("qr_scan")
 
+    // Gestiona el evento de character created.
     fun onCharacterCreated() {
         checkAchievement("first_character_created")
     }
 
+    // Gestiona el evento de character sheet opened.
     fun onCharacterSheetOpened() {
         checkAchievement("character_sheet_opened")
     }
 
+    // Gestiona el evento de character sheet exported.
     fun onCharacterSheetExported() {
         checkAchievement("character_sheet_exported")
     }
 
+    // Gestiona el evento de social opened.
     fun onSocialOpened() {
         checkAchievement("social_opened")
     }
 
+    // Gestiona el evento de ranking opened.
     fun onRankingOpened() {
         checkAchievement("ranking_opened")
     }
 
+    // Gestiona el evento de achievements opened.
     fun onAchievementsOpened() {
         checkAchievement("achievements_opened")
     }

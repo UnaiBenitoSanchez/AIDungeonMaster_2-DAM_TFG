@@ -1,5 +1,6 @@
 package com.example.aidungeonmaster.ui.accessibility
 
+// Clase que encapsula la lógica de voice named color.
 data class VoiceNamedColor(
     val displayName: String,
     val hex: String,
@@ -21,6 +22,7 @@ private val guildVoiceColors = listOf(
     VoiceNamedColor("gris", "#616161", listOf("gris", "plateado", "plata"))
 )
 
+// Ejecuta la lógica de find voice named color.
 fun findVoiceNamedColor(spokenValue: String): VoiceNamedColor? {
     val normalizedValue = spokenValue.normalizedForVoiceCommand()
     if (normalizedValue.isBlank()) return null
@@ -47,5 +49,6 @@ fun findVoiceNamedColor(spokenValue: String): VoiceNamedColor? {
     }
 }
 
+// Ejecuta la lógica de guild voice color help.
 fun guildVoiceColorHelp(): String =
     guildVoiceColors.joinToString(", ") { it.displayName }

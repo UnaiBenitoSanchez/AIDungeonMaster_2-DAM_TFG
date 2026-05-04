@@ -39,6 +39,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.aidungeonmaster.data.model.LocationLifeState
 import com.example.aidungeonmaster.viewmodel.InventoryViewModel
 
+// Puente de integración para gallery model.
 private class GalleryModelBridge(
     private val canOpenShop: () -> Boolean,
     private val onOpenShop: () -> Unit
@@ -46,6 +47,7 @@ private class GalleryModelBridge(
     private val handler = Handler(Looper.getMainLooper())
 
     @JavascriptInterface
+    // Gestiona el evento de model tap.
     fun onModelTap() {
         if (canOpenShop()) {
             handler.post { onOpenShop() }
@@ -55,6 +57,7 @@ private class GalleryModelBridge(
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
+// Ejecuta la lógica de locations gallery screen.
 fun LocationsGalleryScreen(
     mapState: WorldMapState,
     charId: String,
@@ -316,6 +319,7 @@ fun LocationsGalleryScreen(
 // ── CHIP DE SELECCIÓN ─────────────────────────────────────────────────────────
 
 @Composable
+// Ejecuta la lógica de location chip.
 private fun LocationChip(
     location: WorldLocation,
     isSelected: Boolean,
@@ -351,13 +355,16 @@ private fun LocationChip(
     }
 }
 
+// Ejecuta la lógica de normalize text.
 private fun normalizeText(value: String): String =
     Normalizer.normalize(value.lowercase().trim(), Normalizer.Form.NFD)
         .replace(Regex("\\p{InCombiningDiacriticalMarks}+"), "")
 
+// Ejecuta la lógica de contains any.
 private fun containsAny(text: String, options: List<String>): Boolean =
     options.any { text.contains(it) }
 
+// Ejecuta la lógica de resolve base location visual type.
 private fun resolveBaseLocationVisualType(location: WorldLocation): String {
     val context = normalizeText("${location.type} ${location.name} ${location.description}")
 
@@ -376,6 +383,7 @@ private fun resolveBaseLocationVisualType(location: WorldLocation): String {
     }
 }
 
+// Ejecuta la lógica de resolve location visual type.
 private fun resolveLocationVisualType(
     location: WorldLocation,
     lifeState: LocationLifeState? = null
@@ -601,6 +609,7 @@ sun.color.setHex(0xCCDDFF);
     return sb.toString()
 }
 
+// Ejecuta la lógica de normalize location type.
 private fun normalizeLocationType(rawType: String): String {
     val normalized = Normalizer.normalize(rawType.lowercase().trim(), Normalizer.Form.NFD)
         .replace(Regex("\\p{InCombiningDiacriticalMarks}+"), "")
@@ -920,6 +929,7 @@ private fun getBackgroundColor(type: String) = when (type) {
     else                 -> "0x0D0700"
 }
 
+// Obtiene ambient color.
 private fun getAmbientColor(type: String) = when (type) {
     "asediada"           -> "0x34130C"
     "bosque"             -> "0x0D2205"
@@ -936,6 +946,7 @@ private fun getAmbientColor(type: String) = when (type) {
     else                 -> "0x111118"
 }
 
+// Obtiene sun color.
 private fun getSunColor(type: String) = when (type) {
     "asediada"           -> "0xFF8A4A"
     "bosque"             -> "0xAAFF88"
@@ -953,6 +964,7 @@ private fun getSunColor(type: String) = when (type) {
     else                 -> "0xFFDDAA"
 }
 
+// Obtiene ground color.
 private fun getGroundColor(type: String) = when (type) {
     "asediada"           -> "0x5A3A1E"
     "bosque"             -> "0x1A2E0A"
@@ -975,6 +987,7 @@ private fun getGroundColor(type: String) = when (type) {
     else                 -> "0x1A1505"
 }
 
+// Obtiene fog density.
 private fun getFogDensity(type: String) = when (type) {
     "asediada"          -> "0.05"
     "bosque"            -> "0.06"
@@ -989,6 +1002,7 @@ private fun getFogDensity(type: String) = when (type) {
     else                -> "0.03"
 }
 
+// Obtiene animation code.
 private fun getAnimationCode(type: String) = when (type) {
     "bosque" ->
         """if(window._leaves) window._leaves.forEach(function(l,i){
@@ -1099,6 +1113,7 @@ private fun getAnimationCode(type: String) = when (type) {
     else -> "// no animation"
 }
 
+// Obtiene model code.
 private fun getModelCode(type: String): String = when (type) {
 
     // ── BOSQUE ────────────────────────────────────────────────────────────────

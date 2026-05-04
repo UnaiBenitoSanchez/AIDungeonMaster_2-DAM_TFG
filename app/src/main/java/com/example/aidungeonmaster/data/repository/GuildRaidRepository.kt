@@ -18,6 +18,7 @@ import kotlinx.coroutines.tasks.await
 import kotlin.math.max
 import kotlin.random.Random
 
+// Repositorio que centraliza el acceso a datos de guild raid.
 class GuildRaidRepository {
 
     companion object {
@@ -29,20 +30,26 @@ class GuildRaidRepository {
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
 
+    // Ejecuta la lógica de current uid.
     private fun currentUid(): String? = auth.currentUser?.uid
 
+    // Ejecuta la lógica de guild ref.
     private fun guildRef(guildId: String) =
         db.collection("guilds").document(guildId)
 
+    // Ejecuta la lógica de room ref.
     private fun roomRef(guildId: String) =
         guildRef(guildId).collection("boss_rooms").document(FINAL_BOSS_ROOM_ID)
 
+    // Ejecuta la lógica de participants ref.
     private fun participantsRef(guildId: String) =
         roomRef(guildId).collection("participants")
 
+    // Ejecuta la lógica de partida ref.
     private fun partidaRef(partidaId: String) =
         db.collection("partidas").document(partidaId)
 
+    // Ejecuta la lógica de partida id.
     private fun partidaId(uid: String, characterName: String): String =
         "${uid}_${characterName}"
 
@@ -52,6 +59,7 @@ class GuildRaidRepository {
         return guildOwnerUid == uid
     }
 
+    // Escucha boss room.
     fun listenBossRoom(
         guildId: String,
         onChange: (GuildBossRoom?) -> Unit,
@@ -74,6 +82,7 @@ class GuildRaidRepository {
         }
     }
 
+    // Escucha boss participants.
     fun listenBossParticipants(
         guildId: String,
         onChange: (List<GuildBossParticipant>) -> Unit,
@@ -94,6 +103,7 @@ class GuildRaidRepository {
             }
     }
 
+    // Obtiene playable characters.
     suspend fun getPlayableCharacters(): List<Character> {
         val uid = currentUid() ?: throw IllegalStateException("Usuario no autenticado")
 
@@ -108,6 +118,7 @@ class GuildRaidRepository {
         }.sortedBy { it.name.lowercase() }
     }
 
+    // Ejecuta la lógica de ensure boss room.
     suspend fun ensureBossRoom(guildId: String): GuildBossRoom {
         val uid = currentUid() ?: throw IllegalStateException("Usuario no autenticado")
         val now = System.currentTimeMillis()
@@ -140,6 +151,7 @@ class GuildRaidRepository {
         return room
     }
 
+    // Selecciona character.
     suspend fun selectCharacter(guildId: String, character: Character) {
         val uid = currentUid() ?: throw IllegalStateException("Usuario no autenticado")
         val profile = db.collection("users").document(uid).get().await()
@@ -182,6 +194,7 @@ class GuildRaidRepository {
         participantsRef(guildId).document(uid).set(participant).await()
     }
 
+    // Actualiza ready.
     suspend fun setReady(guildId: String, ready: Boolean) {
         val uid = currentUid() ?: throw IllegalStateException("Usuario no autenticado")
         val now = System.currentTimeMillis()
@@ -264,6 +277,7 @@ class GuildRaidRepository {
         myParticipantRef.set(refreshedParticipant).await()
     }
 
+    // Inicia battle if ready.
     suspend fun startBattleIfReady(guildId: String) {
         currentUid() ?: throw IllegalStateException("Usuario no autenticado")
         if (!isCurrentUserGuildOwner(guildId)) {
@@ -329,6 +343,7 @@ class GuildRaidRepository {
         ).await()
     }
 
+    // Carga boss consumables.
     suspend fun loadBossConsumables(guildId: String): List<Item> {
         val uid = currentUid() ?: throw IllegalStateException("Usuario no autenticado")
         val participant = participantsRef(guildId).document(uid).get().await()
@@ -345,6 +360,7 @@ class GuildRaidRepository {
             .sortedBy { it.name.lowercase() }
     }
 
+    // Ejecuta la lógica de player attack.
     suspend fun playerAttack(guildId: String) {
         val uid = currentUid() ?: throw IllegalStateException("Usuario no autenticado")
         val room = requireMyTurnRoom(guildId, uid)
@@ -411,6 +427,7 @@ class GuildRaidRepository {
         batch.commit().await()
     }
 
+    // Ejecuta la lógica de use ability.
     suspend fun useAbility(guildId: String, ability: GuildBossAbility) {
         val uid = currentUid() ?: throw IllegalStateException("Usuario no autenticado")
         val room = requireMyTurnRoom(guildId, uid)
@@ -589,6 +606,7 @@ class GuildRaidRepository {
         }
     }
 
+    // Ejecuta la lógica de use consumable.
     suspend fun useConsumable(guildId: String, item: Item) {
         val uid = currentUid() ?: throw IllegalStateException("Usuario no autenticado")
         val room = requireMyTurnRoom(guildId, uid)
@@ -710,6 +728,7 @@ class GuildRaidRepository {
         }
     }
 
+    // Ejecuta la lógica de resolve boss turn.
     suspend fun resolveBossTurn(guildId: String) {
         currentUid() ?: throw IllegalStateException("Usuario no autenticado")
         if (!isCurrentUserGuildOwner(guildId)) return
@@ -855,6 +874,7 @@ class GuildRaidRepository {
         ).await()
     }
 
+    // Gestiona la salida de boss room.
     suspend fun leaveBossRoom(guildId: String) {
         val uid = currentUid() ?: throw IllegalStateException("Usuario no autenticado")
         val room = roomRef(guildId).get().await().toObject(GuildBossRoom::class.java)
@@ -864,6 +884,7 @@ class GuildRaidRepository {
         participantsRef(guildId).document(uid).delete().await()
     }
 
+    // Gestiona la salida de boss room if present.
     suspend fun leaveBossRoomIfPresent(guildId: String) {
         val uid = currentUid() ?: return
         val room = roomRef(guildId).get().await().toObject(GuildBossRoom::class.java)
@@ -875,6 +896,7 @@ class GuildRaidRepository {
         }
     }
 
+    // Reinicia boss room.
     suspend fun resetBossRoom(guildId: String) {
         val uid = currentUid() ?: throw IllegalStateException("Usuario no autenticado")
         val roomSnap = roomRef(guildId).get().await()
@@ -930,6 +952,7 @@ class GuildRaidRepository {
             .mapNotNull { it.toObject(GuildBossParticipant::class.java) }
     }
 
+    // Ejecuta la lógica de normalize start of turn.
     private fun normalizeStartOfTurn(
         participant: GuildBossParticipant,
         now: Long
@@ -945,6 +968,7 @@ class GuildRaidRepository {
         )
     }
 
+    // Construye next room after player action.
     private fun buildNextRoomAfterPlayerAction(
         room: GuildBossRoom,
         participants: List<GuildBossParticipant>,
@@ -979,6 +1003,7 @@ class GuildRaidRepository {
         )
     }
 
+    // Construye next room after boss action.
     private fun buildNextRoomAfterBossAction(
         room: GuildBossRoom,
         participants: List<GuildBossParticipant>,
@@ -999,6 +1024,7 @@ class GuildRaidRepository {
         )
     }
 
+    // Calcula next turn.
     private fun computeNextTurn(
         room: GuildBossRoom,
         participants: List<GuildBossParticipant>
@@ -1026,6 +1052,7 @@ class GuildRaidRepository {
         return BOSS_TURN_UID to 0
     }
 
+    // Ejecuta la lógica de trim log.
     private fun trimLog(log: List<String>): List<String> {
         return if (log.size <= 30) log else log.takeLast(30)
     }
@@ -1056,14 +1083,17 @@ class GuildRaidRepository {
         return Triple(bossHp, bossAtkMin, bossAtkMax)
     }
 
+    // Ejecuta la lógica de boss armor class.
     private fun bossArmorClass(room: GuildBossRoom): Int {
         return (10 + (room.bossHpMax / 50).coerceIn(2, 6)).coerceAtLeast(12)
     }
 
+    // Ejecuta la lógica de boss attack bonus.
     private fun bossAttackBonus(room: GuildBossRoom): Int {
         return (4 + (room.round / 3)).coerceAtLeast(4)
     }
 
+    // Clase que encapsula la lógica de attack roll result.
     private data class AttackRollResult(
         val rolls: List<Int>,
         val keptRoll: Int,
@@ -1073,6 +1103,7 @@ class GuildRaidRepository {
         val rollText: String
     )
 
+    // Ejecuta la lógica de roll attack against.
     private fun rollAttackAgainst(
         attackBonus: Int,
         targetArmorClass: Int,
@@ -1100,14 +1131,17 @@ class GuildRaidRepository {
         )
     }
 
+    // Ejecuta la lógica de roll d20.
     private fun rollD20(): Int = Random.nextInt(1, 21)
 
+    // Ejecuta la lógica de roll int between.
     private fun rollIntBetween(min: Int, max: Int): Int {
         val realMin = min.coerceAtLeast(1)
         val realMax = max.coerceAtLeast(realMin)
         return Random.nextInt(realMin, realMax + 1)
     }
 
+    // Analiza dice.
     private fun parseDice(expr: String): Triple<Int, Int, Int> {
         val clean = expr.trim().lowercase()
         val match = """(\d*)d(\d+)(?:\+(\d+))?""".toRegex().find(clean)
@@ -1119,6 +1153,7 @@ class GuildRaidRepository {
         return Triple(count, sides, bonus)
     }
 
+    // Ejecuta la lógica de roll dice expression.
     private fun rollDiceExpression(expr: String, crit: Boolean = false): Int {
         val (count, sides, bonus) = parseDice(expr)
         val actualCount = if (crit) count * 2 else count
@@ -1126,6 +1161,7 @@ class GuildRaidRepository {
         return total.coerceAtLeast(1)
     }
 
+    // Ejecuta la lógica de dice min max.
     private fun diceMinMax(expr: String, flatBonus: Int = 0): Pair<Int, Int> {
         val (count, sides, bonus) = parseDice(expr)
         val min = (count + bonus + flatBonus).coerceAtLeast(1)
@@ -1161,12 +1197,14 @@ class GuildRaidRepository {
         )
     }
 
+    // Calcula basic attack range.
     private fun computeBasicAttackRange(character: Character): Pair<Int, Int> {
         val weaponDamageExpr = character.equippedWeapon?.resolvedWeaponDamage ?: "1d4"
         val bonus = character.weaponDamageBonus
         return diceMinMax(weaponDamageExpr, flatBonus = bonus)
     }
 
+    // Analiza inventory.
     private fun parseInventory(raw: Any?): List<Item> {
         val rawList = raw as? List<*> ?: return emptyList()
         return rawList.mapNotNull { entry ->
@@ -1174,9 +1212,11 @@ class GuildRaidRepository {
         }
     }
 
+    // Analiza equipped items.
     private fun parseEquippedItems(raw: Any?): EquippedItems {
         val map = raw as? Map<*, *> ?: return EquippedItems()
 
+        // Analiza slot.
         fun parseSlot(vararg keys: String): Item? {
             val rawItem = keys
                 .asSequence()
@@ -1199,6 +1239,7 @@ class GuildRaidRepository {
         )
     }
 
+    // Analiza item map.
     private fun parseItemMap(m: Map<*, *>): Item {
         val statBonusesRaw = m["statBonuses"] as? Map<*, *>
         val statBonuses = statBonusesRaw
@@ -1255,6 +1296,7 @@ class GuildRaidRepository {
         )
     }
 
+    // Ejecuta la lógica de item to map.
     private fun itemToMap(item: Item): Map<String, Any> {
         val out = mutableMapOf<String, Any>(
             "id" to item.id.ifBlank { System.currentTimeMillis().toString() },
@@ -1294,6 +1336,7 @@ class GuildRaidRepository {
         return out
     }
 
+    // Elimina matching item.
     private fun removeMatchingItem(
         items: MutableList<Item>,
         target: Item
@@ -1306,6 +1349,7 @@ class GuildRaidRepository {
         return items
     }
 
+    // Ejecuta la lógica de extract healing expression.
     private fun extractHealingExpression(item: Item): String {
         val allText = listOf(item.effect, item.description, item.name)
             .joinToString(" ")

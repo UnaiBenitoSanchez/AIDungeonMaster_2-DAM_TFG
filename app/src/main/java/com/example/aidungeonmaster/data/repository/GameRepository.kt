@@ -5,11 +5,13 @@ import androidx.annotation.RequiresApi
 import com.example.aidungeonmaster.data.model.Game
 import com.google.firebase.firestore.FirebaseFirestore
 
+// Repositorio que centraliza el acceso a datos de game.
 class GameRepository {
 
     private val db = FirebaseFirestore.getInstance()
 
     @RequiresApi(Build.VERSION_CODES.O)
+    // Obtiene games by user.
     fun getGamesByUser(
         userId: String,
         onResult: (List<Game>) -> Unit
@@ -25,6 +27,7 @@ class GameRepository {
             }
     }
 
+    // Crea game.
     fun createGame(game: Game) {
         db.collection("games").add(game)
     }

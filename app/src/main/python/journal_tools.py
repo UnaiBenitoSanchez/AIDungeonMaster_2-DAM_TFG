@@ -3,6 +3,7 @@ import re
 from collections import Counter, defaultdict
 
 
+# Ejecuta la lógica de safe load.
 def _safe_load(data):
     try:
         return json.loads(data)
@@ -10,14 +11,17 @@ def _safe_load(data):
         return None
 
 
+# Ejecuta la lógica de clean.
 def _clean(text: str) -> str:
     return re.sub(r"\s+", " ", (text or "").strip())
 
 
+# Ejecuta la lógica de norm.
 def _norm(text: str) -> str:
     return _clean(text).lower()
 
 
+# Ejecuta la lógica de entry label.
 def _entry_label(entry: dict) -> str:
     title = _clean(entry.get("title", ""))
     summary = _clean(entry.get("summary", ""))
@@ -26,6 +30,7 @@ def _entry_label(entry: dict) -> str:
     return title or summary or "Suceso sin nombre"
 
 
+# Construye repeat group key.
 def build_repeat_group_key(entry_json: str) -> str:
     entry = _safe_load(entry_json)
     if not entry:
@@ -45,6 +50,7 @@ def build_repeat_group_key(entry_json: str) -> str:
     return f"{etype}|{location}|{title}"
 
 
+# Ejecuta la lógica de summarize entries.
 def summarize_entries(entries_json: str) -> str:
     entries = _safe_load(entries_json)
     if not entries:
@@ -105,6 +111,7 @@ def summarize_entries(entries_json: str) -> str:
     return result or "Todavía no hay acontecimientos destacados en la aventura."
 
 
+# Ejecuta la lógica de summarize entries by chapter.
 def summarize_entries_by_chapter(entries_json: str) -> str:
     entries = _safe_load(entries_json)
     if not entries:
@@ -126,6 +133,7 @@ def summarize_entries_by_chapter(entries_json: str) -> str:
     return "\n\n".join(blocks)
 
 
+# Ejecuta la lógica de make chapter title.
 def make_chapter_title(entries_json: str) -> str:
     entries = _safe_load(entries_json)
     if not entries:
@@ -166,6 +174,7 @@ def make_chapter_title(entries_json: str) -> str:
     return "Capítulo de viaje y decisiones"
 
 
+# Ejecuta la lógica de rewrite entry epic.
 def rewrite_entry_epic(entry_json: str) -> str:
     entry = _safe_load(entry_json)
     if not entry:

@@ -20,7 +20,9 @@ import androidx.compose.ui.unit.TextUnit
 import com.example.aidungeonmaster.ui.settings.AppLanguageManager
 import androidx.compose.material3.Text as MaterialText
 
+// Clase que encapsula la lógica de fixed text translator.
 object FixedTextTranslator {
+    // Clase que encapsula la lógica de t.
     private data class T(
         val en: String,
         val ca: String,
@@ -503,18 +505,30 @@ object FixedTextTranslator {
 
         )
 
+    // Ejecuta la lógica de translate.
     fun translate(context: Context, value: String): String {
         if (value.isBlank()) return value
         val language = AppLanguageManager.getSavedLanguage(context).code
         if (language == "es") return value
-        exact[value]?.let { return if (language == "gl" && it.gl.isBlank()) value else it.of(language) }
-        terms[value]?.let { return if (language == "gl" && it.gl.isBlank()) value else it.of(language) }
-        translateDynamic(language, value)?.let { return replaceKnownTerms(language, it) }
+        exact[value]?.let { return resolveMappedTranslation(language, value, it) }
+        terms[value]?.let { return resolveMappedTranslation(language, value, it) }
+        translateDynamic(language, value)?.let { return finalizeTranslation(language, it) }
         val composite = replaceKnownTerms(language, value)
-        return composite
+        return finalizeTranslation(language, composite)
     }
 
+    // Ejecuta la lógica de resolve mapped translation.
+    private fun resolveMappedTranslation(language: String, original: String, translation: T): String {
+        val mapped = if (language == "gl" && translation.gl.isBlank()) original else translation.of(language)
+        return finalizeTranslation(language, mapped)
+    }
 
+    // Ejecuta la lógica de finalize translation.
+    private fun finalizeTranslation(language: String, value: String): String =
+        if (language == "gl") autoTranslateToGalician(value) else value
+
+
+    // Traduce dynamic.
     private fun translateDynamic(language: String, value: String): String? {
         fun e(key: String) = exact[key]?.of(language).orEmpty()
         fun w(key: String) = word(language, key)
@@ -627,6 +641,7 @@ object FixedTextTranslator {
     }
 
 
+    // Ejecuta la lógica de replace known terms.
     private fun replaceKnownTerms(language: String, value: String): String {
         var translated = value
 
@@ -638,9 +653,136 @@ object FixedTextTranslator {
             translated = translated.replace(original, replacement)
         }
 
+        return if (language == "gl") autoTranslateToGalician(translated) else translated
+    }
+
+    // Ejecuta la lógica de auto translate to galician.
+    private fun autoTranslateToGalician(value: String): String {
+        val phraseReplacements = linkedMapOf(
+            "¡Bienvenido a AI Dungeon Master!" to "Benvido a AI Dungeon Master!",
+            "Tus personajes" to "Os teus personaxes",
+            "Tus Personajes" to "Os teus personaxes",
+            "Más opciones" to "Máis opcións",
+            "Ver tutorial" to "Ver titorial",
+            "Selecciona idioma" to "Selecciona idioma",
+            "Mis gremios" to "Os meus gremios",
+            "Mi perfil" to "O meu perfil",
+            "Mis amigos" to "Os meus amigos",
+            "Opciones de accesibilidad" to "Opcións de accesibilidade",
+            "Opciones de usabilidad" to "Opcións de usabilidade",
+            "Configura ayudas visuales y control por voz." to "Configura axudas visuais e control por voz.",
+            "Configura ayudas visuales y manejo por voz de la aplicación." to "Configura axudas visuais e manexo por voz da aplicación.",
+            "Modo visita: puedes recorrer la sala, pero no modificar la decoración." to "Modo visita: podes percorrer a sala, pero non modificar a decoración.",
+            "Usa el joystick para caminar por la sala y pisa una baldosa para decorarla." to "Usa o joystick para camiñar pola sala e pisa unha baldosa para decorala.",
+            "Sala personal" to "Sala persoal",
+            "Ocultar decoración" to "Ocultar decoración",
+            "Búsqueda" to "Busca",
+            "búsqueda" to "busca",
+            "Buscar aventureros" to "Buscar aventureiros",
+            "Buscar por nombre o usuario" to "Buscar por nome ou usuario",
+            "Nombre visible" to "Nome visible",
+            "Elegir foto" to "Escoller foto",
+            "Guardar perfil" to "Gardar perfil",
+            "Abrir chat privado" to "Abrir chat privado",
+            "Salas de personajes" to "Salas de personaxes",
+            "En línea" to "En liña",
+            "Jefe final" to "Xefe final",
+            "Cargando gremio..." to "Cargando gremio...",
+            "Cargando sala del jefe..." to "Cargando sala do xefe...",
+            "Estado de la sala" to "Estado da sala",
+            "Esperando que comience la batalla..." to "Agardando a que comece a batalla...",
+            "Todavía no te has unido a la pelea con un personaje." to "Aínda non te uniches á loita cun personaxe.",
+            "Todavía no tienes amigos." to "Aínda non tes amigos.",
+            "Todavía no perteneces a ningún gremio." to "Aínda non pertences a ningún gremio.",
+            "Todavía no has descubierto monstruos." to "Aínda non descubriches monstros.",
+            "No se pudo guardar el PDF." to "Non se puido gardar o PDF.",
+            "No se pudo cargar la ficha del personaje." to "Non se puido cargar a ficha do personaxe.",
+            "Ficha PDF guardada correctamente." to "Ficha PDF gardada correctamente.",
+            "Descargar ficha en PDF" to "Descargar ficha en PDF",
+            "Guardar ficha" to "Gardar ficha",
+            "Personaje derrotado" to "Personaxe derrotado",
+            "Crea gremio" to "Crea gremio",
+            "Crear gremio" to "Crear gremio",
+            "Buscar gremios" to "Buscar gremios",
+            "Buscar usuarios" to "Buscar usuarios",
+            "Solicitudes de amistad" to "Solicitudes de amizade",
+            "Lista de amigos" to "Lista de amigos",
+            "Zona social" to "Zona social"
+        )
+
+        val wordReplacements = linkedMapOf(
+            "personajes" to "personaxes",
+            "Personajes" to "Personaxes",
+            "personaje" to "personaxe",
+            "Personaje" to "Personaxe",
+            "descripción" to "descrición",
+            "Descripción" to "Descrición",
+            "amistad" to "amizade",
+            "Amistad" to "Amizade",
+            "guardar" to "gardar",
+            "Guardar" to "Gardar",
+            "guardado" to "gardado",
+            "Guardado" to "Gardado",
+            "guardada" to "gardada",
+            "Guardada" to "Gardada",
+            "línea" to "liña",
+            "Línea" to "Liña",
+            "daño" to "dano",
+            "Daño" to "Dano",
+            "contraseña" to "contrasinal",
+            "Contraseña" to "Contrasinal",
+            "nombre" to "nome",
+            "Nombre" to "Nome",
+            "miembros" to "membros",
+            "Miembros" to "Membros",
+            "registro" to "rexistro",
+            "Registro" to "Rexistro",
+            "registros" to "rexistros",
+            "Registros" to "Rexistros",
+            "configuración" to "configuración",
+            "batalla" to "batalla",
+            "gremio" to "gremio",
+            "jefe" to "xefe",
+            "Jefe" to "Xefe",
+            "sala" to "sala",
+            "pelea" to "loita",
+            "Pelear" to "Loitar",
+            "mundo" to "mundo",
+            "ficha" to "ficha",
+            "última" to "última",
+            "Última" to "Última",
+            "correo" to "correo",
+            "botín" to "botín",
+            "debilidad" to "debilidade",
+            "Debilidad" to "Debilidade",
+            "debilidades" to "debilidades",
+            "Debilidades" to "Debilidades",
+            "resistencia" to "resistencia",
+            "resistencias" to "resistencias"
+        )
+
+        var translated = value
+        phraseReplacements.forEach { (from, to) ->
+            translated = translated.replace(from, to)
+        }
+        wordReplacements.forEach { (from, to) ->
+            translated = translated.replace(from, to)
+        }
+        translated = translated
+            .replace("No se pudo", "Non se puido")
+            .replace("No hay", "Non hai")
+            .replace("Todavía", "Aínda")
+            .replace("Todavia", "Aínda")
+            .replace("Más", "Máis")
+            .replace(" mas ", " máis ")
+            .replace("Última orden", "Última orde")
+            .replace("Última vez", "Última vez")
+            .replace("Seleccionado", "Seleccionado")
+
         return translated
     }
 
+    // Ejecuta la lógica de word.
     private fun word(language: String, key: String): String = when (key) {
         "Lv." -> when (language) { "en" -> "Lv."; "ca" -> "Nv."; "eu" -> "Maila "; "de" -> "St."; "fr" -> "Nv."; "gl" -> "Nv."; else -> "Nv." }
         "Ago" -> when (language) { "en" -> ""; "ca" -> "Fa"; "eu" -> "Duela"; "de" -> "Vor"; "fr" -> "Il y a"; "gl" -> "Hai"; else -> "Hace" }.ifBlank { "" }
@@ -658,10 +800,12 @@ object FixedTextTranslator {
 }
 
 @Composable
+// Ejecuta la lógica de localized text.
 fun localizedText(value: String): String =
     FixedTextTranslator.translate(LocalContext.current, value)
 
 @Composable
+// Ejecuta la lógica de text.
 fun Text(
     text: String,
     modifier: Modifier = Modifier,
@@ -703,6 +847,7 @@ fun Text(
 }
 
 @Composable
+// Ejecuta la lógica de text.
 fun Text(
     text: AnnotatedString,
     modifier: Modifier = Modifier,

@@ -64,19 +64,25 @@ private fun rollDnDStat(): Pair<Int, List<Int>> {
     return total to rolls
 }
 
+// Ejecuta la lógica de roll all stats.
 private fun rollAllStats(statNames: List<String>): Map<String, Pair<Int, List<Int>>> =
     statNames.associateWith { rollDnDStat() }
 
 // ── ESTADOS DEL RETRATO ──────────────────────────────────────────────────────
 private sealed class PortraitState {
+    // Clase que encapsula la lógica de idle.
     object Idle : PortraitState()
+    // Clase que encapsula la lógica de loading.
     object Loading : PortraitState()
+    // Clase que encapsula la lógica de ready.
     data class Ready(val bitmap: Bitmap, val base64: String) : PortraitState()
+    // Clase que encapsula la lógica de failed.
     data class Failed(val reason: String) : PortraitState()
 }
 
 // ── DIÁLOGO PRINCIPAL ────────────────────────────────────────────────────────
 @Composable
+// Ejecuta la lógica de create character dialog.
 fun CreateCharacterDialog(
     onDismiss: () -> Unit,
     onCreate: (
@@ -148,12 +154,14 @@ fun CreateCharacterDialog(
 
     val classOptions = subclassesByClass.keys.toList()
 
+    // Actualiza race by voice.
     fun setRaceByVoice(value: String) {
         val matched = findBestVoiceOption(value, raceOptions)
         race = matched ?: value
         portraitState = PortraitState.Idle
     }
 
+    // Actualiza class by voice.
     fun setClassByVoice(value: String) {
         val matched = findBestVoiceOption(value, classOptions)
         if (matched != null) {
@@ -163,12 +171,14 @@ fun CreateCharacterDialog(
         }
     }
 
+    // Actualiza subclass by voice.
     fun setSubclassByVoice(value: String) {
         val options = subclassesByClass[clazz].orEmpty()
         val matched = findBestVoiceOption(value, options)
         subclazz = matched ?: value
     }
 
+    // Actualiza stat by voice.
     fun setStatByVoice(stat: String, value: String) {
         val number = value.toIntOrNull()?.coerceIn(1, 30) ?: return
         diceResults = diceResults.toMutableMap().also { map ->
@@ -177,6 +187,7 @@ fun CreateCharacterDialog(
         diceModeActive = false
     }
 
+    // Ejecuta la lógica de change stat by voice.
     fun changeStatByVoice(stat: String, delta: Int) {
         val current = diceResults[stat]?.first ?: 10
         val next = (current + delta).coerceIn(1, 30)
@@ -187,6 +198,7 @@ fun CreateCharacterDialog(
         diceModeActive = false
     }
 
+    // Alterna bonus by voice.
     fun toggleBonusByVoice(stat: String, amount: Int) {
         when (amount) {
             2 -> {
@@ -201,6 +213,7 @@ fun CreateCharacterDialog(
         }
     }
 
+    // Genera portrait by voice or button.
     fun generatePortraitByVoiceOrButton() {
         if (!canGenerate || portraitState is PortraitState.Loading) return
 
@@ -223,6 +236,7 @@ fun CreateCharacterDialog(
         }
     }
 
+    // Ejecuta la lógica de submit character by voice or button.
     fun submitCharacterByVoiceOrButton() {
         val finalStats = diceResults.mapValues { (statName, pair) ->
             var total = pair.first
@@ -256,6 +270,7 @@ fun CreateCharacterDialog(
         portraitState,
         isGenerating
     ) {
+        // Ejecuta la lógica de stat aliases.
         fun statAliases(stat: String): List<String> = when (stat) {
             "Fuerza" -> listOf("Fuerza", "fue", "strength")
             "Destreza" -> listOf("Destreza", "des", "dex", "dexterity")

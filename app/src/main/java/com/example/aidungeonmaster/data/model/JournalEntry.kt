@@ -1,5 +1,6 @@
 package com.example.aidungeonmaster.data.model
 
+// Modelo de datos que representa journal entry.
 data class JournalEntry(
     val id: String = "",
     val title: String = "",

@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
+// Modelo de datos que representa ranking entry.
 data class RankingEntry(
     val charId: String = "",
     val characterName: String = "",
@@ -27,6 +28,7 @@ data class RankingEntry(
     val carisma: Int = 0
 )
 
+// Clase que encapsula la lógica de ranking category.
 enum class RankingCategory(val label: String, val icon: String, val field: String, val displayName: String) {
     TOTAL_STATS("Stats Totales",  "🏆", "totalStats",   "pts totales"),
     HP_MAX     ("HP Máximo",      "❤️", "hpMax",        "HP"),
@@ -38,6 +40,7 @@ enum class RankingCategory(val label: String, val icon: String, val field: Strin
     CHARISMA   ("Carisma",        "✨", "carisma",      "CAR")
 }
 
+// ViewModel que coordina el estado y la lógica de ranking.
 class RankingViewModel : ViewModel() {
 
     private val db = FirebaseFirestore.getInstance()
@@ -50,6 +53,7 @@ class RankingViewModel : ViewModel() {
 
     init { loadAllRankings() }
 
+    // Carga all rankings.
     fun loadAllRankings() {
         viewModelScope.launch {
             _isLoading.value = true

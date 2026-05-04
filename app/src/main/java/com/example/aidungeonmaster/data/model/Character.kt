@@ -2,6 +2,7 @@ package com.example.aidungeonmaster.data.model
 
 private val DICE_REGEX = Regex("""\d+d\d+(?:\+\d+)?""", RegexOption.IGNORE_CASE)
 
+// Ejecuta la lógica de normalize equip slot.
 fun normalizeEquipSlot(raw: String): String {
     return raw.trim()
         .lowercase()
@@ -28,6 +29,7 @@ fun normalizeEquipSlot(raw: String): String {
         }
 }
 
+// Clase que encapsula la lógica de item enchantment.
 data class ItemEnchantment(
     val id: String = "",
     val name: String = "",
@@ -38,6 +40,7 @@ data class ItemEnchantment(
     val weaponDamageBonus: Int = 0
 )
 
+// Clase que encapsula la lógica de equipment set bonus.
 data class EquipmentSetBonus(
     val piecesRequired: Int,
     val statBonuses: Map<String, Int> = emptyMap(),
@@ -47,6 +50,7 @@ data class EquipmentSetBonus(
     val initiativeBonus: Int = 0
 )
 
+// Clase que encapsula la lógica de equipment set definition.
 data class EquipmentSetDefinition(
     val id: String,
     val name: String,
@@ -153,6 +157,7 @@ data class Item(
         get() = enchantments.sumOf { it.weaponDamageBonus }
 
     companion object {
+        // Ejecuta la lógica de extract dice expression.
         private fun extractDiceExpression(text: String): String {
             return DICE_REGEX.find(text)?.value ?: ""
         }
@@ -176,10 +181,12 @@ data class EquippedItems(
 
     val amulet: Item? = null
 ) {
+    // Ejecuta la lógica de all equipped.
     fun allEquipped(): List<Item> = listOfNotNull(
         head, chest, legs, feet, hands, mainHand, offHand, ring, ring2, amulet
     )
 
+    // Ejecuta la lógica de item in slot.
     fun itemInSlot(slot: String): Item? = when (normalizeEquipSlot(slot)) {
         "head" -> head
         "chest" -> chest
@@ -194,6 +201,7 @@ data class EquippedItems(
         else -> null
     }
 
+    // Ejecuta la lógica de with item.
     fun withItem(slot: String, item: Item?): EquippedItems = when (normalizeEquipSlot(slot)) {
         "head" -> copy(head = item)
         "chest" -> copy(chest = item)
@@ -209,6 +217,7 @@ data class EquippedItems(
     }
 }
 
+// Ejecuta la lógica de normalize stat key.
 private fun normalizeStatKey(raw: String): String {
     return raw.trim()
         .lowercase()
@@ -219,6 +228,7 @@ private fun normalizeStatKey(raw: String): String {
         .replace("ú", "u")
 }
 
+// Comprueba si onical stat name.
 private fun canonicalStatName(raw: String): String = when (normalizeStatKey(raw)) {
     "fuerza" -> "Fuerza"
     "destreza" -> "Destreza"
@@ -278,6 +288,7 @@ private val BASIC_EQUIPMENT_SETS = listOf(
     )
 )
 
+// Modelo de datos que representa character.
 data class Character(
     val id: String = "",
     val name: String = "",
@@ -315,6 +326,7 @@ data class Character(
             else -> 2
         }
 
+    // Ejecuta la lógica de base stat value.
     private fun baseStatValue(name: String): Int {
         val canonical = canonicalStatName(name)
         return stats[canonical] ?: 10
@@ -359,6 +371,7 @@ data class Character(
             .groupBy({ it.first }, { it.second })
             .mapValues { (_, values) -> values.sum() }
 
+    // Ejecuta la lógica de total stat.
     fun totalStat(name: String): Int {
         val canonical = canonicalStatName(name)
         return baseStatValue(canonical) +
@@ -366,6 +379,7 @@ data class Character(
                 (setStatBonuses[canonical] ?: 0)
     }
 
+    // Ejecuta la lógica de stat modifier.
     fun statModifier(name: String): Int = (totalStat(name) - 10) / 2
 
     val strTotal get() = totalStat("Fuerza")

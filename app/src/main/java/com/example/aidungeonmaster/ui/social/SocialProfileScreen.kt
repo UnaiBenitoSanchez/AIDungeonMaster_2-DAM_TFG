@@ -52,6 +52,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+// Clase que encapsula la lógica de profile palette.
 private data class ProfilePalette(val accent: String, val background: String)
 
 private val profilePalettes = listOf(
@@ -64,6 +65,7 @@ private val profilePalettes = listOf(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+// Ejecuta la lógica de social profile screen.
 fun SocialProfileScreen(
     userUid: String,
     isMe: Boolean,
@@ -338,6 +340,7 @@ fun SocialProfileScreen(
 }
 
 @Composable
+// Ejecuta la lógica de profile palette chip.
 private fun ProfilePaletteChip(
     palette: ProfilePalette,
     selected: Boolean,
@@ -369,6 +372,7 @@ private fun ProfilePaletteChip(
 }
 
 @Composable
+// Ejecuta la lógica de presence indicator.
 fun PresenceIndicator(
     isOnline: Boolean,
     lastSeen: Long?
@@ -405,10 +409,12 @@ fun PresenceIndicator(
     }
 }
 
+// Analiza color.
 private fun parseColor(hex: String): Color =
     runCatching { Color(android.graphics.Color.parseColor(hex)) }
         .getOrElse { Color(0xFF1E1E1E) }
 
+// Formatea last seen.
 private fun formatLastSeen(timestamp: Long): String {
     if (timestamp <= 0L) return "sin datos"
     return SimpleDateFormat("dd/MM HH:mm", Locale.getDefault()).format(Date(timestamp))

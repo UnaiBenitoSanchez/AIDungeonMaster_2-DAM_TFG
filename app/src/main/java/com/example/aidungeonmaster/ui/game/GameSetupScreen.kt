@@ -28,6 +28,7 @@ import com.example.aidungeonmaster.ui.accessibility.VoiceFormRegistry
 import com.example.aidungeonmaster.ui.accessibility.VoiceFormScreen
 
 @Composable
+// Ejecuta la lógica de game setup screen.
 fun GameSetupScreen(
     navController: NavHostController,
     userId: String,
@@ -41,6 +42,7 @@ fun GameSetupScreen(
     val characters by homeViewModel.characters.collectAsState()
     val characterId = characters.find { it.name == characterName }?.id ?: ""
 
+    // Selecciona adventure theme.
     fun selectAdventureTheme(theme: String) {
         if (characterId.isNotEmpty()) {
             // 1. Guardamos el tema en el personaje (Firebase)
@@ -113,6 +115,7 @@ fun GameSetupScreen(
 }
 
 @Composable
+// Ejecuta la lógica de theme button custom.
 fun ThemeButtonCustom(theme: String, onClick: () -> Unit) {
     Box(
         modifier = Modifier
@@ -132,6 +135,7 @@ fun ThemeButtonCustom(theme: String, onClick: () -> Unit) {
 }
 
 @Composable
+// Ejecuta la lógica de cyberpunk layout.
 fun CyberpunkLayout(title: String) {
     // Animación de parpadeo (flicker)
     val infiniteTransition = rememberInfiniteTransition(label = "neon")
@@ -177,6 +181,7 @@ fun CyberpunkLayout(title: String) {
 }
 
 @Composable
+// Ejecuta la lógica de gothic layout.
 fun GothicLayout(title: String) {
     Box(modifier = Modifier.fillMaxSize().background(Color(0xFF0F0000))) {
         Canvas(modifier = Modifier.fillMaxSize()) {
@@ -224,6 +229,7 @@ fun androidx.compose.ui.graphics.drawscope.DrawScope.drawbat(x: Float, y: Float)
 }
 
 @Composable
+// Ejecuta la lógica de epic layout.
 fun EpicLayout(title: String) {
     Box(modifier = Modifier.fillMaxSize().background(
         Brush.linearGradient(listOf(Color(0xFF53350A), Color(0xFFB8860B)))
@@ -247,6 +253,7 @@ fun EpicLayout(title: String) {
 }
 
 @Composable
+// Ejecuta la lógica de mystery layout.
 fun MysteryLayout(title: String) {
     Box(modifier = Modifier.fillMaxSize().background(Color(0xFF0D1117))) {
         Canvas(modifier = Modifier.fillMaxSize()) {

@@ -4,6 +4,7 @@ import java.text.Normalizer
 import java.util.Locale
 import kotlin.math.min
 
+// Clase que encapsula la lógica de voice input type.
 enum class VoiceInputType {
     TEXT,
     HUMAN_NAME,
@@ -13,6 +14,7 @@ enum class VoiceInputType {
     NUMBER
 }
 
+// Clase que encapsula la lógica de voice form field.
 data class VoiceFormField(
     val label: String,
     val aliases: List<String>,
@@ -27,6 +29,7 @@ data class VoiceFormField(
     }
 )
 
+// Clase que encapsula la lógica de voice form action.
 data class VoiceFormAction(
     val label: String,
     val aliases: List<String>,
@@ -36,11 +39,13 @@ data class VoiceFormAction(
     val feedback: String = "$label ejecutado."
 )
 
+// Pantalla que representa voice form.
 data class VoiceFormScreen(
     val screenName: String,
     val fields: List<VoiceFormField> = emptyList(),
     val actions: List<VoiceFormAction> = emptyList()
 ) {
+    // Ejecuta la lógica de try handle.
     fun tryHandle(rawCommand: String): String? {
         val command = rawCommand.normalizedForVoiceCommand()
         if (command.isBlank()) return null
@@ -84,6 +89,7 @@ data class VoiceFormScreen(
         return null
     }
 
+    // Construye help text.
     private fun buildHelpText(): String {
         val fieldNames = fields.joinToString(", ") { it.label }
         val actionNames = actions.joinToString(", ") { it.label }
@@ -104,15 +110,19 @@ data class VoiceFormScreen(
     }
 }
 
+// Clase que encapsula la lógica de voice form registration.
 class VoiceFormRegistration internal constructor(
     private val onDispose: () -> Unit
 ) {
+    // Ejecuta la lógica de dispose.
     fun dispose() = onDispose()
 }
 
+// Clase que encapsula la lógica de voice form registry.
 object VoiceFormRegistry {
     private val screenStack = mutableListOf<VoiceFormScreen>()
 
+    // Ejecuta la lógica de register.
     fun register(screen: VoiceFormScreen): VoiceFormRegistration {
         screenStack.remove(screen)
         screenStack.add(screen)
@@ -122,11 +132,13 @@ object VoiceFormRegistry {
         }
     }
 
+    // Ejecuta la lógica de try handle.
     fun tryHandle(rawCommand: String): String? {
         return screenStack.lastOrNull()?.tryHandle(rawCommand)
     }
 }
 
+// Ejecuta la lógica de string.
 fun String.normalizedForVoiceCommand(): String {
     val withoutAccents = Normalizer.normalize(this, Normalizer.Form.NFD)
         .replace("\\p{Mn}+".toRegex(), "")
@@ -138,6 +150,7 @@ fun String.normalizedForVoiceCommand(): String {
         .trim()
 }
 
+// Ejecuta la lógica de find best voice option.
 fun findBestVoiceOption(
     spokenValue: String,
     options: List<String>
@@ -168,6 +181,7 @@ fun findBestVoiceOption(
         ?.first
 }
 
+// Ejecuta la lógica de string.
 private fun String.matchesVoiceAction(aliases: List<String>): Boolean {
     return aliases.any { alias ->
         val normalizedAlias = alias.normalizedForVoiceCommand()
@@ -177,6 +191,7 @@ private fun String.matchesVoiceAction(aliases: List<String>): Boolean {
     }
 }
 
+// Ejecuta la lógica de extract field value.
 private fun extractFieldValue(
     command: String,
     aliases: List<String>
@@ -253,6 +268,7 @@ private fun extractFieldValue(
     return null
 }
 
+// Ejecuta la lógica de string.
 private fun String.toVoiceFormValue(type: VoiceInputType): String {
     val normalized = this.normalizedForVoiceCommand()
 
@@ -314,6 +330,7 @@ private fun String.toVoiceFormValue(type: VoiceInputType): String {
     }
 }
 
+// Analiza spanish number.
 private fun parseSpanishNumber(value: String): Int? {
     value.toIntOrNull()?.let { return it }
 
@@ -360,6 +377,7 @@ private fun parseSpanishNumber(value: String): Int? {
     return null
 }
 
+// Ejecuta la lógica de levenshtein distance.
 private fun levenshteinDistance(a: String, b: String): Int {
     if (a == b) return 0
     if (a.isEmpty()) return b.length

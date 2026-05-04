@@ -1,5 +1,6 @@
 package com.example.aidungeonmaster.data.model
 
+// Modelo de datos que representa friend request.
 data class FriendRequest(
     val id: String = "",
     val fromUid: String = "",

@@ -6,7 +6,6 @@
     <string name="language_basque">Basque</string>
     <string name="language_german">Allemand</string>
     <string name="language_french">Français</string>
-    <string name="language_galician">Galicien</string>
     <string name="common_back">Retour</string>
     <string name="common_close">Fermer</string>
     <string name="common_cancel">Annuler</string>
@@ -30,6 +29,12 @@
     <string name="common_you">Vous</string>
     <string name="common_unknown">Inconnu</string>
     <string name="common_no_data">Aucune donnée</string>
+    <string name="common_explore">Explorer</string>
+    <string name="common_profile">Mon profil</string>
+    <string name="common_search_users">Rechercher des utilisateurs</string>
+    <string name="common_friend_requests">Demandes d’amitié</string>
+    <string name="common_friends_list">Liste d’amis</string>
+    <string name="common_social_area">Zone sociale</string>
     <string name="home_title_characters">Vos personnages</string>
     <string name="home_more_options">Plus d’options</string>
     <string name="home_view_tutorial">Voir le tutoriel</string>
@@ -116,6 +121,10 @@
     <string name="guild_details_member">Membre</string>
     <string name="guild_details_lead">Promouvoir</string>
     <string name="guild_details_knocked_out">KO</string>
+    <string name="guild_details_overview">Vue d’ensemble</string>
+    <string name="guild_details_leader_badge">Chef : %1$s</string>
+    <string name="guild_details_guild_full">Guilde complète</string>
+    <string name="guild_details_join_guild">Rejoindre la guilde</string>
     <string name="bestiary_title">Bestiaire</string>
     <string name="bestiary_filter_all">Tous</string>
     <string name="bestiary_filter_defeated">Vaincus</string>
@@ -169,4 +178,5 @@
     <string name="bestiary_loot_detail_line">Catégorie : %1$s · Quantité max observée : %2$d · Fois vue : %3$d</string>
     <string name="bestiary_registered_loot">Butin enregistré</string>
     <string name="bestiary_no_confirmed_loot">Aucun butin confirmé pour cette créature pour le moment.</string>
+    <string name="language_galician">Galicien</string>
 </resources>

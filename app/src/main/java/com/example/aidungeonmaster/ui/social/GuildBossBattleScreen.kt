@@ -65,6 +65,7 @@ import com.example.aidungeonmaster.viewmodel.SocialViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+// Ejecuta la lógica de guild boss battle screen.
 fun GuildBossBattleScreen(
     guildId: String,
     onBack: () -> Unit,
@@ -243,6 +244,7 @@ fun GuildBossBattleScreen(
 }
 
 @Composable
+// Ejecuta la lógica de waiting boss battle content.
 private fun WaitingBossBattleContent(
     room: GuildBossRoom,
     participants: List<GuildBossParticipant>,
@@ -327,6 +329,7 @@ private fun WaitingBossBattleContent(
 }
 
 @Composable
+// Ejecuta la lógica de finished boss battle content.
 private fun FinishedBossBattleContent(
     room: GuildBossRoom,
     participants: List<GuildBossParticipant>,
@@ -413,6 +416,7 @@ private fun FinishedBossBattleContent(
 }
 
 @Composable
+// Ejecuta la lógica de active boss battle content.
 private fun ActiveBossBattleContent(
     room: GuildBossRoom,
     participants: List<GuildBossParticipant>,
@@ -713,6 +717,7 @@ private fun ActiveBossBattleContent(
 
 // --- Panel de habilidades expandible ---
 @Composable
+// Ejecuta la lógica de abilities panel.
 private fun AbilitiesPanel(
     abilities: List<GuildBossAbility>,
     cooldowns: Map<String, Int>,
@@ -749,6 +754,7 @@ private fun AbilitiesPanel(
 }
 
 @Composable
+// Ejecuta la lógica de ability button.
 private fun AbilityButton(
     ability: GuildBossAbility,
     cooldownTurns: Int,
@@ -827,6 +833,7 @@ private fun AbilityButton(
 
 // --- Panel de objetos consumibles ---
 @Composable
+// Ejecuta la lógica de consumables panel.
 private fun ConsumablesPanel(
     items: List<Item>,
     isActing: Boolean,
@@ -859,6 +866,7 @@ private fun ConsumablesPanel(
 }
 
 @Composable
+// Ejecuta la lógica de consumable button.
 private fun ConsumableButton(
     item: Item,
     isActing: Boolean,
@@ -910,6 +918,7 @@ private fun ConsumableButton(
 }
 
 @Composable
+// Ejecuta la lógica de participant card.
 private fun ParticipantCard(
     participant: GuildBossParticipant,
     currentUserUid: String,

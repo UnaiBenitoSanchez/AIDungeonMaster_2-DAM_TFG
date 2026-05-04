@@ -25,6 +25,7 @@ import java.util.concurrent.atomic.AtomicLong
 
 private val logIdCounter = AtomicLong(0L)
 
+// Clase que encapsula la lógica de combat phase.
 enum class CombatPhase {
     INTRO,
     PLAYER_TURN,
@@ -35,6 +36,7 @@ enum class CombatPhase {
     FLED
 }
 
+// Clase que encapsula la lógica de log type.
 enum class LogType {
     SYSTEM,
     PLAYER_HIT, PLAYER_MISS, PLAYER_CRIT,
@@ -42,12 +44,14 @@ enum class LogType {
     HEAL, SPECIAL
 }
 
+// Modelo de datos que representa combat log entry.
 data class CombatLogEntry(
     val text: String,
     val type: LogType,
     val id: Long = logIdCounter.incrementAndGet()
 )
 
+// Clase que encapsula la lógica de dice anim state.
 data class DiceAnimState(
     val diceLabel: String = "",
     val actionLabel: String = "",
@@ -59,8 +63,10 @@ data class DiceAnimState(
     val isHeal: Boolean = false,
 )
 
+// Clase que encapsula la lógica de ability type.
 enum class AbilityType { DAMAGE, HEAL, BUFF_DEFENSE, BUFF_ATTACK, SPECIAL_FLEE }
 
+// Clase que encapsula la lógica de class ability.
 data class ClassAbility(
     val id: String,
     val name: String,
@@ -182,6 +188,7 @@ class CombatViewModel(
     private val playerAC: Int
         get() = (playerCharacter.armorClass + defenseBonus).coerceIn(8, 32)
 
+    // Ejecuta la lógica de resolve active weapon.
     private fun resolveActiveWeapon(): Item {
         return playerCharacter.equippedWeapon ?: Item(
             id = "fist",
@@ -223,6 +230,7 @@ class CombatViewModel(
     }
 
 
+    // Ejecuta la lógica de infer enemy tags.
     private fun inferEnemyTags(): List<String> {
         val basis = enemy.name.lowercase()
         val tags = mutableListOf<String>()
@@ -234,6 +242,7 @@ class CombatViewModel(
         return tags.distinct()
     }
 
+    // Ejecuta la lógica de infer observed weaknesses.
     private fun inferObservedWeaknesses(triggerSource: String? = null): List<String> {
         val basis = listOf(enemy.name, triggerSource.orEmpty()).joinToString(" ").lowercase()
         val weaknesses = mutableListOf<String>()
@@ -246,6 +255,7 @@ class CombatViewModel(
         return weaknesses.distinct()
     }
 
+    // Ejecuta la lógica de infer observed resistances.
     private fun inferObservedResistances(): List<String> {
         val basis = enemy.name.lowercase()
         val resistances = mutableListOf<String>()
@@ -257,6 +267,7 @@ class CombatViewModel(
         return resistances.distinct()
     }
 
+    // Construye detailed loot from victory.
     private fun buildDetailedLootFromVictory(coinsGained: Int, finisherName: String): List<BestiaryLoot> {
         val loot = mutableListOf<BestiaryLoot>()
         if (coinsGained > 0) {
@@ -278,6 +289,7 @@ class CombatViewModel(
         return loot.distinctBy { it.name.lowercase() }
     }
 
+    // Ejecuta la lógica de merge detailed loot.
     private fun mergeDetailedLoot(current: List<BestiaryLoot>, incoming: List<BestiaryLoot>): List<BestiaryLoot> {
         if (incoming.isEmpty()) return current
         val merged = current.associateBy { it.name.lowercase() }.toMutableMap()
@@ -429,6 +441,7 @@ class CombatViewModel(
         }
     }
 
+    // Ejecuta la lógica de use ability.
     fun useAbility(ability: ClassAbility) {
         if (_phase.value != CombatPhase.PLAYER_TURN) return
         val cd = _cooldowns.value[ability.id] ?: 0
@@ -608,6 +621,7 @@ class CombatViewModel(
         }
     }
 
+    // Ejecuta la lógica de enemy attack.
     private fun enemyAttack() {
         viewModelScope.launch {
             val attackRoll = roll(20)
@@ -850,6 +864,7 @@ class CombatViewModel(
 
     private fun roll(sides: Int): Int = (1..sides).random()
 
+    // Analiza dice.
     private fun parseDice(expr: String): Triple<Int, Int, Int> {
         val clean = expr.uppercase().trim()
         val rx    = """(\d*)D(\d+)(?:\+(\d+))?""".toRegex()
@@ -860,6 +875,7 @@ class CombatViewModel(
         return Triple(cnt, sides, bonus)
     }
 
+    // Ejecuta la lógica de log.
     private fun log(text: String, type: LogType) {
         _log.value = _log.value + CombatLogEntry(text, type)
     }
@@ -876,8 +892,10 @@ class CombatViewModel(
         _dice.value = DiceAnimState(diceLabel, actionLabel, rolls, total, true, isCrit, isFumble, isHeal)
     }
 
+    // Ejecuta la lógica de hide dice.
     private fun hideDice() { _dice.value = DiceAnimState() }
 
+    // Ejecuta la lógica de add cooldown.
     private fun addCooldown(ability: ClassAbility) {
         _cooldowns.value = _cooldowns.value + (ability.id to ability.cooldownTurns)
     }

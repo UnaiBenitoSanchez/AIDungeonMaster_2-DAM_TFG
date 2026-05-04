@@ -19,6 +19,7 @@ import kotlin.math.pow
 import kotlin.math.sin
 import kotlin.math.tanh
 
+// Clase que encapsula la lógica de adventure music engine.
 object AdventureMusicEngine {
 
     private const val SR = 44100
@@ -33,6 +34,7 @@ object AdventureMusicEngine {
     private val engineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val DELAY_BUF = (SR * DELAY_BUFFER_SECONDS).toInt().coerceAtLeast(1)
 
+    // Pantalla que representa music.
     enum class MusicScreen(val volume: Float) {
         GAMEPLAY(1.00f),
         INVENTORY(0.42f),
@@ -44,10 +46,12 @@ object AdventureMusicEngine {
         MUTED(0.00f)
     }
 
+    // Clase que encapsula la lógica de lead wave.
     private enum class LeadWave {
         SQUARE, TRIANGLE, SAW, SINE
     }
 
+    // Modelo de datos que representa adventure theme profile.
     private data class AdventureThemeProfile(
         val name: String,
         val bpm: Double,
@@ -234,6 +238,7 @@ object AdventureMusicEngine {
         }
     }
 
+    // Clase que encapsula la lógica de render state.
     private data class RenderState(
         var profile: AdventureThemeProfile,
         val delayBufL: FloatArray = FloatArray(DELAY_BUF),
@@ -264,6 +269,7 @@ object AdventureMusicEngine {
     private var currentGain = 0f
     private var stepCounter = 0
 
+    // Ejecuta la lógica de enter gameplay.
     fun enterGameplay(theme: String) {
         requestedTheme = AdventureThemeProfile.fromTheme(theme)
         requestedScreen = MusicScreen.GAMEPLAY
@@ -271,15 +277,18 @@ object AdventureMusicEngine {
         ensurePlaying()
     }
 
+    // Actualiza screen.
     fun setScreen(screen: MusicScreen) {
         requestedScreen = screen
         stopJob?.cancel()
     }
 
+    // Actualiza voice control ducking.
     fun setVoiceControlDucking(enabled: Boolean) {
         voiceControlDuckingEnabled = enabled
     }
 
+    // Ejecuta la lógica de release screen.
     fun releaseScreen(delayMs: Long = DEFAULT_STOP_DELAY_MS) {
         stopJob?.cancel()
         stopJob = engineScope.launch {
@@ -291,6 +300,7 @@ object AdventureMusicEngine {
         }
     }
 
+    // Detiene now.
     fun stopNow() {
         isPlaying = false
 
@@ -316,6 +326,7 @@ object AdventureMusicEngine {
         Log.d(TAG, "■ Música de aventura detenida")
     }
 
+    // Ejecuta la lógica de ensure playing.
     private fun ensurePlaying() {
         if (isPlaying) return
 
@@ -412,6 +423,7 @@ object AdventureMusicEngine {
         }
     }
 
+    // Ejecuta la lógica de effective requested volume.
     private fun effectiveRequestedVolume(): Float {
         val duckingMultiplier = if (voiceControlDuckingEnabled) {
             VOICE_CONTROL_DUCKING_MULTIPLIER
@@ -421,11 +433,13 @@ object AdventureMusicEngine {
         return (requestedScreen.volume * duckingMultiplier).coerceIn(0f, 1f)
     }
 
+    // Ejecuta la lógica de step samples for.
     private fun stepSamplesFor(profile: AdventureThemeProfile): Int {
         val stepSec = 60.0 / profile.bpm / 4.0
         return (SR * stepSec).toInt().coerceAtLeast(1)
     }
 
+    // Ejecuta la lógica de synthesize step.
     private fun synthesizeStep(
         renderState: RenderState,
         stepIndex: Int,
@@ -523,6 +537,7 @@ object AdventureMusicEngine {
         return buf
     }
 
+    // Aplica master gain and convert.
     private fun applyMasterGainAndConvert(
         input: FloatArray,
         startGain: Float,
@@ -545,14 +560,17 @@ object AdventureMusicEngine {
         return out
     }
 
+    // Ejecuta la lógica de lerp.
     private fun lerp(a: Float, b: Float, t: Float): Float {
         return a + (b - a) * t.coerceIn(0f, 1f)
     }
 
+    // Ejecuta la lógica de soft clip.
     private fun softClip(x: Float): Float {
         return tanh(x.toDouble()).toFloat().coerceIn(-1f, 1f)
     }
 
+    // Ejecuta la lógica de lead osc.
     private fun leadOsc(wave: LeadWave, freq: Double, t: Double): Float {
         val p = (t * freq) % 1.0
         val value = when (wave) {
@@ -592,6 +610,7 @@ object AdventureMusicEngine {
         return (440.0 * 2.0.pow((midi - 69) / 12.0)).toFloat()
     }
 
+    // Ejecuta la lógica de adsr.
     private fun adsr(
         t: Double,
         dur: Double,
@@ -610,12 +629,14 @@ object AdventureMusicEngine {
         }.coerceIn(0.0, 1.0)
     }
 
+    // Ejecuta la lógica de kick808.
     private fun kick808(t: Double): Float {
         if (t > 0.35) return 0f
         val freq = 65.0 * exp(-12.0 * t) + 40.0
         return (sin(2 * PI * freq * t) * exp(-6.0 * t) * 0.9).toFloat()
     }
 
+    // Ejecuta la lógica de snare808.
     private fun snare808(t: Double): Float {
         if (t > 0.22) return 0f
         val noise = ((Math.random() * 2.0 - 1.0) * exp(-22.0 * t)).toFloat()
@@ -623,6 +644,7 @@ object AdventureMusicEngine {
         return ((noise * 0.6f) + tone) * 0.8f
     }
 
+    // Ejecuta la lógica de hihat808.
     private fun hihat808(t: Double): Float {
         if (t > 0.05) return 0f
         return ((Math.random() * 2.0 - 1.0) * exp(-60.0 * t) * 0.3).toFloat()

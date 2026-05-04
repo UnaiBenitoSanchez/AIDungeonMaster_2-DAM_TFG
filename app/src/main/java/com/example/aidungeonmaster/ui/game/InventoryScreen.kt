@@ -45,6 +45,7 @@ import com.example.aidungeonmaster.ui.accessibility.findBestVoiceOption
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
+// Ejecuta la lógica de inventory screen.
 fun InventoryScreen(
     gameId: String,
     onBack: () -> Unit,
@@ -421,6 +422,7 @@ fun InventoryScreen(
 }
 
 @Composable
+// Ejecuta la lógica de inventory pager tabs.
 private fun InventoryPagerTabs(selectedPage: Int) {
     Row(
         modifier = Modifier
@@ -447,6 +449,7 @@ private fun InventoryPagerTabs(selectedPage: Int) {
 }
 
 @Composable
+// Ejecuta la lógica de tab chip.
 private fun TabChip(
     title: String,
     selected: Boolean,
@@ -476,6 +479,7 @@ private fun TabChip(
 }
 
 @Composable
+// Ejecuta la lógica de inventory page.
 private fun InventoryPage(
     character: Character,
     getComparison: (Item) -> ItemComparison?,
@@ -538,6 +542,7 @@ private fun InventoryPage(
 }
 
 @Composable
+// Ejecuta la lógica de equipment page.
 private fun EquipmentPage(
     character: Character,
     onUnequip: (String) -> Unit
@@ -587,6 +592,7 @@ private fun EquipmentPage(
 }
 
 @Composable
+// Ejecuta la lógica de character header card.
 private fun CharacterHeaderCard(
     character: Character,
     statsExpanded: Boolean,
@@ -772,6 +778,7 @@ private fun CharacterHeaderCard(
 }
 
 @Composable
+// Ejecuta la lógica de equipment slot card.
 private fun EquipmentSlotCard(
     slotKey: String,
     slotLabel: String,
@@ -869,6 +876,7 @@ private fun EquipmentSlotCard(
 }
 
 @Composable
+// Ejecuta la lógica de inventory item row.
 fun InventoryItemRow(
     item: Item,
     comparison: ItemComparison? = null,
@@ -1050,6 +1058,7 @@ fun InventoryItemRow(
     }
 }
 
+// Construye inventory item detail text.
 private fun buildInventoryItemDetailText(item: Item): String {
     val parts = mutableListOf<String>()
 
@@ -1107,6 +1116,7 @@ private fun buildInventoryItemDetailText(item: Item): String {
     return parts.joinToString(" · ")
 }
 
+// Construye equipment detail text.
 private fun buildEquipmentDetailText(item: Item): String {
     val parts = mutableListOf<String>()
 
@@ -1146,6 +1156,7 @@ private fun buildEquipmentDetailText(item: Item): String {
     return parts.joinToString(" · ")
 }
 
+// Ejecuta la lógica de normalize item type.
 private fun normalizeItemType(raw: String): String {
     return raw
         .trim()
@@ -1157,6 +1168,7 @@ private fun normalizeItemType(raw: String): String {
         .replace("ú", "u")
 }
 
+// Ejecuta la lógica de friendly slot name.
 private fun friendlySlotName(slot: String): String = when (normalizeItemType(slot)) {
     "head", "cabeza" -> "cabeza"
     "chest", "pecho", "torso" -> "pecho"
@@ -1171,6 +1183,7 @@ private fun friendlySlotName(slot: String): String = when (normalizeItemType(slo
     else -> slot
 }
 
+// Ejecuta la lógica de slot emoji.
 private fun slotEmoji(slot: String): String = when (normalizeItemType(slot)) {
     "head", "cabeza" -> "🪖"
     "chest", "pecho", "torso" -> "🦺"
@@ -1184,8 +1197,10 @@ private fun slotEmoji(slot: String): String = when (normalizeItemType(slot)) {
     else -> "📦"
 }
 
+// Formatea mod.
 private fun formatMod(value: Int): String = if (value >= 0) "+$value" else "$value"
 
+// Ejecuta la lógica de friendly rarity name.
 private fun friendlyRarityName(rarity: String): String = when (rarity.lowercase()) {
     "common" -> "Común"
     "uncommon" -> "Poco común"
@@ -1195,6 +1210,7 @@ private fun friendlyRarityName(rarity: String): String = when (rarity.lowercase(
     else -> rarity.replaceFirstChar { it.uppercase() }
 }
 
+// Ejecuta la lógica de rarity order.
 private fun rarityOrder(rarity: String): Int = when (rarity.lowercase()) {
     "legendary" -> 0
     "epic" -> 1
@@ -1204,6 +1220,7 @@ private fun rarityOrder(rarity: String): Int = when (rarity.lowercase()) {
     else -> 5
 }
 
+// Ejecuta la lógica de item display order.
 private fun itemDisplayOrder(item: Item): Int = when {
     item.isWeapon -> 0
     item.isArmor -> 1
@@ -1212,6 +1229,7 @@ private fun itemDisplayOrder(item: Item): Int = when {
     else -> 4
 }
 
+// Ejecuta la lógica de icon for item type.
 private fun iconForItemType(item: Item): String = when {
     item.resolvedEquipSlot == "ring" || item.resolvedEquipSlot == "ring2" -> "💍"
     item.resolvedEquipSlot == "amulet" -> "📿"
@@ -1230,6 +1248,7 @@ private fun iconForItemType(item: Item): String = when {
 }
 
 @Composable
+// Ejecuta la lógica de ring slot chooser dialog.
 private fun RingSlotChooserDialog(
     item: Item,
     currentEquipment: com.example.aidungeonmaster.data.model.EquippedItems?,

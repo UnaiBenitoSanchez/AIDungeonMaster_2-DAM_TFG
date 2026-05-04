@@ -1,7 +1,9 @@
 package com.example.aidungeonmaster.utils
 
+// Clase que encapsula la lógica de race modifiers.
 object RaceModifiers {
 
+    // Ejecuta la lógica de apply.
     fun apply(race: String, stats: Map<String, Int>): Map<String, Int> {
         return when (race) {
             "Humano" -> stats.mapValues { it.value + 1 }

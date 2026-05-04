@@ -16,6 +16,7 @@ import kotlinx.coroutines.tasks.await
 import java.text.Normalizer
 import kotlin.math.absoluteValue
 
+// ViewModel que coordina el estado y la lógica de world map.
 class WorldMapViewModel : ViewModel() {
 
     private val db = FirebaseFirestore.getInstance()
@@ -52,6 +53,7 @@ class WorldMapViewModel : ViewModel() {
         "lugar" to "📍"
     )
 
+    // Carga map.
     fun loadMap(charId: String) {
         currentCharId = charId
 
@@ -123,6 +125,7 @@ class WorldMapViewModel : ViewModel() {
         }
     }
 
+    // Guarda map.
     private fun saveMap() {
         if (currentCharId.isBlank()) return
 
@@ -150,6 +153,7 @@ class WorldMapViewModel : ViewModel() {
         }
     }
 
+    // Ejecuta la lógica de process adventure step.
     fun processAdventureStep(storyText: String, locationJson: String?) {
         viewModelScope.launch {
             simulateWorldIfNeeded()
@@ -168,6 +172,7 @@ class WorldMapViewModel : ViewModel() {
         }
     }
 
+    // Analiza location from json.
     private fun parseLocationFromJson(json: String?): WorldLocation? {
         if (json.isNullOrBlank()) return null
 
@@ -195,6 +200,7 @@ class WorldMapViewModel : ViewModel() {
         }
     }
 
+    // Ejecuta la lógica de detect location from text.
     private fun detectLocationFromText(text: String): WorldLocation? {
         val locationPatterns = listOf(
             Regex(
@@ -237,10 +243,12 @@ class WorldMapViewModel : ViewModel() {
         return null
     }
 
+    // Ejecuta la lógica de detect type.
     private fun detectType(name: String, context: String): String {
         return normalizeLocationType(name, context)
     }
 
+    // Ejecuta la lógica de extract sentence containing.
     private fun extractSentenceContaining(text: String, keyword: String): String {
         return text.split(Regex("[.!?]"))
             .firstOrNull { it.contains(keyword, ignoreCase = true) }
@@ -248,16 +256,19 @@ class WorldMapViewModel : ViewModel() {
             ?: text.take(100)
     }
 
+    // Genera x.
     private fun generateX(name: String): Float {
         val hash = name.hashCode()
         return ((hash and 0xFF).toFloat() / 255f) * 0.8f + 0.1f
     }
 
+    // Genera y.
     private fun generateY(name: String): Float {
         val hash = name.hashCode()
         return (((hash shr 8) and 0xFF).toFloat() / 255f) * 0.8f + 0.1f
     }
 
+    // Ejecuta la lógica de sanitize loaded locations.
     private fun sanitizeLoadedLocations(
         locations: List<WorldLocation>,
         currentId: String
@@ -302,6 +313,7 @@ class WorldMapViewModel : ViewModel() {
         return deduped.values.map { it.copy(isCurrentLocation = it.id == selectedId) }
     }
 
+    // Actualiza current location.
     private fun updateCurrentLocation(newLocation: WorldLocation) {
         val state = _worldMapState.value
         val alreadyExists = state.locations.any { it.id == newLocation.id }
@@ -354,6 +366,7 @@ class WorldMapViewModel : ViewModel() {
         saveMap()
     }
 
+    // Ejecuta la lógica de initial life state for.
     private fun initialLifeStateFor(location: WorldLocation): LocationLifeState {
         val normalizedType = normalizeLocationType(location.type, "${location.name} ${location.description}")
 
@@ -432,6 +445,7 @@ class WorldMapViewModel : ViewModel() {
         }
     }
 
+    // Aplica story consequences.
     private fun applyStoryConsequences(storyText: String, locationId: String) {
         val text = normalizeText(storyText)
         if (text.isBlank()) return
@@ -524,6 +538,7 @@ class WorldMapViewModel : ViewModel() {
         saveMap()
     }
 
+    // Ejecuta la lógica de simulate world if needed.
     private fun simulateWorldIfNeeded() {
         val state = _worldMapState.value
         val now = System.currentTimeMillis()
@@ -557,6 +572,7 @@ class WorldMapViewModel : ViewModel() {
         saveMap()
     }
 
+    // Ejecuta la lógica de evolve one world tick.
     private fun evolveOneWorldTick(
         state: WorldMapState,
         tickIndex: Int,
@@ -581,6 +597,7 @@ class WorldMapViewModel : ViewModel() {
         return state.copy(locationStates = updatedStates)
     }
 
+    // Ejecuta la lógica de evolve location.
     private fun evolveLocation(
         location: WorldLocation,
         state: LocationLifeState,
@@ -622,6 +639,7 @@ class WorldMapViewModel : ViewModel() {
         )
     }
 
+    // Ejecuta la lógica de drift.
     private fun drift(seed: Int, biome: String, channel: DriftChannel): Int {
         val roll = seed.absoluteValue % 100
 
@@ -717,6 +735,7 @@ class WorldMapViewModel : ViewModel() {
         }
     }
 
+    // Ejecuta la lógica de world event summary.
     private fun worldEventSummary(
         locationName: String,
         biome: String,
@@ -742,6 +761,7 @@ class WorldMapViewModel : ViewModel() {
         }
     }
 
+    // Ejecuta la lógica de resolve mood.
     private fun resolveMood(
         prosperity: Int,
         security: Int,
@@ -758,10 +778,13 @@ class WorldMapViewModel : ViewModel() {
         }
     }
 
+    // Ejecuta la lógica de clamp stat.
     private fun clampStat(value: Int): Int = value.coerceIn(0, 100)
 
+    // Ejecuta la lógica de sanitize coordinate.
     private fun sanitizeCoordinate(value: Float): Float = value.coerceIn(0.08f, 0.92f)
 
+    // Ejecuta la lógica de stable location id.
     private fun stableLocationId(raw: String): String {
         val normalized = Normalizer.normalize(raw.lowercase().trim(), Normalizer.Form.NFD)
             .replace(Regex("\\p{InCombiningDiacriticalMarks}+"), "")
@@ -772,13 +795,16 @@ class WorldMapViewModel : ViewModel() {
         return normalized.ifBlank { "lugar_${raw.hashCode().absoluteValue}" }
     }
 
+    // Ejecuta la lógica de normalize text.
     private fun normalizeText(value: String): String =
         Normalizer.normalize(value.lowercase().trim(), Normalizer.Form.NFD)
             .replace(Regex("\\p{InCombiningDiacriticalMarks}+"), "")
 
+    // Ejecuta la lógica de string.
     private fun String.containsAnyWorld(vararg options: String): Boolean =
         options.any { this.contains(it) }
 
+    // Ejecuta la lógica de normalize location type.
     private fun normalizeLocationType(rawType: String?, context: String = ""): String {
         val raw = listOfNotNull(rawType, context)
             .joinToString(" ")
@@ -815,6 +841,7 @@ class WorldMapViewModel : ViewModel() {
         }
     }
 
+    // Ejecuta la lógica de extract float.
     private fun extractFloat(value: Any?): Float? {
         return when (value) {
             is Number -> value.toFloat()
@@ -823,6 +850,7 @@ class WorldMapViewModel : ViewModel() {
         }
     }
 
+    // Ejecuta la lógica de world location.
     private fun WorldLocation.toMap(): Map<String, Any> = mapOf(
         "id" to id,
         "name" to name,
@@ -835,6 +863,7 @@ class WorldMapViewModel : ViewModel() {
         "discoveredAt" to discoveredAt
     )
 
+    // Ejecuta la lógica de map.
     private fun Map<String, Any>.toWorldLocation(): WorldLocation = WorldLocation(
         id = stableLocationId((this["id"] as? String).orEmpty().ifBlank { (this["name"] as? String).orEmpty() }),
         name = (this["name"] as? String ?: "").trim(),
@@ -850,6 +879,7 @@ class WorldMapViewModel : ViewModel() {
         discoveredAt = (this["discoveredAt"] as? Number)?.toLong() ?: 0L
     )
 
+    // Ejecuta la lógica de location life state.
     private fun LocationLifeState.toMap(): Map<String, Any> = mapOf(
         "locationId" to locationId,
         "prosperity" to prosperity,
@@ -862,6 +892,7 @@ class WorldMapViewModel : ViewModel() {
         "lastUpdatedAt" to lastUpdatedAt
     )
 
+    // Ejecuta la lógica de map.
     private fun Map<String, Any>.toLocationLifeState(locationId: String): LocationLifeState =
         LocationLifeState(
             locationId = this["locationId"] as? String ?: locationId,
@@ -879,6 +910,7 @@ class WorldMapViewModel : ViewModel() {
 
 private const val WORLD_TICK_MS = 6L * 60L * 60L * 1000L
 
+// Clase que encapsula la lógica de drift channel.
 private enum class DriftChannel {
     PROSPERITY,
     SECURITY,

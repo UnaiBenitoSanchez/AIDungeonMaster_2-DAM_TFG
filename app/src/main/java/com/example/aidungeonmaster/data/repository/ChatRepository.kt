@@ -7,21 +7,26 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.tasks.await
 
+// Repositorio que centraliza el acceso a datos de chat.
 class ChatRepository {
 
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
 
+    // Ejecuta la lógica de current uid.
     fun currentUid(): String? = auth.currentUser?.uid
 
+    // Construye friendship id.
     fun buildFriendshipId(uid1: String, uid2: String): String {
         return if (uid1 < uid2) "${uid1}_${uid2}" else "${uid2}_${uid1}"
     }
 
+    // Construye chat id.
     fun buildChatId(uid1: String, uid2: String): String {
         return buildFriendshipId(uid1, uid2)
     }
 
+    // Obtiene or create private chat.
     suspend fun getOrCreatePrivateChat(friendUid: String, guildId: String? = null): String {
         val myUid = currentUid() ?: throw IllegalStateException("Usuario no autenticado")
         require(friendUid != myUid) { "No puedes crear un chat contigo mismo." }
@@ -80,6 +85,7 @@ class ChatRepository {
         return myMembership.exists() && otherMembership.exists()
     }
 
+    // Envía message.
     suspend fun sendMessage(chatId: String, text: String) {
         val myUid = currentUid() ?: throw IllegalStateException("Usuario no autenticado")
         val cleanText = text.trim()
@@ -113,6 +119,7 @@ class ChatRepository {
         }.await()
     }
 
+    // Ejecuta la lógica de mark messages as seen.
     suspend fun markMessagesAsSeen(chatId: String, messages: List<ChatMessage>) {
         val myUid = currentUid() ?: return
 
@@ -135,6 +142,7 @@ class ChatRepository {
         }.await()
     }
 
+    // Escucha messages.
     fun listenMessages(
         chatId: String,
         onChange: (List<ChatMessage>) -> Unit,

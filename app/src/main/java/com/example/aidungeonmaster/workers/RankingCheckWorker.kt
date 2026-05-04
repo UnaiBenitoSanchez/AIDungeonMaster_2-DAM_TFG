@@ -35,6 +35,7 @@ class RankingCheckWorker(
     private val prefs: SharedPreferences =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
+    // Ejecuta la lógica de do work.
     override suspend fun doWork(): Result {
         val userId = FirebaseAuth.getInstance().currentUser?.uid
             ?: run {

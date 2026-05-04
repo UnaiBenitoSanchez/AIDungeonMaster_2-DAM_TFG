@@ -26,6 +26,7 @@ private val LevelBg     = Color(0xFF0A0A0A)
 private val LevelBorder = Color(0xFFFFD700)
 
 @Composable
+// Ejecuta la lógica de level up dialog.
 fun LevelUpDialog(
     newLevel: Int,
     characterClass: String,
@@ -158,6 +159,7 @@ private fun levelBonuses(level: Int, charClass: String): List<String> {
     return base
 }
 
+// Ejecuta la lógica de prof bonus for level.
 private fun profBonusForLevel(level: Int): Int = when {
     level >= 17 -> 6
     level >= 13 -> 5

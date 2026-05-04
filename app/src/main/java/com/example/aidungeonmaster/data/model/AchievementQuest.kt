@@ -12,6 +12,7 @@ enum class AchievementCategory(val label: String, val emoji: String) {
     COLLECTOR("Coleccionista", "🎒")
 }
 
+// Clase que encapsula la lógica de achievement.
 data class Achievement(
     val id: String = "",
     val title: String = "",
@@ -218,6 +219,7 @@ object AchievementCatalog {
         )
     )
 
+    // Obtiene by id.
     fun getById(id: String): Achievement? = all.firstOrNull { it.id == id }
 }
 
@@ -227,6 +229,7 @@ object AchievementCatalog {
 
 enum class QuestStatus { AVAILABLE, IN_PROGRESS, COMPLETED, FAILED }
 
+// Clase que encapsula la lógica de quest objective type.
 enum class QuestObjectiveType {
     WINS,           // Ganar N combates
     LOCATIONS,      // Descubrir N lugares
@@ -236,6 +239,7 @@ enum class QuestObjectiveType {
     XP_EARN         // Ganar N XP total
 }
 
+// Clase que encapsula la lógica de quest objective.
 data class QuestObjective(
     val type: QuestObjectiveType = QuestObjectiveType.WINS,
     val targetValue: Int = 1,
@@ -246,6 +250,7 @@ data class QuestObjective(
     val progress: Float get() = (currentValue.toFloat() / targetValue).coerceIn(0f, 1f)
 }
 
+// Clase que encapsula la lógica de quest.
 data class Quest(
     val id: String = "",
     val title: String = "",
@@ -353,5 +358,6 @@ object QuestCatalog {
         )
     )
 
+    // Obtiene by id.
     fun getById(id: String): Quest? = all.firstOrNull { it.id == id }
 }

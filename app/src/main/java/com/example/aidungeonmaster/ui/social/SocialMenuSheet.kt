@@ -30,6 +30,7 @@ import com.example.aidungeonmaster.ui.tutorial.tutorialAnchor
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+// Ejecuta la lógica de social menu sheet.
 fun SocialMenuSheet(
     onDismiss: () -> Unit,
     onMyProfile: () -> Unit,
@@ -101,6 +102,7 @@ fun SocialMenuSheet(
 }
 
 @Composable
+// Ejecuta la lógica de social option item.
 private fun SocialOptionItem(
     text: String,
     modifier: Modifier = Modifier,
@@ -137,6 +139,7 @@ private fun SocialOptionItem(
 }
 
 @Composable
+// Ejecuta la lógica de notification badge.
 fun NotificationBadge(
     count: Int,
     modifier: Modifier = Modifier
@@ -161,6 +164,7 @@ fun NotificationBadge(
     }
 }
 
+// Ejecuta la lógica de anchor or plain.
 private fun anchorOrPlain(
     key: String,
     tutorialTargets: SnapshotStateMap<String, Rect>?

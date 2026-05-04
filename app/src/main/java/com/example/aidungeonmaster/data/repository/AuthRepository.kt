@@ -8,11 +8,13 @@ import kotlinx.coroutines.tasks.await
 import java.text.Normalizer
 import kotlin.random.Random
 
+// Repositorio que centraliza el acceso a datos de auth.
 class AuthRepository {
 
     private val auth = FirebaseAuth.getInstance()
     private val db = FirebaseFirestore.getInstance()
 
+    // Ejecuta la lógica de login.
     fun login(
         email: String,
         password: String,
@@ -26,6 +28,7 @@ class AuthRepository {
             }
     }
 
+    // Ejecuta la lógica de register.
     fun register(
         email: String,
         password: String,
@@ -90,12 +93,14 @@ class AuthRepository {
             }
     }
 
+    // Ejecuta la lógica de sign in with google.
     suspend fun signInWithGoogle(idToken: String): FirebaseUser {
         val credential = GoogleAuthProvider.getCredential(idToken, null)
         val result = auth.signInWithCredential(credential).await()
         return result.user ?: throw IllegalStateException("No se pudo completar el acceso con Google.")
     }
 
+    // Ejecuta la lógica de upsert public user profile.
     suspend fun upsertPublicUserProfile(firebaseUser: FirebaseUser, provider: String) {
         val docRef = db.collection("users").document(firebaseUser.uid)
         val existing = docRef.get().await()
@@ -172,6 +177,7 @@ class AuthRepository {
         docRef.set(profile).await()
     }
 
+    // Comprueba si user logged.
     fun isUserLogged(): Boolean {
         return auth.currentUser != null
     }
@@ -203,6 +209,7 @@ class AuthRepository {
         return "aventurero${System.currentTimeMillis().toString().takeLast(6)}"
     }
 
+    // Ejecuta la lógica de sanitize username.
     private fun sanitizeUsername(raw: String): String {
         val normalized = Normalizer.normalize(raw.lowercase().trim(), Normalizer.Form.NFD)
             .replace(Regex("\\p{InCombiningDiacriticalMarks}+"), "")

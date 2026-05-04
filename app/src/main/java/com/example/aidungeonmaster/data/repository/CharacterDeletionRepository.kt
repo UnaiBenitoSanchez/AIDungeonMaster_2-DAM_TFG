@@ -5,10 +5,12 @@ import com.google.firebase.firestore.CollectionReference
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 
+// Repositorio que centraliza el acceso a datos de character deletion.
 class CharacterDeletionRepository(
     private val db: FirebaseFirestore = FirebaseFirestore.getInstance()
 ) {
 
+    // Elimina everywhere.
     suspend fun deleteEverywhere(
         userId: String,
         characterName: String,

@@ -90,6 +90,7 @@ private val CardCream = Color(0xFFFFF0C7)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+// Ejecuta la lógica de character sheet screen.
 fun CharacterSheetScreen(
     userId: String,
     characterName: String,
@@ -124,6 +125,7 @@ fun CharacterSheetScreen(
         }
     }
 
+    // Ejecuta la lógica de launch pdf export.
     fun launchPdfExport(current: Character) {
         val safeName = current.name
             .replace(" ", "_")
@@ -437,6 +439,7 @@ private suspend fun loadCharacterSheet(
 }
 
 @Composable
+// Ejecuta la lógica de sheet header.
 private fun SheetHeader(characterName: String) {
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -469,6 +472,7 @@ private fun SheetHeader(characterName: String) {
 }
 
 @Composable
+// Ejecuta la lógica de identity section.
 private fun IdentitySection(character: Character) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -505,6 +509,7 @@ private fun IdentitySection(character: Character) {
 }
 
 @Composable
+// Ejecuta la lógica de character portrait.
 private fun CharacterPortrait(
     portraitUrl: String,
     fallback: String,
@@ -558,6 +563,7 @@ private fun CharacterPortrait(
 }
 
 @Composable
+// Ejecuta la lógica de sheet line.
 private fun SheetLine(
     label: String,
     value: String,
@@ -584,6 +590,7 @@ private fun SheetLine(
 }
 
 @Composable
+// Ejecuta la lógica de section title.
 private fun SectionTitle(text: String) {
     Surface(
         color = Accent,
@@ -601,6 +608,7 @@ private fun SectionTitle(text: String) {
 }
 
 @Composable
+// Ejecuta la lógica de main stat box.
 private fun MainStatBox(
     label: String,
     value: String,
@@ -638,6 +646,7 @@ private fun MainStatBox(
 }
 
 @Composable
+// Ejecuta la lógica de attribute grid.
 private fun AttributeGrid(character: Character) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -658,6 +667,7 @@ private fun AttributeGrid(character: Character) {
 }
 
 @Composable
+// Ejecuta la lógica de attribute box.
 private fun AttributeBox(
     label: String,
     value: Int,
@@ -710,6 +720,7 @@ private fun AttributeBox(
 }
 
 @Composable
+// Ejecuta la lógica de detail panel.
 private fun DetailPanel(
     title: String,
     value: String
@@ -728,14 +739,17 @@ private fun DetailPanel(
     }
 }
 
+// Ejecuta la lógica de ability modifier.
 private fun abilityModifier(score: Int): Int {
     return floor((score - 10) / 2.0).toInt()
 }
 
+// Ejecuta la lógica de signed.
 private fun signed(value: Int): String {
     return if (value >= 0) "+$value" else value.toString()
 }
 
+// Formatea last played.
 private fun formatLastPlayed(timestamp: Long): String {
     if (timestamp <= 0L) return "Sin partidas todavía"
     return SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(Date(timestamp))

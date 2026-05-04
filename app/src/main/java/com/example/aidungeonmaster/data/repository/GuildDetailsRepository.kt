@@ -8,13 +8,16 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.tasks.await
 
+// Repositorio que centraliza el acceso a datos de guild details.
 class GuildDetailsRepository {
 
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
 
+    // Ejecuta la lógica de current uid.
     fun currentUid(): String? = auth.currentUser?.uid
 
+    // Obtiene guild members.
     suspend fun getGuildMembers(guild: Guild): List<GuildMemberSummary> {
         val membersSnapshot = db.collection("guilds")
             .document(guild.id)
@@ -60,6 +63,7 @@ class GuildDetailsRepository {
         )
     }
 
+    // Escucha guild chat.
     fun listenGuildChat(
         guildId: String,
         onChange: (List<GuildChatMessage>) -> Unit,
@@ -84,6 +88,7 @@ class GuildDetailsRepository {
             }
     }
 
+    // Envía guild chat message.
     suspend fun sendGuildChatMessage(guildId: String, text: String) {
         val myUid = currentUid() ?: throw IllegalStateException("Usuario no autenticado")
         val cleanText = text.trim()

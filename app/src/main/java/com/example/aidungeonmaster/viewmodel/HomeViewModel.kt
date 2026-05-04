@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
+// ViewModel que coordina el estado y la lógica de home.
 class HomeViewModel : ViewModel() {
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
@@ -31,6 +32,7 @@ class HomeViewModel : ViewModel() {
 
     init { fetchCharacters() }
 
+    // Guarda character.
     fun saveCharacter(
         name: String,
         race: String,
@@ -108,6 +110,7 @@ class HomeViewModel : ViewModel() {
         }
     }
 
+    // Recupera characters.
     fun fetchCharacters(forceRefresh: Boolean = false) {
         val userId = auth.currentUser?.uid
 
@@ -206,6 +209,7 @@ class HomeViewModel : ViewModel() {
         }
     }
 
+    // Elimina character.
     fun deleteCharacter(characterId: String, characterName: String) {
         val userId = auth.currentUser?.uid ?: return
 
@@ -234,6 +238,7 @@ class HomeViewModel : ViewModel() {
         }
     }
 
+    // Ejecuta la lógica de logout.
     fun logout(onLogout: () -> Unit) {
         viewModelScope.launch {
             runCatching { socialRepository.updatePresence(false) }
@@ -242,6 +247,7 @@ class HomeViewModel : ViewModel() {
         }
     }
 
+    // Actualiza character theme.
     fun updateCharacterTheme(characterId: String, theme: String) {
         val userId = auth.currentUser?.uid ?: return
         viewModelScope.launch {
@@ -258,6 +264,7 @@ class HomeViewModel : ViewModel() {
         }
     }
 
+    // Gestiona el evento de cleared.
     override fun onCleared() {
         charactersListener?.remove()
         charactersListener = null

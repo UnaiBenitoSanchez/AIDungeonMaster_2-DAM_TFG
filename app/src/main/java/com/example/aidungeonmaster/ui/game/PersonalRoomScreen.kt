@@ -64,12 +64,14 @@ import com.example.aidungeonmaster.data.model.personalRoomSlotById
 import com.example.aidungeonmaster.viewmodel.InventoryViewModel
 import com.example.aidungeonmaster.viewmodel.PersonalRoomViewModel
 
+// Puente de integración para personal room.
 private class PersonalRoomBridge(
     private val onSlotFocus: (slotId: String?) -> Unit
 ) {
     private val handler = Handler(Looper.getMainLooper())
 
     @JavascriptInterface
+    // Gestiona el evento de slot focus.
     fun onSlotFocus(slotId: String) {
         handler.post {
             onSlotFocus(slotId.ifBlank { null })
@@ -77,6 +79,7 @@ private class PersonalRoomBridge(
     }
 
     @JavascriptInterface
+    // Gestiona el evento de slot clear.
     fun onSlotClear() {
         handler.post {
             onSlotFocus(null)
@@ -87,6 +90,7 @@ private class PersonalRoomBridge(
 @OptIn(ExperimentalMaterial3Api::class)
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
+// Ejecuta la lógica de personal room screen.
 fun PersonalRoomScreen(
     charId: String,
     characterName: String,
@@ -568,6 +572,7 @@ fun PersonalRoomScreen(
 }
 
 @Composable
+// Ejecuta la lógica de decoration card.
 private fun DecorationCard(
     decoration: PersonalRoomDecoration,
     owned: Boolean,
@@ -681,6 +686,7 @@ private fun DecorationCard(
     }
 }
 
+// Construye personal room html.
 private fun buildPersonalRoomHtml(state: PersonalRoomState): String {
     val slotsJs = PERSONAL_ROOM_SLOTS.joinToString(",\n") { slot ->
         """{ id: "${slot.id}", label: "${slot.label}", x: ${slot.x}, z: ${slot.z} }"""
@@ -1140,6 +1146,7 @@ animate();
     """.trimIndent()
 }
 
+// Construye decoration js.
 private fun buildDecorationJs(decorationId: String, slotId: String): String {
     return when (decorationId) {
         "banner_royal" -> """

@@ -3,6 +3,7 @@ package com.example.aidungeonmaster.ui.game
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 
+// Repositorio que centraliza el acceso a datos de game.
 class GameRepository {
     private val db = FirebaseFirestore.getInstance()
     private val gamesCollection = db.collection("partidas")

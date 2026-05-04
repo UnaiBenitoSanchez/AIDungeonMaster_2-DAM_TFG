@@ -12,6 +12,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import java.util.UUID
 
+// ViewModel que coordina el estado y la lógica de journal.
 class JournalViewModel : ViewModel() {
 
     private val db = FirebaseFirestore.getInstance()
@@ -25,10 +26,12 @@ class JournalViewModel : ViewModel() {
     private val _selectedEntry = MutableStateFlow<JournalEntry?>(null)
     val selectedEntry: MutableStateFlow<JournalEntry?> = _selectedEntry
 
+    // Selecciona entry.
     fun selectEntry(entry: JournalEntry?) {
         _selectedEntry.value = entry
     }
 
+    // Carga journal.
     fun loadJournal(charId: String) {
         viewModelScope.launch {
             _isLoading.value = true
@@ -59,6 +62,7 @@ class JournalViewModel : ViewModel() {
         }
     }
 
+    // Ejecuta la lógica de add entry.
     fun addEntry(
         charId: String,
         title: String,
@@ -136,6 +140,7 @@ class JournalViewModel : ViewModel() {
         }
     }
 
+    // Ejecuta la lógica de add or merge simple entry.
     fun addOrMergeSimpleEntry(
         charId: String,
         title: String,
@@ -236,6 +241,7 @@ class JournalViewModel : ViewModel() {
         }
     }
 
+    // Ejecuta la lógica de rewrite entry epic.
     fun rewriteEntryEpic(charId: String, entry: JournalEntry) {
         viewModelScope.launch {
             try {
@@ -281,6 +287,7 @@ class JournalViewModel : ViewModel() {
         }
     }
 
+    // Elimina entry.
     fun deleteEntry(charId: String, entryId: String) {
         viewModelScope.launch {
             try {
@@ -303,6 +310,7 @@ class JournalViewModel : ViewModel() {
         }
     }
 
+    // Analiza journal entry.
     private fun parseJournalEntry(
         id: String,
         data: Map<*, *>
@@ -336,6 +344,7 @@ class JournalViewModel : ViewModel() {
         }
     }
 
+    // Ejecuta la lógica de journal entry to map.
     private fun journalEntryToMap(entry: JournalEntry): Map<String, Any> {
         return mapOf(
             "title" to entry.title,
@@ -360,12 +369,14 @@ class JournalViewModel : ViewModel() {
         )
     }
 
+    // Ejecuta la lógica de normalize list.
     private fun normalizeList(values: List<String>): List<String> {
         return values.map { it.trim() }
             .filter { it.isNotBlank() }
             .distinct()
     }
 
+    // Ejecuta la lógica de merge distinct.
     private fun mergeDistinct(
         base: List<String>,
         incoming: List<String>
@@ -376,12 +387,14 @@ class JournalViewModel : ViewModel() {
             .distinct()
     }
 
+    // Ejecuta la lógica de pick longer.
     private fun pickLonger(current: String, incoming: String): String {
         val a = current.trim()
         val b = incoming.trim()
         return if (b.length > a.length) b else a
     }
 
+    // Ejecuta la lógica de resolve next chapter.
     private fun resolveNextChapter(entries: List<JournalEntry>): Pair<Int, String> {
         if (entries.isEmpty()) return 1 to "Capítulo 1"
 
@@ -395,6 +408,7 @@ class JournalViewModel : ViewModel() {
         return nextIndex to "Capítulo $nextIndex"
     }
 
+    // Construye repeat group key.
     private fun buildRepeatGroupKey(
         title: String,
         type: String,

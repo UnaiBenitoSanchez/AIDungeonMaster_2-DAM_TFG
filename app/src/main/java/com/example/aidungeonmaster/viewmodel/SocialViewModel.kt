@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+// ViewModel que coordina el estado y la lógica de social.
 class SocialViewModel : ViewModel() {
 
     private val repository = SocialRepository()
@@ -111,6 +112,7 @@ class SocialViewModel : ViewModel() {
     private val _guildLeaveCompleted = MutableStateFlow(false)
     val guildLeaveCompleted = _guildLeaveCompleted.asStateFlow()
 
+    // Ejecuta la lógica de refresh boss consumables.
     fun refreshBossConsumables() {
         val guildId = _selectedGuild.value?.id ?: return
         viewModelScope.launch {
@@ -124,6 +126,7 @@ class SocialViewModel : ViewModel() {
         }
     }
 
+    // Ejecuta la lógica de use boss ability.
     fun useBossAbility(ability: GuildBossAbility) {
         val guildId = _selectedGuild.value?.id ?: return
         viewModelScope.launch {
@@ -137,6 +140,7 @@ class SocialViewModel : ViewModel() {
         }
     }
 
+    // Ejecuta la lógica de use boss consumable.
     fun useBossConsumable(item: Item) {
         val guildId = _selectedGuild.value?.id ?: return
         viewModelScope.launch {
@@ -152,6 +156,7 @@ class SocialViewModel : ViewModel() {
         }
     }
 
+    // Inicia boss battle.
     fun startBossBattle() {
         val guildId = _selectedGuild.value?.id ?: return
         viewModelScope.launch {
@@ -167,6 +172,7 @@ class SocialViewModel : ViewModel() {
         }
     }
 
+    // Ejecuta la lógica de upload my profile photo.
     fun uploadMyProfilePhoto(context: Context, uri: Uri) {
         viewModelScope.launch {
             runCatching {
@@ -180,11 +186,13 @@ class SocialViewModel : ViewModel() {
         }
     }
 
+    // Carga my profile.
     fun loadMyProfile() {
         val uid = repository.currentUid() ?: return
         loadProfile(uid)
     }
 
+    // Ejecuta la lógica de search users.
     fun searchUsers(query: String) {
         viewModelScope.launch {
             try {
@@ -198,6 +206,7 @@ class SocialViewModel : ViewModel() {
         }
     }
 
+    // Carga profile.
     fun loadProfile(userUid: String) {
         viewModelScope.launch {
             try {
@@ -208,6 +217,7 @@ class SocialViewModel : ViewModel() {
         }
     }
 
+    // Carga profile characters.
     fun loadProfileCharacters(userUid: String) {
         viewModelScope.launch {
             if (userUid.isBlank()) {
@@ -226,6 +236,7 @@ class SocialViewModel : ViewModel() {
         }
     }
 
+    // Guarda my profile.
     fun saveMyProfile(
         displayName: String,
         bio: String,
@@ -243,6 +254,7 @@ class SocialViewModel : ViewModel() {
         }
     }
 
+    // Inicia incoming requests listener.
     fun startIncomingRequestsListener() {
         if (incomingRequestsListener != null) return
         incomingRequestsListener = repository.listenIncomingRequests(
@@ -251,11 +263,13 @@ class SocialViewModel : ViewModel() {
         )
     }
 
+    // Detiene incoming requests listener.
     fun stopIncomingRequestsListener() {
         incomingRequestsListener?.remove()
         incomingRequestsListener = null
     }
 
+    // Inicia friends listener.
     fun startFriendsListener() {
         if (friendsListener != null) return
         friendsListener = repository.listenFriends(
@@ -264,12 +278,14 @@ class SocialViewModel : ViewModel() {
         )
     }
 
+    // Detiene friends listener.
     fun stopFriendsListener() {
         friendsListener?.remove()
         friendsListener = null
         repository.clearFriendListeners()
         _friends.value = emptyList()
     }
+    // Inicia guilds listener.
     fun startGuildsListener() {
         if (guildsListener != null) return
 
@@ -306,17 +322,20 @@ class SocialViewModel : ViewModel() {
         )
     }
 
+    // Detiene guilds listener.
     fun stopGuildsListener() {
         guildsListener?.remove()
         guildsListener = null
     }
 
+    // Limpia guild search.
     fun clearGuildSearch() {
         _lastGuildQuery.value = ""
         _guildSearchResults.value = emptyList()
         _isSearching.value = false
     }
 
+    // Ejecuta la lógica de search guilds.
     fun searchGuilds(query: String) {
         val cleanQuery = query.trim()
         _lastGuildQuery.value = query
@@ -343,6 +362,7 @@ class SocialViewModel : ViewModel() {
         }
     }
 
+    // Carga guild search results.
     fun loadGuildSearchResults(query: String) {
         _lastGuildQuery.value = query
 
@@ -362,6 +382,7 @@ class SocialViewModel : ViewModel() {
         }
     }
 
+    // Crea guild.
     fun createGuild(
         name: String,
         description: String,
@@ -380,6 +401,7 @@ class SocialViewModel : ViewModel() {
         }
     }
 
+    // Actualiza guild colors.
     fun updateGuildColors(guildId: String, accentColor: String, bannerColor: String) {
         viewModelScope.launch {
             runCatching {
@@ -398,6 +420,7 @@ class SocialViewModel : ViewModel() {
         }
     }
 
+    // Gestiona la unión a guild.
     fun joinGuild(guild: Guild) {
         viewModelScope.launch {
             runCatching {
@@ -416,6 +439,7 @@ class SocialViewModel : ViewModel() {
         }
     }
 
+    // Gestiona la salida de guild.
     fun leaveGuild(guild: Guild) {
         viewModelScope.launch {
             runCatching {
@@ -434,6 +458,7 @@ class SocialViewModel : ViewModel() {
         }
     }
 
+    // Ejecuta la lógica de transfer leadership.
     fun transferLeadership(guild: Guild, newLeaderUid: String) {
         viewModelScope.launch {
             runCatching {
@@ -461,6 +486,7 @@ class SocialViewModel : ViewModel() {
         }
     }
 
+    // Abre guild details.
     fun openGuildDetails(guild: Guild) {
         val previousId = _selectedGuild.value?.id
         val newId = guild.id
@@ -488,6 +514,7 @@ class SocialViewModel : ViewModel() {
         }
     }
 
+    // Abre guild details by id.
     fun openGuildDetailsById(guildId: String) {
         val fromMine = _myGuilds.value.firstOrNull { it.id == guildId }
         val fromSearch = _guildSearchResults.value.firstOrNull { it.id == guildId }
@@ -515,6 +542,7 @@ class SocialViewModel : ViewModel() {
         }
     }
 
+    // Ejecuta la lógica de refresh guild members.
     private fun refreshGuildMembers(guild: Guild) {
         viewModelScope.launch {
             _isGuildMembersLoading.value = true
@@ -529,6 +557,7 @@ class SocialViewModel : ViewModel() {
         }
     }
 
+    // Ejecuta la lógica de restart guild chat if needed.
     private fun restartGuildChatIfNeeded(guild: Guild) {
         stopGuildChatListener()
         _selectedGuildChat.value = emptyList()
@@ -552,6 +581,7 @@ class SocialViewModel : ViewModel() {
         )
     }
 
+    // Envía guild message.
     fun sendGuildMessage(text: String) {
         val guild = _selectedGuild.value ?: return
         if (!guild.joined) {
@@ -570,6 +600,7 @@ class SocialViewModel : ViewModel() {
         }
     }
 
+    // Inicia guild boss listeners.
     private fun startGuildBossListeners(guildId: String) {
         if (activeGuildBossGuildId == guildId &&
             guildBossRoomListener != null &&
@@ -597,6 +628,7 @@ class SocialViewModel : ViewModel() {
         )
     }
 
+    // Detiene guild boss listeners.
     private fun stopGuildBossListeners() {
         guildBossRoomListener?.remove()
         guildBossRoomListener = null
@@ -605,6 +637,7 @@ class SocialViewModel : ViewModel() {
         activeGuildBossGuildId = null
     }
 
+    // Carga boss characters.
     fun loadBossCharacters() {
         viewModelScope.launch {
             _isGuildBossLoading.value = true
@@ -619,6 +652,7 @@ class SocialViewModel : ViewModel() {
         }
     }
 
+    // Selecciona boss character.
     fun selectBossCharacter(character: Character) {
         val guildId = _selectedGuild.value?.id ?: return
         viewModelScope.launch {
@@ -635,6 +669,7 @@ class SocialViewModel : ViewModel() {
         }
     }
 
+    // Actualiza boss ready.
     fun setBossReady(ready: Boolean) {
         val guildId = _selectedGuild.value?.id ?: return
         viewModelScope.launch {
@@ -648,6 +683,7 @@ class SocialViewModel : ViewModel() {
         }
     }
 
+    // Ejecuta la lógica de perform boss attack.
     fun performBossAttack() {
         val guildId = _selectedGuild.value?.id ?: return
         viewModelScope.launch {
@@ -661,6 +697,7 @@ class SocialViewModel : ViewModel() {
         }
     }
 
+    // Ejecuta la lógica de resolve boss turn if needed.
     fun resolveBossTurnIfNeeded() {
         val guild = _selectedGuild.value ?: return
         val guildId = guild.id
@@ -677,6 +714,7 @@ class SocialViewModel : ViewModel() {
         }
     }
 
+    // Gestiona la salida de boss room.
     fun leaveBossRoom() {
         val guildId = _selectedGuild.value?.id ?: return
         viewModelScope.launch {
@@ -690,6 +728,7 @@ class SocialViewModel : ViewModel() {
         }
     }
 
+    // Gestiona la salida de boss room silently.
     fun leaveBossRoomSilently() {
         val guildId = _selectedGuild.value?.id ?: return
         viewModelScope.launch {
@@ -699,6 +738,7 @@ class SocialViewModel : ViewModel() {
         }
     }
 
+    // Reinicia boss room.
     fun resetBossRoom() {
         val guildId = _selectedGuild.value?.id ?: return
         viewModelScope.launch {
@@ -726,19 +766,23 @@ class SocialViewModel : ViewModel() {
         }
     }
 
+    // Ejecuta la lógica de mark user left battle.
     fun markUserLeftBattle() {
         _userExplicitlyLeftBattle.value = true
     }
 
+    // Limpia user left battle.
     fun clearUserLeftBattle() {
         _userExplicitlyLeftBattle.value = false
     }
 
+    // Detiene guild chat listener.
     private fun stopGuildChatListener() {
         guildChatListener?.remove()
         guildChatListener = null
     }
 
+    // Cierra guild details.
     fun closeGuildDetails() {
         stopGuildChatListener()
         _selectedGuild.value = null
@@ -756,17 +800,21 @@ class SocialViewModel : ViewModel() {
         _guildBossConsumables.value = emptyList()
     }
 
+    // Comprueba si leave guild.
     fun canLeaveGuild(guild: Guild): Boolean {
         val myUid = repository.currentUid().orEmpty()
         return guild.joined && guild.ownerUid != myUid
     }
 
+    // Comprueba si guild owner.
     fun isGuildOwner(guild: Guild): Boolean {
         return repository.currentUid() == guild.ownerUid
     }
 
+    // Ejecuta la lógica de current user uid.
     fun currentUserUid(): String = repository.currentUid().orEmpty()
 
+    // Envía friend request.
     fun sendFriendRequest(user: AppUser) {
         viewModelScope.launch {
             try {
@@ -778,6 +826,7 @@ class SocialViewModel : ViewModel() {
         }
     }
 
+    // Ejecuta la lógica de accept request.
     fun acceptRequest(request: FriendRequest) {
         viewModelScope.launch {
             try {
@@ -789,6 +838,7 @@ class SocialViewModel : ViewModel() {
         }
     }
 
+    // Ejecuta la lógica de reject request.
     fun rejectRequest(request: FriendRequest) {
         viewModelScope.launch {
             try {
@@ -800,14 +850,17 @@ class SocialViewModel : ViewModel() {
         }
     }
 
+    // Limpia message.
     fun clearMessage() {
         _message.value = null
     }
 
+    // Ejecuta la lógica de consume guild leave completed.
     fun consumeGuildLeaveCompleted() {
         _guildLeaveCompleted.value = false
     }
 
+    // Gestiona el evento de cleared.
     override fun onCleared() {
         stopIncomingRequestsListener()
         stopFriendsListener()

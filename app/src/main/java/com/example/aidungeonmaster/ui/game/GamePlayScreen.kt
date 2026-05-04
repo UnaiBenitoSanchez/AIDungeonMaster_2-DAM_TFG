@@ -63,6 +63,7 @@ import com.example.aidungeonmaster.data.model.Character
 @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+// Ejecuta la lógica de game play screen.
 fun GamePlayScreen(
     navController: androidx.navigation.NavHostController,
     userId: String,
@@ -458,6 +459,7 @@ fun GamePlayScreen(
 // ── BURBUJAS DE CHAT ──────────────────────────────────────────────────────────
 
 @Composable
+// Ejecuta la lógica de game message bubble.
 fun GameMessageBubble(author: String, text: String) {
     val isAI = author == "DM"
     Column(
@@ -488,6 +490,7 @@ fun GameMessageBubble(author: String, text: String) {
 // ── BARRA DE VIDA ─────────────────────────────────────────────────────────────
 
 @Composable
+// Ejecuta la lógica de player stats header.
 fun PlayerStatsHeader(hpCurrent: Int, hpMax: Int) {
     Surface(color = Color.Black.copy(alpha = 0.4f), modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -511,6 +514,7 @@ fun PlayerStatsHeader(hpCurrent: Int, hpMax: Int) {
     }
 }
 
+// Ejecuta la lógica de adjust coins found by world.
 private fun adjustCoinsFoundByWorld(
     baseCoins: Int,
     state: com.example.aidungeonmaster.data.model.LocationLifeState?

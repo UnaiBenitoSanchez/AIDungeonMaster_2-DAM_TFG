@@ -43,6 +43,7 @@ private val RarEpic      = Color(0xFF9C27B0)
 private val RarLegendary = Color(0xFFFF9800)
 
 @Composable
+// Ejecuta la lógica de death summary screen.
 fun DeathSummaryScreen(
     character: Character?,
     xpGained: Int,
@@ -235,6 +236,7 @@ fun DeathSummaryScreen(
 // ── Componentes internos ──────────────────────────────────────────────────────
 
 @Composable
+// Ejecuta la lógica de dspanel.
 private fun DSPanel(title: String, content: @Composable ColumnScope.() -> Unit) {
     Column(
         modifier = Modifier
@@ -263,6 +265,7 @@ private fun DSPanel(title: String, content: @Composable ColumnScope.() -> Unit) 
 }
 
 @Composable
+// Ejecuta la lógica de dsrow.
 private fun DSRow(label: String, value: String) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
@@ -275,6 +278,7 @@ private fun DSRow(label: String, value: String) {
 }
 
 @Composable
+// Ejecuta la lógica de dsitem row.
 private fun DSItemRow(item: Item) {
     val rarityColor = when (item.rarity.lowercase()) {
         "uncommon"  -> RarUncommon
@@ -317,6 +321,7 @@ private fun DSItemRow(item: Item) {
 }
 
 @Composable
+// Ejecuta la lógica de dsdivider.
 private fun DSDivider() {
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Box(
