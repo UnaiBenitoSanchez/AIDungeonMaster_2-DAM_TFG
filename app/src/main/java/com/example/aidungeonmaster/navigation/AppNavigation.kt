@@ -208,12 +208,16 @@ sealed class Screen(val route: String) {
     }
 
     // Clase que encapsula la lógica de private chat.
-    object PrivateChat : Screen("private_chat/{friendUid}/{friendName}") {
+    object PrivateChat : Screen("private_chat/{friendUid}/{friendName}?guildId={guildId}") {
         // Crea route.
-        fun createRoute(friendUid: String, friendName: String): String {
+        fun createRoute(friendUid: String, friendName: String, guildId: String? = null): String {
             val encodedUid = Uri.encode(friendUid)
             val encodedName = Uri.encode(friendName)
-            return "private_chat/$encodedUid/$encodedName"
+            return if (guildId.isNullOrBlank()) {
+                "private_chat/$encodedUid/$encodedName"
+            } else {
+                "private_chat/$encodedUid/$encodedName?guildId=${Uri.encode(guildId)}"
+            }
         }
     }
 
@@ -728,8 +732,14 @@ fun AppNavigation(
                     guildId = guildId,
                     initialTab = initialTab,
                     onBack = { navController.popBackStack() },
-                    onOpenMemberChat = { memberUid, memberName, _ ->
-                        navController.navigate(Screen.PrivateChat.createRoute(memberUid, memberName))
+                    onOpenMemberChat = { memberUid, memberName, guildIdForChat ->
+                        navController.navigate(
+                            Screen.PrivateChat.createRoute(
+                                friendUid = memberUid,
+                                friendName = memberName,
+                                guildId = guildIdForChat
+                            )
+                        )
                     },
                     onOpenBossBattle = { battleGuildId ->
                         navController.navigate(Screen.GuildBossBattle.createRoute(battleGuildId)) {
@@ -744,7 +754,12 @@ fun AppNavigation(
                 route = Screen.PrivateChat.route,
                 arguments = listOf(
                     navArgument("friendUid") { type = NavType.StringType },
-                    navArgument("friendName") { type = NavType.StringType }
+                    navArgument("friendName") { type = NavType.StringType },
+                    navArgument("guildId") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    }
                 )
             ) { backStackEntryArg ->
                 val friendUid = Uri.decode(
@@ -753,10 +768,12 @@ fun AppNavigation(
                 val friendName = Uri.decode(
                     backStackEntryArg.arguments?.getString("friendName").orEmpty()
                 )
+                val guildId = backStackEntryArg.arguments?.getString("guildId")?.let(Uri::decode)
 
                 PrivateChatScreen(
                     friendUid = friendUid,
                     friendName = friendName,
+                    guildId = guildId,
                     onBack = { navController.popBackStack() }
                 )
             }

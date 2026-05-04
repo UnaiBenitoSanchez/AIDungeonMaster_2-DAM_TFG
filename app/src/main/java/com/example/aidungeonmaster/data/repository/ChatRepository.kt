@@ -1,7 +1,6 @@
 package com.example.aidungeonmaster.data.repository
 
 import com.example.aidungeonmaster.data.model.ChatMessage
-import com.example.aidungeonmaster.data.model.PrivateChat
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
@@ -31,57 +30,111 @@ class ChatRepository {
         val myUid = currentUid() ?: throw IllegalStateException("Usuario no autenticado")
         require(friendUid != myUid) { "No puedes crear un chat contigo mismo." }
 
-        val isFriend = db.collection("users")
-            .document(myUid)
-            .collection("friends")
-            .document(friendUid)
-            .get()
-            .await()
-            .exists()
+        val access = resolvePrivateChatAccess(
+            myUid = myUid,
+            otherUid = friendUid,
+            explicitGuildId = guildId
+        )
 
-        val allowedByGuild = areUsersInSameCurrentGuild(myUid, friendUid)
-
-        if (!isFriend && !allowedByGuild) {
+        if (!access.allowed) {
             throw IllegalStateException("Solo puedes escribir a amigos o miembros de tu gremio actual.")
         }
 
         val chatId = buildChatId(myUid, friendUid)
         val chatRef = db.collection("private_chats").document(chatId)
 
-        // Si el chat ya existe, no lo tocamos.
-        // Tras la primera creación ya eres miembro, así que esta lectura sí está permitida.
-        val existingChat = chatRef.get().await()
-        if (existingChat.exists()) {
+        // IMPORTANTE:
+        // Firestore puede denegar el get() previo cuando el chat todavía no existe y ambos usuarios
+        // aún no son miembros del documento. Ese caso ocurre precisamente en el primer chat privado
+        // entre miembros del mismo gremio que no son amigos. Si la lectura falla, continuamos con
+        // la creación directa del chat en lugar de abortar con PERMISSION_DENIED.
+        val existingChat = runCatching { chatRef.get().await() }.getOrNull()
+        if (existingChat?.exists() == true) {
             return chatId
         }
 
         val now = System.currentTimeMillis()
-
-        val chat = PrivateChat(
-            id = chatId,
-            members = listOf(myUid, friendUid).sorted(),
-            friendshipId = chatId,
-            createdAt = now,
-            lastMessage = "",
-            lastMessageAt = now,
-            lastSenderUid = myUid
+        val chat = mutableMapOf<String, Any>(
+            "id" to chatId,
+            "members" to listOf(myUid, friendUid).sorted(),
+            "createdAt" to now,
+            "lastMessage" to "",
+            "lastMessageAt" to now,
+            "lastSenderUid" to myUid
         )
 
-        // Solo se crea cuando no existe.
-        chatRef.set(chat).await()
+        // Solo los chats nacidos de una amistad llevan friendshipId persistido.
+        // En los chats habilitados por gremio no añadimos este campo para que las reglas
+        // opcionales sigan evaluando el caso de forma segura.
+        access.friendshipId?.takeIf { it.isNotBlank() }?.let { chat["friendshipId"] = it }
+        access.guildId?.takeIf { it.isNotBlank() }?.let { chat["guildId"] = it }
 
+        chatRef.set(chat).await()
         return chatId
     }
 
+    // Resuelve si el usuario puede abrir un chat privado con otro usuario.
+    private suspend fun resolvePrivateChatAccess(
+        myUid: String,
+        otherUid: String,
+        explicitGuildId: String?
+    ): PrivateChatAccess {
+        val friendshipMirror = db.collection("users")
+            .document(myUid)
+            .collection("friends")
+            .document(otherUid)
+            .get()
+            .await()
+
+        if (friendshipMirror.exists()) {
+            return PrivateChatAccess(
+                allowed = true,
+                friendshipId = friendshipMirror.getString("friendshipId")
+                    .orEmpty()
+                    .ifBlank { buildFriendshipId(myUid, otherUid) }
+            )
+        }
+
+        val normalizedGuildId = explicitGuildId.orEmpty().trim()
+        if (normalizedGuildId.isNotBlank() && areUsersMembersOfGuild(normalizedGuildId, myUid, otherUid)) {
+            return PrivateChatAccess(
+                allowed = true,
+                guildId = normalizedGuildId
+            )
+        }
+
+        val sharedCurrentGuildId = sharedCurrentGuildId(myUid, otherUid)
+        if (sharedCurrentGuildId.isNotBlank()) {
+            return PrivateChatAccess(
+                allowed = true,
+                guildId = sharedCurrentGuildId
+            )
+        }
+
+        return PrivateChatAccess(allowed = false)
+    }
+
     // Comprueba si ambos usuarios tienen el mismo gremio activo en su perfil público.
-    private suspend fun areUsersInSameCurrentGuild(myUid: String, otherUid: String): Boolean {
+    private suspend fun sharedCurrentGuildId(myUid: String, otherUid: String): String {
         val myUser = db.collection("users").document(myUid).get().await()
         val otherUser = db.collection("users").document(otherUid).get().await()
 
         val myCurrentGuildId = myUser.getString("currentGuildId").orEmpty()
         val otherCurrentGuildId = otherUser.getString("currentGuildId").orEmpty()
 
-        return myCurrentGuildId.isNotBlank() && myCurrentGuildId == otherCurrentGuildId
+        return if (myCurrentGuildId.isNotBlank() && myCurrentGuildId == otherCurrentGuildId) {
+            myCurrentGuildId
+        } else {
+            ""
+        }
+    }
+
+    // Comprueba si ambos usuarios figuran como miembros del gremio indicado.
+    private suspend fun areUsersMembersOfGuild(guildId: String, myUid: String, otherUid: String): Boolean {
+        val guildMembers = db.collection("guilds").document(guildId).collection("members")
+        val myMember = guildMembers.document(myUid).get().await()
+        val otherMember = guildMembers.document(otherUid).get().await()
+        return myMember.exists() && otherMember.exists()
     }
 
     // Envía un mensaje al chat y actualiza la vista previa del último mensaje.
@@ -166,3 +219,10 @@ class ChatRepository {
             }
     }
 }
+
+// Resultado de la validación de acceso al chat privado.
+private data class PrivateChatAccess(
+    val allowed: Boolean,
+    val friendshipId: String? = null,
+    val guildId: String? = null
+)
