@@ -15,8 +15,6 @@ import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.tasks.await
 import com.example.aidungeonmaster.data.model.ChatMessage
 
-import com.google.firebase.firestore.SetOptions
-
 // Repositorio que centraliza el acceso a datos de social.
 class SocialRepository {
 
@@ -191,14 +189,8 @@ class SocialRepository {
         )
 
         val chatId = friendshipId
-        val chat = mapOf(
-            "members" to listOf(request.fromUid, request.toUid),
-            "friendshipId" to friendshipId,
-            "createdAt" to now,
-            "lastMessage" to "",
-            "lastMessageAt" to now,
-            "lastSenderUid" to myUid
-        )
+        val chatRef = db.collection("private_chats").document(chatId)
+        val existingChat = runCatching { chatRef.get().await() }.getOrNull()
 
         db.runBatch { batch ->
             batch.update(
@@ -223,8 +215,20 @@ class SocialRepository {
                 otherFriendMirror
             )
 
-            // Si el chat ya existía por mensajería directa previa, se conservan sus metadatos no incluidos.
-            batch.set(db.collection("private_chats").document(chatId), chat, SetOptions.merge())
+            // Si ya existía un chat previo, no lo tocamos.
+            // Así evitamos violar validChatUpdate() al añadir friendshipId
+            // o al reescribir members con un orden distinto.
+            if (existingChat?.exists() != true) {
+                val chat = mapOf(
+                    "members" to listOf(request.fromUid, request.toUid).sorted(),
+                    "friendshipId" to friendshipId,
+                    "createdAt" to now,
+                    "lastMessage" to "",
+                    "lastMessageAt" to now,
+                    "lastSenderUid" to myUid
+                )
+                batch.set(chatRef, chat)
+            }
         }.await()
     }
 
@@ -372,7 +376,11 @@ class SocialRepository {
             .mapNotNull { doc ->
                 doc.toObject(Character::class.java)?.copy(id = doc.id)
             }
-            .sortedBy { it.name.lowercase() }
+            .sortedWith(
+                compareByDescending<Character> { it.lastPlayed }
+                    .thenByDescending { it.level }
+                    .thenBy { it.name.lowercase() }
+            )
     }
 
     // Actualiza my profile.

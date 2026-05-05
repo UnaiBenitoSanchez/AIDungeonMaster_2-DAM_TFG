@@ -259,6 +259,12 @@ fun SocialProfileScreen(
                 }
             }
 
+            AdventurerInsightsCard(
+                characters = profileCharacters,
+                accentColor = parseColor(accentColor),
+                backgroundColor = parseColor(backgroundColor)
+            )
+
             if (isMe) {
                 OutlinedTextField(
                     value = displayName,
