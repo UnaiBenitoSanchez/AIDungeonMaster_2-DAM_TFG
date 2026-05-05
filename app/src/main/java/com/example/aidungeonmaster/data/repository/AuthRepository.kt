@@ -1,5 +1,6 @@
 package com.example.aidungeonmaster.data.repository
 
+import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
@@ -7,6 +8,16 @@ import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 import java.text.Normalizer
 import kotlin.random.Random
+
+// Estado de disponibilidad del cambio / reseteo de contraseña.
+enum class PasswordResetAvailability {
+    EMPTY_EMAIL,
+    INVALID_EMAIL,
+    AVAILABLE,
+    GOOGLE_ONLY,
+    EMAIL_NOT_FOUND,
+    UNKNOWN
+}
 
 // Repositorio que centraliza el acceso a datos de auth.
 class AuthRepository {
@@ -71,7 +82,8 @@ class AuthRepository {
                     "createdAt" to now,
                     "updatedAt" to now,
                     "characterCount" to 0,
-                    "currentGuildId" to ""
+                    "currentGuildId" to "",
+                    "authProvider" to EmailAuthProvider.PROVIDER_ID
                 )
 
                 db.collection("users")
@@ -175,6 +187,47 @@ class AuthRepository {
         )
 
         docRef.set(profile).await()
+    }
+
+    // Envía correo de recuperación de contraseña.
+    suspend fun sendPasswordReset(email: String) {
+        val trimmed = email.trim()
+        if (trimmed.isBlank()) {
+            throw IllegalStateException("Introduce un correo electrónico válido.")
+        }
+
+        auth.sendPasswordResetEmail(trimmed).await()
+    }
+
+    // Indica si el usuario actual tiene proveedor email/password enlazado.
+    fun currentUserSupportsPasswordAuth(): Boolean {
+        val currentUser = auth.currentUser ?: return false
+        return currentUser.providerData.any { it.providerId == EmailAuthProvider.PROVIDER_ID }
+    }
+
+    // Indica si el usuario actual solo ha iniciado sesión con Google.
+    fun currentUserIsGoogleOnly(): Boolean {
+        val currentUser = auth.currentUser ?: return false
+        val hasPasswordProvider = currentUser.providerData.any { it.providerId == EmailAuthProvider.PROVIDER_ID }
+        val hasGoogleProvider = currentUser.providerData.any { it.providerId == GoogleAuthProvider.PROVIDER_ID }
+        return hasGoogleProvider && !hasPasswordProvider
+    }
+
+    // Cambia la contraseña del usuario autenticado pidiendo reautenticación previa.
+    suspend fun updateCurrentUserPassword(currentPassword: String, newPassword: String) {
+        val user = auth.currentUser ?: throw IllegalStateException("Usuario no autenticado")
+        if (!currentUserSupportsPasswordAuth()) {
+            throw IllegalStateException("Esta cuenta solo usa Google. El cambio de contraseña está desactivado.")
+        }
+
+        val email = user.email?.trim().orEmpty()
+        if (email.isBlank()) {
+            throw IllegalStateException("No se ha podido recuperar el correo del usuario autenticado.")
+        }
+
+        val credential = EmailAuthProvider.getCredential(email, currentPassword)
+        user.reauthenticate(credential).await()
+        user.updatePassword(newPassword).await()
     }
 
     // Comprueba si user logged.

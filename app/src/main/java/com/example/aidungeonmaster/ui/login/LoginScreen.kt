@@ -46,6 +46,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -72,6 +73,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.aidungeonmaster.R
 import com.example.aidungeonmaster.data.auth.GoogleAuthManager
+import com.example.aidungeonmaster.data.repository.PasswordResetAvailability
 import com.example.aidungeonmaster.ui.theme.ColorBlindType
 import com.example.aidungeonmaster.ui.theme.LocalColorBlindType
 import com.example.aidungeonmaster.viewmodel.AuthViewModel
@@ -96,6 +98,7 @@ fun LoginScreen(
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
+    var passwordResetMessage by remember { mutableStateOf<String?>(null) }
 
     val context = LocalContext.current
     val googleAuthManager = remember { GoogleAuthManager() }
@@ -134,6 +137,11 @@ fun LoginScreen(
                         throwable.message ?: "No se pudo iniciar sesión con Google."
                 }
         }
+    }
+
+    LaunchedEffect(email) {
+        passwordResetMessage = null
+        viewModel.refreshPasswordResetAvailability(email)
     }
 
     DisposableEffect(email, password, viewModel.isLoading) {
@@ -195,6 +203,27 @@ fun LoginScreen(
                         feedback = "Iniciando sesión."
                     ),
                     VoiceFormAction(
+                        label = "restablecer contraseña",
+                        aliases = listOf(
+                            "restablecer contraseña",
+                            "restablecer contrasena",
+                            "he olvidado mi contraseña",
+                            "he olvidado mi contrasena",
+                            "recuperar contraseña",
+                            "recuperar contrasena"
+                        ),
+                        enabled = {
+                            !viewModel.isLoading &&
+                                    !viewModel.isSendingPasswordReset &&
+                                    viewModel.passwordResetAvailability == PasswordResetAvailability.AVAILABLE
+                        },
+                        disabledFeedback = "Necesito un correo electrónico válido para enviar la recuperación.",
+                        onRun = {
+                            viewModel.sendPasswordReset(email) { passwordResetMessage = it }
+                        },
+                        feedback = "Enviando correo de recuperación."
+                    ),
+                    VoiceFormAction(
                         label = "ir a registro",
                         aliases = listOf(
                             "ir a registro",
@@ -216,6 +245,17 @@ fun LoginScreen(
     }
 
     val currentColorBlindType = LocalColorBlindType.current
+    val passwordResetButtonText = when {
+        viewModel.isSendingPasswordReset -> "Enviando correo de recuperación..."
+        viewModel.passwordResetAvailability == PasswordResetAvailability.INVALID_EMAIL ->
+            "Introduce un correo válido"
+        else -> "¿Has olvidado tu contraseña?"
+    }
+    val canSendPasswordReset =
+        !viewModel.isLoading &&
+                !viewModel.isSendingPasswordReset &&
+                !viewModel.isCheckingPasswordResetAvailability &&
+                viewModel.passwordResetAvailability == PasswordResetAvailability.AVAILABLE
 
     Box(
         modifier = modifier
@@ -360,6 +400,38 @@ fun LoginScreen(
                         shape = RoundedCornerShape(12.dp),
                         enabled = !viewModel.isLoading
                     )
+
+                    TextButton(
+                        onClick = {
+                            viewModel.sendPasswordReset(email) { passwordResetMessage = it }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = canSendPasswordReset
+                    ) {
+                        Text(
+                            text = passwordResetButtonText,
+                            color = if (canSendPasswordReset) {
+                                MaterialTheme.colorScheme.secondary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                        )
+                    }
+
+                    passwordResetMessage?.let { infoMsg ->
+                        Surface(
+                            color = MaterialTheme.colorScheme.secondaryContainer,
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = infoMsg,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.padding(12.dp)
+                            )
+                        }
+                    }
 
                     viewModel.errorMessage?.let { errorMsg ->
                         Surface(

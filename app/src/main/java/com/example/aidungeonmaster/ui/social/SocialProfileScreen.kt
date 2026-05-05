@@ -4,6 +4,9 @@ import com.example.aidungeonmaster.ui.i18n.Text
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -23,7 +26,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -44,9 +50,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.aidungeonmaster.utils.ImageUtils
+import com.example.aidungeonmaster.viewmodel.AuthViewModel
 import com.example.aidungeonmaster.viewmodel.SocialViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -72,7 +81,8 @@ fun SocialProfileScreen(
     onBack: () -> Unit,
     onOpenChat: ((String, String) -> Unit)? = null,
     onOpenPersonalRoom: ((String, String, String) -> Unit)? = null,
-    viewModel: SocialViewModel = viewModel()
+    viewModel: SocialViewModel = viewModel(),
+    authViewModel: AuthViewModel = viewModel()
 ) {
     val profile by viewModel.profile.collectAsState()
     val profileCharacters by viewModel.profileCharacters.collectAsState()
@@ -83,6 +93,13 @@ fun SocialProfileScreen(
     var bio by remember { mutableStateOf("") }
     var accentColor by remember { mutableStateOf("#D4AF37") }
     var backgroundColor by remember { mutableStateOf("#1E1E1E") }
+    var currentPassword by remember { mutableStateOf("") }
+    var newPassword by remember { mutableStateOf("") }
+    var confirmNewPassword by remember { mutableStateOf("") }
+    var currentPasswordVisible by remember { mutableStateOf(false) }
+    var newPasswordVisible by remember { mutableStateOf(false) }
+    var confirmNewPasswordVisible by remember { mutableStateOf(false) }
+    var passwordSuccessMessage by remember { mutableStateOf<String?>(null) }
 
     val context = LocalContext.current
 
@@ -107,6 +124,20 @@ fun SocialProfileScreen(
         }
     }
 
+    LaunchedEffect(authViewModel.errorMessage) {
+        authViewModel.errorMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            authViewModel.clearError()
+        }
+    }
+
+    LaunchedEffect(passwordSuccessMessage) {
+        if (!passwordSuccessMessage.isNullOrBlank()) {
+            snackbarHostState.showSnackbar(passwordSuccessMessage!!)
+            passwordSuccessMessage = null
+        }
+    }
+
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
@@ -114,6 +145,9 @@ fun SocialProfileScreen(
             viewModel.uploadMyProfilePhoto(context, uri)
         }
     }
+
+    val canChangePassword = authViewModel.canCurrentUserChangePassword()
+    val isGoogleOnlyAccount = authViewModel.isCurrentUserGoogleOnly()
 
     Scaffold(
         topBar = {
@@ -275,6 +309,147 @@ fun SocialProfileScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text("Guardar perfil")
+                }
+
+                Card(
+                    shape = RoundedCornerShape(20.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            text = "Seguridad de la cuenta",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+
+                        Text(
+                            text = if (canChangePassword) {
+                                "Puedes cambiar tu contraseña desde aquí. Te pediremos la contraseña actual para reautenticarte."
+                            } else if (isGoogleOnlyAccount) {
+                                "Esta cuenta ha iniciado sesión solo con Google. El cambio de contraseña queda desactivado en la app."
+                            } else {
+                                "El cambio de contraseña no está disponible para esta cuenta."
+                            },
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        OutlinedTextField(
+                            value = currentPassword,
+                            onValueChange = { currentPassword = it },
+                            label = { Text("Contraseña actual") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            enabled = canChangePassword && !authViewModel.isChangingPassword,
+                            visualTransformation = if (currentPasswordVisible) {
+                                VisualTransformation.None
+                            } else {
+                                PasswordVisualTransformation()
+                            },
+                            trailingIcon = {
+                                IconButton(
+                                    onClick = { currentPasswordVisible = !currentPasswordVisible },
+                                    enabled = canChangePassword
+                                ) {
+                                    Icon(
+                                        imageVector = if (currentPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                        contentDescription = if (currentPasswordVisible) "Ocultar contraseña actual" else "Mostrar contraseña actual"
+                                    )
+                                }
+                            }
+                        )
+
+                        OutlinedTextField(
+                            value = newPassword,
+                            onValueChange = { newPassword = it },
+                            label = { Text("Nueva contraseña") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            enabled = canChangePassword && !authViewModel.isChangingPassword,
+                            visualTransformation = if (newPasswordVisible) {
+                                VisualTransformation.None
+                            } else {
+                                PasswordVisualTransformation()
+                            },
+                            trailingIcon = {
+                                IconButton(
+                                    onClick = { newPasswordVisible = !newPasswordVisible },
+                                    enabled = canChangePassword
+                                ) {
+                                    Icon(
+                                        imageVector = if (newPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                        contentDescription = if (newPasswordVisible) "Ocultar nueva contraseña" else "Mostrar nueva contraseña"
+                                    )
+                                }
+                            }
+                        )
+
+                        OutlinedTextField(
+                            value = confirmNewPassword,
+                            onValueChange = { confirmNewPassword = it },
+                            label = { Text("Confirmar nueva contraseña") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            enabled = canChangePassword && !authViewModel.isChangingPassword,
+                            visualTransformation = if (confirmNewPasswordVisible) {
+                                VisualTransformation.None
+                            } else {
+                                PasswordVisualTransformation()
+                            },
+                            trailingIcon = {
+                                IconButton(
+                                    onClick = { confirmNewPasswordVisible = !confirmNewPasswordVisible },
+                                    enabled = canChangePassword
+                                ) {
+                                    Icon(
+                                        imageVector = if (confirmNewPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                        contentDescription = if (confirmNewPasswordVisible) "Ocultar confirmación de contraseña" else "Mostrar confirmación de contraseña"
+                                    )
+                                }
+                            }
+                        )
+
+                        Button(
+                            onClick = {
+                                when {
+                                    newPassword != confirmNewPassword -> {
+                                        authViewModel.errorMessage = "Las contraseñas nuevas no coinciden."
+                                    }
+                                    newPassword == currentPassword -> {
+                                        authViewModel.errorMessage = "La nueva contraseña debe ser distinta de la actual."
+                                    }
+                                    else -> {
+                                        authViewModel.changeCurrentUserPassword(
+                                            currentPassword = currentPassword,
+                                            newPassword = newPassword
+                                        ) {
+                                            currentPassword = ""
+                                            newPassword = ""
+                                            confirmNewPassword = ""
+                                            currentPasswordVisible = false
+                                            newPasswordVisible = false
+                                            confirmNewPasswordVisible = false
+                                            passwordSuccessMessage = "Contraseña actualizada correctamente."
+                                        }
+                                    }
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = canChangePassword && !authViewModel.isChangingPassword
+                        ) {
+                            if (authViewModel.isChangingPassword) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Text("Cambiar contraseña")
+                            }
+                        }
+                    }
                 }
             } else {
                 Button(
