@@ -384,29 +384,6 @@ Gestiona:
 
 La aplicación utiliza **Firebase Authentication** y **Cloud Firestore** como backend principal.
 
-Colecciones y ámbitos funcionales destacados:
-
-- `users/{uid}`: perfil público, presencia, colores, bio y metadatos sociales.
-- `users/{uid}/characters`: personajes del usuario.
-- `users/{uid}/friends`: espejo de amistades.
-- `users/{uid}/guilds`: pertenencia a gremios.
-- `users/{uid}/achievements`: logros desbloqueados.
-- `users/{uid}/quests`: progreso de misiones.
-- `friend_requests`: solicitudes de amistad.
-- `friendships`: relación consolidada de amistad.
-- `private_chats`: chats privados y mensajes.
-- `guilds`: documento principal de gremios.
-- `guilds/{guildId}/members`: miembros del gremio.
-- `guilds/{guildId}/chat`: mensajería interna del gremio.
-- `guilds/{guildId}/boss_rooms`: estado de combate cooperativo.
-- `partidas/{charId}`: estado principal de cada partida/personaje.
-- `partidas/{charId}/journal`: diario narrativo.
-- `partidas/{charId}/bestiary`: bestiario del personaje.
-- `partidas/{charId}/worldMap`: estado del mapa.
-- `partidas/{charId}/personalRoom`: sala personal.
-- `ranking`: ranking global.
-- `bank_accounts`: balance de banco por personaje.
-
 ---
 
 ## Workers y automatización local
@@ -451,40 +428,6 @@ En accesibilidad incorpora:
 
 ---
 
-## Configuración del proyecto
-
-Para ejecutar el proyecto correctamente se necesitan:
-
-### 1. Firebase
-- archivo `app/google-services.json`;
-- proyecto Firebase configurado con Authentication y Firestore.
-
-### 2. Claves en `local.properties`
-El proyecto espera claves de entorno definidas en `local.properties`:
-
-```properties
-GROQ_API_KEY=tu_clave
-CLOUDFLARE_ACCOUNT_ID=tu_account_id
-CLOUDFLARE_API_TOKEN=tu_api_token
-GOOGLE_WEB_CLIENT_ID=tu_web_client_id
-GEMINI_API_KEY=tu_clave_opcional
-```
-
-Notas:
-- `GROQ_API_KEY` se usa para narrativa estructurada.
-- `CLOUDFLARE_ACCOUNT_ID` y `CLOUDFLARE_API_TOKEN` se usan para generación visual.
-- `GOOGLE_WEB_CLIENT_ID` se usa para el login con Google.
-- `GEMINI_API_KEY` está preparada como constante de compilación, aunque no forma parte del flujo principal actual.
-
-### 3. Requisitos de compilación
-- Android Studio reciente;
-- JDK 17;
-- Android SDK 36;
-- Gradle compatible con AGP 8.13.x;
-- dispositivo/emulador con Android 7.0 o superior.
-
----
-
 ## Permisos utilizados
 
 La aplicación solicita y/o declara permisos para:
@@ -522,7 +465,6 @@ Proyecto académico de TFG orientado a la exploración de:
 - Notificaciones en tiempo real completamente funcionales para eventos sociales, combates de gremio y alertas de juego.
 - Control por voz con reconocimiento adaptado al idioma seleccionado en la aplicación, respondiendo también en ese mismo idioma.
 - Detección y escaneo contextual de peluquerías y farmacias cercanas, ampliando los tipos de establecimientos reales vinculados al juego.
-- Integración completa de audio nativo avanzado si se activa la rama experimental `rust_audio/`.
 
 ---
 
