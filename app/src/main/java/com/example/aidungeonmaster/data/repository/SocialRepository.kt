@@ -475,6 +475,25 @@ class SocialRepository {
             .await()
     }
 
+    // Actualiza my profile photo desde una data URL ya recortada/optimizada en cliente.
+    suspend fun updateMyProfilePhotoDataUrl(dataUrl: String) {
+        val myUid = currentUid() ?: throw IllegalStateException("Usuario no autenticado")
+
+        if (!dataUrl.startsWith("data:image/")) {
+            throw IllegalArgumentException("Formato de imagen no válido")
+        }
+
+        db.collection("users")
+            .document(myUid)
+            .update(
+                mapOf(
+                    "photoUrl" to dataUrl,
+                    "updatedAt" to System.currentTimeMillis()
+                )
+            )
+            .await()
+    }
+
     // Crea guild.
     suspend fun createGuild(
         name: String,

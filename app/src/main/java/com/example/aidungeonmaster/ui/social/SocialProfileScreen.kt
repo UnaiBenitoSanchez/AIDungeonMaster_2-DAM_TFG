@@ -7,7 +7,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -48,18 +47,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.aidungeonmaster.utils.ImageUtils
 import com.example.aidungeonmaster.viewmodel.AuthViewModel
 import com.example.aidungeonmaster.viewmodel.SocialViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import androidx.compose.foundation.clickable
 
 // Clase que encapsula la lógica de profile palette.
 private data class ProfilePalette(val accent: String, val background: String)
@@ -100,6 +98,9 @@ fun SocialProfileScreen(
     var newPasswordVisible by remember { mutableStateOf(false) }
     var confirmNewPasswordVisible by remember { mutableStateOf(false) }
     var passwordSuccessMessage by remember { mutableStateOf<String?>(null) }
+
+    var pendingProfileBitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+    var showProfilePhotoPreview by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
 
@@ -142,12 +143,37 @@ fun SocialProfileScreen(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
         if (uri != null) {
-            viewModel.uploadMyProfilePhoto(context, uri)
+            pendingProfileBitmap = decodeBitmapFromUri(context, uri)
+
+            if (pendingProfileBitmap == null) {
+                viewModel.showMessage("No se pudo leer la imagen seleccionada")
+            }
         }
     }
 
     val canChangePassword = authViewModel.canCurrentUserChangePassword()
     val isGoogleOnlyAccount = authViewModel.isCurrentUserGoogleOnly()
+
+    if (showProfilePhotoPreview) {
+        ProfilePhotoPreviewDialog(
+            photoUrl = profile?.photoUrl.orEmpty(),
+            displayName = profile?.displayName.orEmpty().ifBlank { "Perfil" },
+            accentColor = parseColor(accentColor),
+            backgroundColor = parseColor(backgroundColor),
+            onDismiss = { showProfilePhotoPreview = false }
+        )
+    }
+
+    pendingProfileBitmap?.let { bitmap ->
+        ProfileImageCropperDialog(
+            sourceBitmap = bitmap,
+            onCancel = { pendingProfileBitmap = null },
+            onCropConfirmed = { dataUrl ->
+                pendingProfileBitmap = null
+                viewModel.uploadMyProfilePhotoDataUrl(dataUrl)
+            }
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -197,45 +223,15 @@ fun SocialProfileScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        val profileBitmap = remember(currentProfile.photoUrl) {
-                            runCatching {
-                                if (currentProfile.photoUrl.startsWith("data:image")) {
-                                    val base64Part =
-                                        currentProfile.photoUrl.substringAfter("base64,", "")
-                                    if (base64Part.isNotBlank()) {
-                                        ImageUtils.base64ToBitmap(base64Part)
-                                    } else {
-                                        null
-                                    }
-                                } else {
-                                    null
-                                }
-                            }.getOrNull()
-                        }
-
-                        if (profileBitmap != null) {
-                            Image(
-                                bitmap = profileBitmap.asImageBitmap(),
-                                contentDescription = "Foto de perfil",
-                                modifier = Modifier
-                                    .size(64.dp)
-                                    .clip(CircleShape)
-                            )
-                        } else {
-                            Column(
-                                modifier = Modifier
-                                    .size(64.dp)
-                                    .background(parseColor(accentColor), CircleShape),
-                                verticalArrangement = Arrangement.Center,
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Text(
-                                    text = currentProfile.displayName.take(1).uppercase(),
-                                    style = MaterialTheme.typography.headlineMedium,
-                                    color = Color.Black
-                                )
+                        SocialUserAvatar(
+                            photoUrl = currentProfile.photoUrl,
+                            displayName = currentProfile.displayName,
+                            size = 64.dp,
+                            accent = parseColor(accentColor),
+                            modifier = Modifier.clickable {
+                                showProfilePhotoPreview = true
                             }
-                        }
+                        )
 
                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text(

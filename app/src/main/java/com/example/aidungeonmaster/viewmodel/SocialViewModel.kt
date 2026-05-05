@@ -186,6 +186,20 @@ class SocialViewModel : ViewModel() {
         }
     }
 
+    // Guarda una foto de perfil ya recortada y comprimida en formato data URL.
+    fun uploadMyProfilePhotoDataUrl(dataUrl: String) {
+        viewModelScope.launch {
+            runCatching {
+                repository.updateMyProfilePhotoDataUrl(dataUrl)
+            }.onSuccess {
+                _message.value = "Foto actualizada"
+                repository.currentUid()?.let { loadProfile(it) }
+            }.onFailure {
+                _message.value = it.message ?: "Error al guardar la foto"
+            }
+        }
+    }
+
     // Carga my profile.
     fun loadMyProfile() {
         val uid = repository.currentUid() ?: return
@@ -853,6 +867,10 @@ class SocialViewModel : ViewModel() {
     // Limpia message.
     fun clearMessage() {
         _message.value = null
+    }
+
+    fun showMessage(text: String) {
+        _message.value = text
     }
 
     // Ejecuta la lógica de consume guild leave completed.
