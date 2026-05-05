@@ -373,7 +373,6 @@ Proyecto académico de TFG orientado a la exploración de:
 - Competiciones entre gremios basadas en peleas de jefes, con clasificaciones y recompensas para los participantes.
 - Sistema de mejoras de gremio que permita desbloquear capacidades colectivas, ventajas pasivas y mejoras progresivas para los miembros.
 - Notificaciones en tiempo real completamente funcionales para eventos sociales, combates de gremio y alertas de juego.
-- Opción de cambio de contraseña desde los ajustes de cuenta del usuario.
 - Control por voz con reconocimiento adaptado al idioma seleccionado en la aplicación, respondiendo también en ese mismo idioma.
 - Detección y escaneo contextual de peluquerías y farmacias cercanas, ampliando los tipos de establecimientos reales vinculados al juego.
 
