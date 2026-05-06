@@ -4,6 +4,7 @@ import com.example.aidungeonmaster.ui.i18n.Text
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Matrix
 import android.util.Base64
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -96,8 +97,9 @@ fun ProfileImageCropperDialog(
     onCancel: () -> Unit,
     onCropConfirmed: (String) -> Unit
 ) {
-    var zoom by remember { mutableFloatStateOf(1f) }
-    var offset by remember { mutableStateOf(Offset.Zero) }
+    var editableBitmap by remember(sourceBitmap) { mutableStateOf(sourceBitmap) }
+    var zoom by remember(editableBitmap) { mutableFloatStateOf(1f) }
+    var offset by remember(editableBitmap) { mutableStateOf(Offset.Zero) }
     var cropBoxSize by remember { mutableStateOf(IntSize.Zero) }
     val cropBoxDp = 300.dp
     val density = LocalDensity.current
@@ -114,7 +116,7 @@ fun ProfileImageCropperDialog(
                     }
 
                     val cropped = cropVisibleSquare(
-                        source = sourceBitmap,
+                        source = editableBitmap,
                         cropBoxPx = cropPx,
                         zoom = zoom,
                         offset = offset
@@ -143,7 +145,7 @@ fun ProfileImageCropperDialog(
                         .clip(RoundedCornerShape(26.dp))
                         .background(Color.Black)
                         .onSizeChanged { cropBoxSize = it }
-                        .pointerInput(sourceBitmap) {
+                        .pointerInput(editableBitmap) {
                             detectTransformGestures { _, pan, gestureZoom, _ ->
                                 zoom = (zoom * gestureZoom).coerceIn(1f, 4f)
                                 offset += pan
@@ -152,7 +154,7 @@ fun ProfileImageCropperDialog(
                     contentAlignment = Alignment.Center
                 ) {
                     Image(
-                        bitmap = sourceBitmap.asImageBitmap(),
+                        bitmap = editableBitmap.asImageBitmap(),
                         contentDescription = "Foto seleccionada",
                         modifier = Modifier
                             .size(cropBoxDp)
@@ -185,6 +187,16 @@ fun ProfileImageCropperDialog(
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(
                         onClick = {
+                            editableBitmap = rotateBitmap90Degrees(editableBitmap)
+                            offset = Offset.Zero
+                            zoom = 1f
+                        }
+                    ) {
+                        Text("Rotar")
+                    }
+
+                    OutlinedButton(
+                        onClick = {
                             offset = Offset.Zero
                             zoom = 1f
                         }
@@ -203,6 +215,12 @@ fun decodeBitmapFromUri(context: Context, uri: android.net.Uri): Bitmap? {
     return context.contentResolver.openInputStream(uri)?.use { input ->
         BitmapFactory.decodeStream(input)
     }
+}
+
+
+private fun rotateBitmap90Degrees(source: Bitmap): Bitmap {
+    val matrix = Matrix().apply { postRotate(90f) }
+    return Bitmap.createBitmap(source, 0, 0, source.width, source.height, matrix, true)
 }
 
 private fun cropVisibleSquare(
