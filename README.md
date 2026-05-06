@@ -13,14 +13,17 @@ El proyecto implementa una experiencia de rol móvil en la que el usuario puede:
 - participar en combates por turnos;
 - gestionar inventario, equipo, monedas, experiencia y progresión;
 - registrar eventos en un diario narrativo enriquecido con procesamiento en Python;
+- completar logros y aceptar/avanzar misiones persistentes;
 - explorar localizaciones persistentes del mundo del juego;
 - visualizar escenarios en 3D y realidad aumentada;
 - escanear QR y usar OCR para activar contenido contextual;
 - interactuar con un módulo social con amistades, perfiles, chats y gremios;
 - participar en batallas cooperativas contra jefes de gremio;
 - personalizar una sala personal del personaje;
+- visitar salas personales de jugadores amigos;
 - exportar fichas de personaje en PDF;
-- usar opciones de accesibilidad como modo daltónico, tutorial guiado y control por voz.
+- usar opciones de accesibilidad como modo daltónico, tutorial guiado y control por voz;
+- recibir notificaciones contextuales por ranking, inactividad o proximidad a tiendas reales.
 
 La aplicación sigue una arquitectura modular inspirada en MVVM y se apoya en Firebase, servicios de IA, renderizado nativo/embebido y procesamiento auxiliar en Python.
 
@@ -29,14 +32,15 @@ La aplicación sigue una arquitectura modular inspirada en MVVM y se apoya en Fi
 ## Características principales
 
 ### Núcleo jugable
-- Creación, selección y borrado de personajes.
+- Creación, selección y borrado completo de personajes.
 - Sistema de aventura narrativa dinámica guiada por IA.
 - Combate por turnos con enemigos, botín y consecuencias persistentes.
 - Gestión de inventario, equipo, rarezas, consumibles y encantamientos.
 - Sistema de experiencia, nivel, estadísticas derivadas y progresión.
 - Diario narrativo persistente con capítulos y reescritura épica.
-- Bestiario, ranking y logros.
+- Bestiario, ranking, logros y misiones.
 - Mapa del mundo persistente con localizaciones descubiertas.
+- Resumen de muerte/fin de sesión con recompensas acumuladas.
 
 ### Funcionalidades avanzadas
 - Generación de narrativa estructurada mediante API externa de IA.
@@ -49,6 +53,7 @@ La aplicación sigue una arquitectura modular inspirada en MVVM y se apoya en Fi
 - Escaneo QR y OCR con ML Kit.
 - Detección contextual de supermercados cercanos mediante geolocalización y OpenStreetMap/Overpass.
 - Tienda contextual del mundo de juego vinculada a localización física.
+- Sistema de banco para depositar y retirar monedas.
 - Notificaciones y tareas programadas con WorkManager.
 
 ### Módulo social
@@ -56,13 +61,16 @@ La aplicación sigue una arquitectura modular inspirada en MVVM y se apoya en Fi
 - Solicitudes de amistad.
 - Lista de amigos.
 - Perfiles sociales personalizables.
-- Foto de perfil y biografía.
-- Presencia online y último acceso.
+- Foto de perfil con vista ampliada.
+- Selección y recorte de foto de perfil antes de guardarla.
+- Biografía, colores de perfil y presencia online.
+- Resumen del aventurero en el perfil social.
 - Chat privado entre jugadores.
 - Sistema de gremios.
 - Chat de gremio.
 - Vista de miembros del gremio.
 - Batallas cooperativas contra jefe de gremio.
+- Posibilidad de visitar la sala personal de amigos.
 
 ### Accesibilidad y experiencia de usuario
 - Tutorial guiado integrado en la interfaz.
@@ -71,6 +79,7 @@ La aplicación sigue una arquitectura modular inspirada en MVVM y se apoya en Fi
 - Síntesis de voz y feedback hablado.
 - Overlay de asistencia de usabilidad.
 - Interfaz multidioma.
+- Comandos de voz para navegación y acciones frecuentes.
 
 ---
 
@@ -135,7 +144,7 @@ Responsabilidades:
 - mantenimiento del estado reactivo;
 - validación de entradas;
 - control del flujo funcional de pantallas y subsistemas;
-- sincronización entre narrativa, combate, inventario, mapa, diario y social.
+- sincronización entre narrativa, combate, inventario, mapa, diario, social y accesibilidad.
 
 #### 3. Capa de datos
 Formada por modelos, repositorios y servicios.
@@ -145,7 +154,7 @@ Responsabilidades:
 - lectura y escritura en Firestore;
 - consumo de APIs externas;
 - encapsulación de operaciones persistentes;
-- gestión de perfiles, amistades, chats, gremios y partidas.
+- gestión de perfiles, amistades, chats, gremios, partidas y economía.
 
 #### 4. Capa de integración externa
 Incluye servicios auxiliares y motores adicionales.
@@ -177,7 +186,7 @@ app/
            │    ├── python/                # Puente Kotlin-Python
            │    ├── ui/
            │    │    ├── accessibility/    # Voz, modo daltónico, overlay de ayuda
-           │    │    ├── achievements/     # Logros
+           │    │    ├── achievements/     # Logros y misiones
            │    │    ├── game/             # Juego, combate, inventario, mapa, AR, QR
            │    │    ├── home/             # Home, personajes, ficha, PDF
            │    │    ├── i18n/             # Traducción fija de interfaz
@@ -192,6 +201,9 @@ app/
            │    └── workers/               # Workers de ranking, inactividad y proximidad
            ├── python/                     # Scripts Python de resumen y diario
            └── res/                        # Recursos visuales, strings e idiomas
+
+rust_audio/                                 # Base experimental para audio nativo (no integrada en el flujo principal actual)
+build/build_rust.sh                         # Script auxiliar de compilación nativa
 ```
 
 ---
@@ -238,18 +250,20 @@ Gestiona:
 - uso de armas y consumibles;
 - huida o derrota;
 - recompensas;
-- integración con inventario, diario, logros y progreso.
+- integración con inventario, diario, bestiario, logros y progreso.
 
-### Inventario y progresión
+### Inventario, economía y progresión
 Gestiona:
 - objetos;
 - equipo por slots;
 - rarezas;
 - encantamientos;
 - monedas;
+- banco persistente;
 - experiencia;
 - nivel;
-- bonificaciones y comparación de equipo.
+- bonificaciones y comparación de equipo;
+- compra, venta y gasto de recursos.
 
 ### Diario narrativo
 Gestiona:
@@ -263,6 +277,15 @@ Gestiona:
 Tecnologías:
 - Firestore
 - Python + Chaquopy
+
+### Logros y misiones
+Gestiona:
+- catálogo de logros;
+- desbloqueo por acciones del jugador;
+- catálogo de misiones;
+- aceptación y progreso de objetivos;
+- recompensas en monedas;
+- persistencia individual por usuario.
 
 ### Mapa y exploración
 Gestiona:
@@ -295,7 +318,9 @@ Gestiona:
 - lista de amigos;
 - chats privados;
 - presencia online y último acceso;
-- personalización visual del perfil.
+- personalización visual del perfil;
+- foto de perfil con ampliación y recorte;
+- resumen automático del aventurero en el perfil.
 
 ### Gremios
 Gestiona:
@@ -304,6 +329,7 @@ Gestiona:
 - resumen del gremio;
 - chat de gremio;
 - miembros;
+- transferencia de liderazgo;
 - batallas cooperativas contra jefe final.
 
 ### Integración contextual
@@ -321,7 +347,8 @@ Gestiona:
 - síntesis de voz;
 - tutorial guiado;
 - modo daltónico;
-- asistencia contextual de navegación.
+- asistencia contextual de navegación;
+- selección de idioma de aplicación.
 
 ---
 
@@ -339,7 +366,8 @@ Gestiona:
    - inventario;
    - diario;
    - mapa;
-   - progreso general.
+   - progreso general;
+   - logros y misiones.
 7. Los cambios se sincronizan con Firestore.
 8. Los subsistemas auxiliares enriquecen la experiencia con:
    - imágenes generadas;
@@ -349,6 +377,68 @@ Gestiona:
    - notificaciones;
    - social y gremios;
    - eventos contextuales por localización real.
+
+---
+
+## Persistencia y backend
+
+La aplicación utiliza **Firebase Authentication** y **Cloud Firestore** como backend principal.
+
+---
+
+## Workers y automatización local
+
+La aplicación programa varias tareas periódicas mediante **WorkManager**:
+
+- **RankingCheckWorker**:
+  - comprueba cambios de posición en el top global;
+  - lanza notificaciones cuando un personaje pierde el top 3.
+
+- **InactivityWorker**:
+  - detecta periodos largos sin jugar;
+  - lanza recordatorios para retomar la aventura.
+
+- **SupermarketProximityWorker**:
+  - consulta ubicación del dispositivo;
+  - detecta supermercados cercanos;
+  - activa notificaciones para abrir la tienda contextual del juego.
+
+Además, la app utiliza el ciclo de vida global (`ProcessLifecycleOwner`) para actualizar automáticamente el estado de presencia del usuario.
+
+---
+
+## Internacionalización y accesibilidad
+
+La aplicación soporta varios idiomas configurables en tiempo de ejecución:
+
+- español;
+- inglés;
+- catalán;
+- euskera;
+- alemán;
+- francés;
+- gallego.
+
+En accesibilidad incorpora:
+- comandos de voz;
+- locución/feedback hablado;
+- overlay de asistencia;
+- tutorial guiado;
+- modo daltónico persistente.
+
+---
+
+## Permisos utilizados
+
+La aplicación solicita y/o declara permisos para:
+
+- internet;
+- cámara;
+- grabación de audio;
+- notificaciones;
+- localización aproximada y precisa;
+- localización en segundo plano;
+- capacidades AR opcionales.
 
 ---
 
@@ -380,7 +470,7 @@ Proyecto académico de TFG orientado a la exploración de:
 
 ## Licencia
 
-Este proyecto se publica **exclusivamente con fines académicos y de demostración**.
+Este proyecto se publica **exclusivamente con fines académicos y de demostración**.  
 Si deseas utilizar este proyecto, **contacta con el autor** antes de hacerlo para pedir permiso.
 
 ---
