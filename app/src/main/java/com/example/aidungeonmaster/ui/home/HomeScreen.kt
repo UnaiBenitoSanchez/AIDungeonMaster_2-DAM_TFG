@@ -593,6 +593,7 @@ fun HomeScreen(
 
                         IconButton(
                             onClick = {
+                                socialViewModel.resetSessionState()
                                 viewModel.logout {
                                     navController.navigate(Screen.Login.route) {
                                         popUpTo(0) { inclusive = true }

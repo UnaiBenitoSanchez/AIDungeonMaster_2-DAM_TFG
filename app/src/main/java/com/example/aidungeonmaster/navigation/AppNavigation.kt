@@ -276,6 +276,7 @@ fun AppNavigation(
             HomeScreen(
                 navController = navController,
                 viewModel = homeViewModel,
+                socialViewModel = socialViewModel,
                 onColorBlindChanged = onColorBlindChanged,
                 onOpenAccessibilityOptions = {
                     accessibilityOpenRequest++
@@ -807,6 +808,7 @@ fun AppNavigation(
                 }
             },
             onLogout = {
+                socialViewModel.resetSessionState()
                 homeViewModel.logout {
                     navController.navigate(Screen.Login.route) {
                         popUpTo(0) { inclusive = true }

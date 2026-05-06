@@ -60,6 +60,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import com.google.firebase.auth.FirebaseAuth
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -99,9 +100,14 @@ fun UsabilityAssistantOverlay(
         context.getSharedPreferences("usability_assistant_prefs", android.content.Context.MODE_PRIVATE)
     }
 
+    val voicePreferenceKey = remember {
+        val uid = FirebaseAuth.getInstance().currentUser?.uid
+        if (uid.isNullOrBlank()) "voice_enabled" else "voice_enabled_$uid"
+    }
+
     var showSheet by remember { mutableStateOf(false) }
-    var voiceEnabled by rememberSaveable {
-        mutableStateOf(usabilityPrefs.getBoolean("voice_enabled", false))
+    var voiceEnabled by rememberSaveable(voicePreferenceKey) {
+        mutableStateOf(usabilityPrefs.getBoolean(voicePreferenceKey, false))
     }
     var voiceState by remember { mutableStateOf(VoiceControlUiState()) }
     var permissionDeniedMessage by remember { mutableStateOf<String?>(null) }
@@ -154,14 +160,26 @@ fun UsabilityAssistantOverlay(
     }
 
     LaunchedEffect(voiceEnabled) {
+        val hasMicrophonePermission = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.RECORD_AUDIO
+        ) == PackageManager.PERMISSION_GRANTED
+
+        val effectiveVoiceEnabled = voiceEnabled && hasMicrophonePermission
+        if (voiceEnabled && !hasMicrophonePermission) {
+            permissionDeniedMessage = "Permiso de micrófono denegado. Actívalo para usar órdenes de voz."
+            voiceEnabled = false
+            return@LaunchedEffect
+        }
+
         usabilityPrefs.edit()
-            .putBoolean("voice_enabled", voiceEnabled)
+            .putBoolean(voicePreferenceKey, effectiveVoiceEnabled)
             .apply()
 
-        AdventureMusicEngine.setVoiceControlDucking(voiceEnabled)
-        CombatMusicEngine.setVoiceControlDucking(voiceEnabled)
+        AdventureMusicEngine.setVoiceControlDucking(effectiveVoiceEnabled)
+        CombatMusicEngine.setVoiceControlDucking(effectiveVoiceEnabled)
 
-        if (voiceEnabled) {
+        if (effectiveVoiceEnabled) {
             voiceManager.start()
         } else {
             voiceManager.stop(announce = false)

@@ -39,6 +39,7 @@ class SocialViewModel : ViewModel() {
     private var guildBossRoomListener: ListenerRegistration? = null
     private var guildBossParticipantsListener: ListenerRegistration? = null
     private var activeGuildBossGuildId: String? = null
+    private var activeSessionUid: String? = null
 
     private val _guildBossRoom = MutableStateFlow<GuildBossRoom?>(null)
     val guildBossRoom = _guildBossRoom.asStateFlow()
@@ -268,8 +269,51 @@ class SocialViewModel : ViewModel() {
         }
     }
 
+
+    private fun ensureActiveSession() {
+        val currentUid = repository.currentUid()
+        if (activeSessionUid != currentUid) {
+            resetSessionState(preserveMessage = activeSessionUid == null)
+            activeSessionUid = currentUid
+        }
+    }
+
+    fun resetSessionState(preserveMessage: Boolean = false) {
+        stopIncomingRequestsListener()
+        stopFriendsListener()
+        stopGuildsListener()
+        stopGuildChatListener()
+        stopGuildBossListeners()
+
+        _incomingRequests.value = emptyList()
+        _friends.value = emptyList()
+        _profile.value = null
+        _profileCharacters.value = emptyList()
+        _myGuilds.value = emptyList()
+        _guildSearchResults.value = emptyList()
+        _selectedGuild.value = null
+        _selectedGuildMembers.value = emptyList()
+        _selectedGuildChat.value = emptyList()
+        _guildBossRoom.value = null
+        _guildBossParticipants.value = emptyList()
+        _guildBossCharacters.value = emptyList()
+        _guildBossConsumables.value = emptyList()
+        _isGuildMembersLoading.value = false
+        _isGuildChatLoading.value = false
+        _isSendingGuildMessage.value = false
+        _isSearching.value = false
+        _isGuildBossLoading.value = false
+        _isGuildBossActing.value = false
+        _userExplicitlyLeftBattle.value = false
+        _guildLeaveCompleted.value = false
+        if (!preserveMessage) {
+            _message.value = null
+        }
+    }
+
     // Inicia incoming requests listener.
     fun startIncomingRequestsListener() {
+        ensureActiveSession()
         if (incomingRequestsListener != null) return
         incomingRequestsListener = repository.listenIncomingRequests(
             onChange = { _incomingRequests.value = it },
@@ -285,6 +329,7 @@ class SocialViewModel : ViewModel() {
 
     // Inicia friends listener.
     fun startFriendsListener() {
+        ensureActiveSession()
         if (friendsListener != null) return
         friendsListener = repository.listenFriends(
             onChange = { _friends.value = it },
@@ -301,6 +346,7 @@ class SocialViewModel : ViewModel() {
     }
     // Inicia guilds listener.
     fun startGuildsListener() {
+        ensureActiveSession()
         if (guildsListener != null) return
 
         guildsListener = repository.listenMyGuilds(
@@ -880,11 +926,7 @@ class SocialViewModel : ViewModel() {
 
     // Gestiona el evento de cleared.
     override fun onCleared() {
-        stopIncomingRequestsListener()
-        stopFriendsListener()
-        stopGuildsListener()
-        stopGuildChatListener()
-        stopGuildBossListeners()
+        resetSessionState(preserveMessage = true)
         super.onCleared()
     }
 }
