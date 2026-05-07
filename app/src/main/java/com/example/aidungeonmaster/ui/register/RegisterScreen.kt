@@ -24,6 +24,8 @@ import androidx.compose.material.icons.filled.AlternateEmail
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -52,6 +54,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -75,6 +78,8 @@ fun RegisterScreen(
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
+    var passwordVisible by remember { mutableStateOf(false) }
+    var confirmPasswordVisible by remember { mutableStateOf(false) }
     var displayName by remember { mutableStateOf("") }
     var username by remember { mutableStateOf("") }
 
@@ -228,7 +233,9 @@ fun RegisterScreen(
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 1.5.sp,
                         color = MaterialTheme.colorScheme.primary
-                    )
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center
                 )
 
                 Text(
@@ -306,8 +313,16 @@ fun RegisterScreen(
                         onValueChange = { password = it },
                         label = { Text("Sello Secreto (Contraseña)") },
                         leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                        trailingIcon = {
+                            val image = if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility
+                            val description = if (passwordVisible) "Ocultar contraseña" else "Mostrar contraseña"
+
+                            androidx.compose.material3.IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                                Icon(imageVector = image, contentDescription = description)
+                            }
+                        },
                         modifier = Modifier.fillMaxWidth(),
-                        visualTransformation = PasswordVisualTransformation(),
+                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                         colors = OutlinedTextFieldDefaults.colors(),
                         shape = RoundedCornerShape(12.dp)
@@ -318,8 +333,16 @@ fun RegisterScreen(
                         onValueChange = { confirmPassword = it },
                         label = { Text("Confirmar Sello") },
                         leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                        trailingIcon = {
+                            val image = if (confirmPasswordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility
+                            val description = if (confirmPasswordVisible) "Ocultar contraseña" else "Mostrar contraseña"
+
+                            androidx.compose.material3.IconButton(onClick = { confirmPasswordVisible = !confirmPasswordVisible }) {
+                                Icon(imageVector = image, contentDescription = description)
+                            }
+                        },
                         modifier = Modifier.fillMaxWidth(),
-                        visualTransformation = PasswordVisualTransformation(),
+                        visualTransformation = if (confirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                         colors = OutlinedTextFieldDefaults.colors(),
                         shape = RoundedCornerShape(12.dp)
