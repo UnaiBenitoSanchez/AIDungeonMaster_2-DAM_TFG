@@ -50,11 +50,24 @@ fun executeVoiceCommand(
     fun currentGameContext(): CharacterContext? {
         val userId = Uri.decode(currentArguments?.getString("userId").orEmpty())
         val characterName = Uri.decode(currentArguments?.getString("characterName").orEmpty())
-        return if (userId.isNotBlank() && characterName.isNotBlank()) {
-            CharacterContext(userId = userId, characterName = characterName)
-        } else {
-            null
+        if (userId.isNotBlank() && characterName.isNotBlank()) {
+            return CharacterContext(userId = userId, characterName = characterName)
         }
+
+        val charId = Uri.decode(currentArguments?.getString("charId").orEmpty())
+        if (charId.isNotBlank() && charId.contains("_")) {
+            val derivedUserId = charId.substringBefore("_")
+            val derivedCharacterName = charId.substringAfter("_", "")
+            if (derivedUserId.isNotBlank() && derivedCharacterName.isNotBlank()) {
+                return CharacterContext(
+                    userId = derivedUserId,
+                    characterName = derivedCharacterName,
+                    character = characters.firstOrNull { it.name == derivedCharacterName }
+                )
+            }
+        }
+
+        return null
     }
 
     // Ejecuta la lógica de matched character context.
@@ -218,7 +231,7 @@ fun executeVoiceCommand(
     }
 
     if (command.containsAny("ayuda", "que puedo decir", "comandos", "ordenes disponibles")) {
-        return "Puedes decir: cambia idioma a inglés, pon la app en gallego, desactiva la voz, protanopía, colores normales, crear personaje, abre gremios, abre chat del gremio, selecciona aventura cyberpunk, descargar ficha en PDF, repetir tutorial o cerrar sesión."
+        return "Puedes decir: abre mapa, abre mapa en realidad aumentada, abre inventario de Aria, cambia idioma a inglés, pon la app en gallego, desactiva la voz, protanopía, colores normales, crear personaje, abre gremios, abre chat del gremio, descargar ficha en PDF, repetir tutorial o cerrar sesión."
     }
 
     if (command.containsAny(
@@ -428,12 +441,33 @@ fun executeVoiceCommand(
         return navigate("qr_scanner/${Uri.encode(context.charId)}", "Abriendo escáner QR de ${context.characterName}.")
     }
 
-    if (command.containsAny("mapa", "abrir mapa", "abre mapa", "ir al mapa", "realidad aumentada")) {
+    if (command.containsAny(
+            "mapa en realidad aumentada",
+            "abrir mapa en realidad aumentada",
+            "abre mapa en realidad aumentada",
+            "mapa ar",
+            "abrir mapa ar",
+            "abre mapa ar",
+            "abrir ar",
+            "abre ar",
+            "realidad aumentada"
+        )
+    ) {
+        val context = matchedCharacterContext()
+            ?: return "Necesito saber de qué personaje. Di, por ejemplo, abre mapa AR de Aria."
+
+        return navigate(
+            Screen.ARMap.createRoute(context.charId),
+            "Abriendo mapa en realidad aumentada de ${context.characterName}."
+        )
+    }
+
+    if (command.containsAny("mapa", "abrir mapa", "abre mapa", "ir al mapa", "mapa del mundo")) {
         val context = matchedCharacterContext()
             ?: return "Necesito saber de qué personaje. Di, por ejemplo, abre mapa de Aria."
 
         return navigate(
-            Screen.ARMap.createRoute(context.charId),
+            Screen.WorldMap.createRoute(context.charId),
             "Abriendo mapa de ${context.characterName}."
         )
     }

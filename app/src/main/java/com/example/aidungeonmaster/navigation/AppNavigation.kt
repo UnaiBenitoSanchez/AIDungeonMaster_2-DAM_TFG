@@ -28,6 +28,7 @@ import com.example.aidungeonmaster.ui.game.GameSetupScreen
 import com.example.aidungeonmaster.ui.game.InventoryScreen
 import com.example.aidungeonmaster.ui.game.JournalScreen
 import com.example.aidungeonmaster.ui.game.LocationsGalleryScreen
+import com.example.aidungeonmaster.ui.game.WorldMapDialog
 import com.example.aidungeonmaster.ui.game.PersonalRoomScreen
 import com.example.aidungeonmaster.ui.game.QRScannerScreen
 import com.example.aidungeonmaster.ui.home.HomeScreen
@@ -150,6 +151,12 @@ sealed class Screen(val route: String) {
         // Crea route.
         fun createRoute(userId: String, characterName: String, theme: String) =
             "game_play/${Uri.encode(userId)}/${Uri.encode(characterName)}/${Uri.encode(theme)}"
+    }
+
+    // Clase que encapsula la lógica de world map.
+    object WorldMap : Screen("world_map/{charId}") {
+        // Crea route.
+        fun createRoute(charId: String) = "world_map/${Uri.encode(charId)}"
     }
 
     // Clase que encapsula la lógica de armap.
@@ -518,6 +525,31 @@ fun AppNavigation(
                 )
             }
 
+            composable(Screen.WorldMap.route) { backStackEntryArg ->
+                val charId = Uri.decode(
+                    backStackEntryArg.arguments?.getString("charId").orEmpty()
+                )
+
+                LaunchedEffect(charId) {
+                    if (charId.isNotBlank()) {
+                        worldMapViewModel.loadMap(charId)
+                    }
+                }
+
+                val mapState by worldMapViewModel.worldMapState.collectAsState()
+
+                WorldMapDialog(
+                    mapState = mapState,
+                    onDismiss = { navController.popBackStack() },
+                    onOpenAR = {
+                        navController.navigate(Screen.ARMap.createRoute(charId)) {
+                            popUpTo(Screen.WorldMap.createRoute(charId)) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    }
+                )
+            }
+
             composable(Screen.ARMap.route) { backStackEntryArg ->
                 val charId = Uri.decode(
                     backStackEntryArg.arguments?.getString("charId").orEmpty()
@@ -832,6 +864,8 @@ private fun String?.isAdventureRoute(): Boolean {
             route.startsWith("inventory") ||
             route.startsWith("journal") ||
             route.startsWith("bestiary") ||
+            route.startsWith("world_map") ||
+            route.startsWith("worldmap") ||
             route.startsWith("ar_map") ||
             route.startsWith("armap") ||
             route.startsWith("locations_gallery") ||
