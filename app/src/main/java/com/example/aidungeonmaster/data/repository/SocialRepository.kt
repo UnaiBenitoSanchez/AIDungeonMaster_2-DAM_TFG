@@ -15,6 +15,8 @@ import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.tasks.await
 import com.example.aidungeonmaster.data.model.ChatMessage
 
+import com.google.firebase.firestore.WriteBatch
+
 // Repositorio que centraliza el acceso a datos de social.
 class SocialRepository {
 
@@ -367,20 +369,86 @@ class SocialRepository {
     suspend fun getUserCharacters(userUid: String): List<Character> {
         if (userUid.isBlank()) return emptyList()
 
-        return db.collection("users")
+        val characterDocs = db.collection("users")
             .document(userUid)
             .collection("characters")
             .get()
             .await()
             .documents
-            .mapNotNull { doc ->
-                doc.toObject(Character::class.java)?.copy(id = doc.id)
-            }
+
+        if (characterDocs.isEmpty()) return emptyList()
+
+        val mergedEntries = characterDocs.mapNotNull { doc ->
+            val baseCharacter = doc.toObject(Character::class.java)?.copy(id = doc.id) ?: return@mapNotNull null
+            val partidaSnapshot = runCatching {
+                db.collection("partidas")
+                    .document(partidaDocumentId(userUid, baseCharacter.name))
+                    .get()
+                    .await()
+            }.getOrNull()
+
+            doc to mergeCharacterWithLiveProgress(baseCharacter, partidaSnapshot)
+        }
+
+        syncCharacterProgressCache(mergedEntries)
+
+        return mergedEntries
+            .map { it.second }
             .sortedWith(
                 compareByDescending<Character> { it.lastPlayed }
                     .thenByDescending { it.level }
+                    .thenByDescending { it.coins }
                     .thenBy { it.name.lowercase() }
             )
+    }
+
+    private fun partidaDocumentId(userUid: String, characterName: String): String =
+        "${userUid}_${characterName}"
+
+    private fun mergeCharacterWithLiveProgress(
+        baseCharacter: Character,
+        partidaSnapshot: DocumentSnapshot?
+    ): Character {
+        if (partidaSnapshot == null || !partidaSnapshot.exists()) return baseCharacter
+
+        return baseCharacter.copy(
+            hpMax = partidaSnapshot.getLong("hpMax")?.toInt() ?: baseCharacter.hpMax,
+            hpCurrent = partidaSnapshot.getLong("hpCurrent")?.toInt() ?: baseCharacter.hpCurrent,
+            lastPlayed = partidaSnapshot.getLong("lastPlayed") ?: baseCharacter.lastPlayed,
+            xp = partidaSnapshot.getLong("xp")?.toInt() ?: baseCharacter.xp,
+            level = partidaSnapshot.getLong("level")?.toInt() ?: baseCharacter.level,
+            coins = partidaSnapshot.getLong("coins")?.toInt() ?: baseCharacter.coins
+        )
+    }
+
+    private suspend fun syncCharacterProgressCache(mergedEntries: List<Pair<DocumentSnapshot, Character>>) {
+        if (mergedEntries.isEmpty()) return
+
+        var batch: WriteBatch? = null
+        var hasUpdates = false
+
+        mergedEntries.forEach { (doc, liveCharacter) ->
+            val cachedCharacter = doc.toObject(Character::class.java)?.copy(id = doc.id) ?: return@forEach
+
+            val updates = mutableMapOf<String, Any>()
+            if (cachedCharacter.hpMax != liveCharacter.hpMax) updates["hpMax"] = liveCharacter.hpMax
+            if (cachedCharacter.hpCurrent != liveCharacter.hpCurrent) updates["hpCurrent"] = liveCharacter.hpCurrent
+            if (cachedCharacter.lastPlayed != liveCharacter.lastPlayed) updates["lastPlayed"] = liveCharacter.lastPlayed
+            if (cachedCharacter.xp != liveCharacter.xp) updates["xp"] = liveCharacter.xp
+            if (cachedCharacter.level != liveCharacter.level) updates["level"] = liveCharacter.level
+            if (cachedCharacter.coins != liveCharacter.coins) updates["coins"] = liveCharacter.coins
+
+            if (updates.isNotEmpty()) {
+                if (batch == null) batch = db.batch()
+                updates["updatedAt"] = System.currentTimeMillis()
+                batch?.update(doc.reference, updates)
+                hasUpdates = true
+            }
+        }
+
+        if (hasUpdates) {
+            runCatching { batch?.commit()?.await() }
+        }
     }
 
     // Actualiza my profile.

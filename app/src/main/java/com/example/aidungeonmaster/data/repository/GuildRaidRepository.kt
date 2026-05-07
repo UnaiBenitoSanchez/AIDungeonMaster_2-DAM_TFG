@@ -1358,4 +1358,37 @@ class GuildRaidRepository {
         val match = """\d+d\d+(?:\+\d+)?""".toRegex().find(allText)
         return match?.value ?: "1d6+2"
     }
+
+    suspend fun leaveAllWaitingBossRoomsIfPresent() {
+        val uid = currentUid() ?: return
+
+        val participantDocs = db.collectionGroup("participants")
+            .whereEqualTo("uid", uid)
+            .get()
+            .await()
+            .documents
+
+        if (participantDocs.isEmpty()) return
+
+        val batch = db.batch()
+        var hasDeletes = false
+
+        participantDocs.forEach { participantDoc ->
+            val roomDoc = participantDoc.reference.parent.parent ?: return@forEach
+            val bossRoomsCollection = roomDoc.parent
+            if (bossRoomsCollection.id != "boss_rooms") return@forEach
+
+            val roomSnapshot = runCatching { roomDoc.get().await() }.getOrNull()
+            val roomStatus = roomSnapshot?.getString("status").orEmpty()
+
+            if (roomStatus != "battle") {
+                batch.delete(participantDoc.reference)
+                hasDeletes = true
+            }
+        }
+
+        if (hasDeletes) {
+            batch.commit().await()
+        }
+    }
 }

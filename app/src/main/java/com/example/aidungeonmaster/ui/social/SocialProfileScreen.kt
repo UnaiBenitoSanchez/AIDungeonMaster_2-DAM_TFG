@@ -70,6 +70,8 @@ private val profilePalettes = listOf(
     ProfilePalette("#BA68C8", "#2D1B69")
 )
 
+private const val PRESENCE_STALE_THRESHOLD_MS = 90_000L
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 // Ejecuta la lógica de social profile screen.
@@ -554,7 +556,12 @@ fun PresenceIndicator(
     isOnline: Boolean,
     lastSeen: Long?
 ) {
-    val text = if (isOnline) {
+    val effectiveOnline = isOnline &&
+            lastSeen != null &&
+            lastSeen > 0L &&
+            (System.currentTimeMillis() - lastSeen) <= PRESENCE_STALE_THRESHOLD_MS
+
+    val text = if (effectiveOnline) {
         "En línea"
     } else {
         "Última vez: " + when {
@@ -574,14 +581,14 @@ fun PresenceIndicator(
             modifier = Modifier
                 .size(10.dp)
                 .clip(CircleShape)
-                .background(if (isOnline) Color(0xFF4CAF50) else Color.Gray)
+                .background(if (effectiveOnline) Color(0xFF4CAF50) else Color.Gray)
         )
 
         Spacer(Modifier.width(8.dp))
 
         Text(
             text = text,
-            color = if (isOnline) Color(0xFF7CFC00) else Color.LightGray
+            color = if (effectiveOnline) Color(0xFF7CFC00) else Color.LightGray
         )
     }
 }

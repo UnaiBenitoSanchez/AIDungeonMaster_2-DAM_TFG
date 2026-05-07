@@ -989,7 +989,22 @@ class CombatViewModel(
                 ClassAbility("quick_def",     "Postura Defensiva",    "+2 CA un turno",                "2",       AbilityType.BUFF_DEFENSE,"🛡️", cooldownTurns = 2),
                 ClassAbility("flee",          "Huir",                 "Intenta escapar",               "flee",    AbilityType.SPECIAL_FLEE,"🏃"),
             )
+        }.withUniversalFlee()
+
+    private fun List<ClassAbility>.withUniversalFlee(): List<ClassAbility> {
+        if (any { it.type == AbilityType.SPECIAL_FLEE || it.id == "flee" }) {
+            return this
         }
+
+        return this + ClassAbility(
+            id = "flee",
+            name = "Huir",
+            description = "Intenta escapar del combate",
+            diceExpression = "flee",
+            type = AbilityType.SPECIAL_FLEE,
+            emoji = "🏃"
+        )
+    }
 }
 
 // ============================================================

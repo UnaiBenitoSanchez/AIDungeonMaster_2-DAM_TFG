@@ -18,6 +18,7 @@ import kotlinx.coroutines.tasks.await
 import com.example.aidungeonmaster.data.model.ItemEnchantment
 import com.example.aidungeonmaster.data.model.normalizeEquipSlot
 import com.example.aidungeonmaster.data.model.LocationLifeState
+
 // Clase que encapsula la lógica de stat comparison line.
 data class StatComparisonLine(
     val label: String,
@@ -48,6 +49,55 @@ class InventoryViewModel : ViewModel() {
 
     private val _levelUpEvent = MutableSharedFlow<Int>(replay = 0, extraBufferCapacity = 1)
     val levelUpEvent = _levelUpEvent.asSharedFlow()
+
+    private suspend fun syncUserCharacterProgress(
+        gameId: String,
+        partidaSnapshot: DocumentSnapshot? = null,
+        overrides: Map<String, Any?> = emptyMap()
+    ) {
+        val partidaDoc = partidaSnapshot ?: runCatching {
+            db.collection("partidas").document(gameId).get().await()
+        }.getOrNull() ?: return
+
+        if (!partidaDoc.exists()) return
+
+        val userId = partidaDoc.getString("userId")
+            ?.takeIf { it.isNotBlank() }
+            ?: gameId.substringBefore("_", "")
+
+        val characterName = partidaDoc.getString("characterName")
+            ?.takeIf { it.isNotBlank() }
+            ?: partidaDoc.getString("name")
+                ?.takeIf { it.isNotBlank() }
+            ?: gameId.substringAfter("_", "")
+
+        if (userId.isBlank() || characterName.isBlank()) return
+
+        val payload = mutableMapOf<String, Any>(
+            "xp" to ((overrides["xp"] as? Int) ?: partidaDoc.getLong("xp")?.toInt() ?: (_character.value?.xp ?: 0)),
+            "level" to ((overrides["level"] as? Int) ?: partidaDoc.getLong("level")?.toInt() ?: (_character.value?.level ?: 1)),
+            "coins" to ((overrides["coins"] as? Int) ?: partidaDoc.getLong("coins")?.toInt() ?: (_character.value?.coins ?: 0)),
+            "hpMax" to ((overrides["hpMax"] as? Int) ?: partidaDoc.getLong("hpMax")?.toInt() ?: (_character.value?.hpMax ?: 20)),
+            "hpCurrent" to ((overrides["hpCurrent"] as? Int) ?: partidaDoc.getLong("hpCurrent")?.toInt() ?: (_character.value?.hpCurrent ?: 20)),
+            "lastPlayed" to ((overrides["lastPlayed"] as? Long) ?: partidaDoc.getLong("lastPlayed") ?: (_character.value?.lastPlayed ?: 0L)),
+            "updatedAt" to System.currentTimeMillis()
+        )
+
+        val characterDocs = db.collection("users")
+            .document(userId)
+            .collection("characters")
+            .whereEqualTo("name", characterName)
+            .get()
+            .await()
+
+        if (characterDocs.isEmpty) return
+
+        val batch = db.batch()
+        characterDocs.documents.forEach { doc ->
+            batch.set(doc.reference, payload, SetOptions.merge())
+        }
+        batch.commit().await()
+    }
 
     // Obtiene item comparison.
     fun getItemComparison(item: Item): ItemComparison? {
@@ -367,6 +417,17 @@ class InventoryViewModel : ViewModel() {
                     hpCurrent = newHpCurrent
                 )
 
+                syncUserCharacterProgress(
+                    gameId = gameId,
+                    partidaSnapshot = snap,
+                    overrides = mapOf(
+                        "xp" to currentXp,
+                        "level" to currentLevel,
+                        "hpMax" to currentHpMax,
+                        "hpCurrent" to newHpCurrent
+                    )
+                )
+
                 Log.d(
                     "INVENTORY_DEBUG",
                     "XP guardado: +$amount → total ${currentXp}xp, nivel $currentLevel"
@@ -398,14 +459,17 @@ class InventoryViewModel : ViewModel() {
     // ─────────────────────────────────────────────────────────────────────────
     fun addCoins(gameId: String, amount: Int) {
         if (amount <= 0) return
+
         viewModelScope.launch {
             try {
+
                 val snap = db.collection("partidas").document(gameId).get().await()
                 val current = snap.getLong("coins")?.toInt() ?: 0
                 val newTotal = current + amount
                 db.collection("partidas").document(gameId)
                     .update("coins", newTotal).await()
                 _character.value = _character.value?.copy(coins = newTotal)
+                syncUserCharacterProgress(gameId, snap, overrides = mapOf("coins" to newTotal))
                 Log.d("INVENTORY_DEBUG", "Monedas +$amount → total $newTotal")
             } catch (e: Exception) {
                 try {
@@ -414,6 +478,7 @@ class InventoryViewModel : ViewModel() {
                     db.collection("partidas").document(gameId)
                         .set(mapOf("coins" to newTotal), SetOptions.merge()).await()
                     _character.value = _character.value?.copy(coins = newTotal)
+                    syncUserCharacterProgress(gameId, overrides = mapOf("coins" to newTotal))
                 } catch (e2: Exception) {
                     Log.e("INVENTORY_ERROR", "addCoins: ${e2.message}", e2)
                 }
@@ -574,6 +639,7 @@ class InventoryViewModel : ViewModel() {
             ).await()
 
             _character.value = _character.value?.copy(coins = newCoins)
+            syncUserCharacterProgress(gameId, gameSnap, overrides = mapOf("coins" to newCoins))
             true
         } catch (e: Exception) {
             Log.e("INVENTORY_ERROR", "depositToBank: ${e.message}", e)
@@ -730,6 +796,8 @@ class InventoryViewModel : ViewModel() {
                     coins = newCoins
                 )
 
+                syncUserCharacterProgress(gameId, overrides = mapOf("coins" to newCoins))
+
                 onResult("💰 Vendiste ${item.name} por $sellPrice monedas")
             } catch (e: Exception) {
                 Log.e("INVENTORY_ERROR", "sellItem: ${e.message}", e)
@@ -764,6 +832,16 @@ class InventoryViewModel : ViewModel() {
                     inventory = emptyList(),
                     equipment = EquippedItems(),
                     coins = 0
+                )
+
+                syncUserCharacterProgress(
+                    charId,
+                    snap,
+                    overrides = mapOf(
+                        "hpCurrent" to originalHpMax,
+                        "hpMax" to originalHpMax,
+                        "coins" to 0
+                    )
                 )
 
                 Log.d(
