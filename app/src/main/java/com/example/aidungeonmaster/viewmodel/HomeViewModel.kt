@@ -15,6 +15,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
+import com.example.aidungeonmaster.AIDungeonMasterApp
+import com.example.aidungeonmaster.data.repository.PushTokenRepository
+
 // ViewModel que coordina el estado y la lógica de home.
 class HomeViewModel : ViewModel() {
     private val db = FirebaseFirestore.getInstance()
@@ -242,6 +245,7 @@ class HomeViewModel : ViewModel() {
     fun logout(onLogout: () -> Unit) {
         viewModelScope.launch {
             runCatching { socialRepository.updatePresence(false) }
+            runCatching { PushTokenRepository(AIDungeonMasterApp.instance).unregisterCurrentTokenForCurrentUser() }
             FirebaseAuth.getInstance().signOut()
             onLogout()
         }

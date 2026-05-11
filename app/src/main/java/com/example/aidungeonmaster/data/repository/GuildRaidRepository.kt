@@ -27,6 +27,8 @@ class GuildRaidRepository {
         private const val DEFAULT_BOSS_NAME = "Señor del Abismo"
     }
 
+    private val pushGatewayRepository = PushGatewayRepository()
+
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
 
@@ -163,6 +165,7 @@ class GuildRaidRepository {
         ensureBossRoom(guildId)
 
         val existingSnap = participantsRef(guildId).document(uid).get().await()
+        val isFirstJoin = !existingSnap.exists()
         val existingJoinedAt = existingSnap.getLong("joinedAt") ?: now
 
         val liveCharacter = loadLiveCharacterState(uid, character)
@@ -192,6 +195,12 @@ class GuildRaidRepository {
         )
 
         participantsRef(guildId).document(uid).set(participant).await()
+
+        if (isFirstJoin) {
+            runCatching {
+                pushGatewayRepository.notifyGuildWaitingRoomJoin(guildId)
+            }
+        }
     }
 
     // Actualiza ready.

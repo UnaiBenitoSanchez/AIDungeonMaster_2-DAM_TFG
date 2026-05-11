@@ -23,6 +23,8 @@ object NotificationHelper {
     const val CHANNEL_RANKING    = "ranking_channel"
     const val CHANNEL_INACTIVITY = "inactivity_channel"
     const val CHANNEL_PROXIMITY  = "proximity_channel"
+    const val CHANNEL_SOCIAL     = "social_channel"
+    const val CHANNEL_GUILD_RAID = "guild_raid_channel"
 
     // ── Emojis de posición ────────────────────────────────────────────────────
 
@@ -80,7 +82,151 @@ object NotificationHelper {
                     enableVibration(true)
                 }
             )
+
+            manager.createNotificationChannel(
+                NotificationChannel(
+                    CHANNEL_SOCIAL,
+                    "Eventos sociales",
+                    NotificationManager.IMPORTANCE_HIGH
+                ).apply {
+                    description = "Mensajes privados, solicitudes de amistad y aceptaciones"
+                    enableVibration(true)
+                }
+            )
+
+            manager.createNotificationChannel(
+                NotificationChannel(
+                    CHANNEL_GUILD_RAID,
+                    "Jefe final del gremio",
+                    NotificationManager.IMPORTANCE_HIGH
+                ).apply {
+                    description = "Avisos de actividad en la sala de espera del jefe final"
+                    enableVibration(true)
+                }
+            )
         }
+    }
+
+    fun showFriendRequestNotification(
+        context: Context,
+        fromDisplayName: String,
+        fromUsername: String,
+        notificationId: Int = 4000
+    ) {
+        val sender = fromDisplayName.ifBlank { fromUsername }.ifBlank { "Un aventurero" }
+        val pending = pendingIntent(
+            context,
+            requestCode = 400 + notificationId,
+            intent = launchIntent(context)
+        )
+
+        val notification = NotificationCompat.Builder(context, CHANNEL_SOCIAL)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentTitle("🤝 Nueva solicitud de amistad")
+            .setContentText("$sender quiere formar grupo contigo.")
+            .setStyle(
+                NotificationCompat.BigTextStyle().bigText(
+                    "$sender te ha enviado una solicitud de amistad. " +
+                            "Entra en el menú social para aceptarla o rechazarla."
+                )
+            )
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setContentIntent(pending)
+            .setAutoCancel(true)
+            .build()
+
+        context.getSystemService(NotificationManager::class.java)
+            .notify(notificationId, notification)
+    }
+
+    fun showFriendAcceptedNotification(
+        context: Context,
+        friendDisplayName: String,
+        friendUsername: String,
+        notificationId: Int = 4100
+    ) {
+        val friend = friendDisplayName.ifBlank { friendUsername }.ifBlank { "Tu compañero" }
+        val pending = pendingIntent(
+            context,
+            requestCode = 410 + notificationId,
+            intent = launchIntent(context)
+        )
+
+        val notification = NotificationCompat.Builder(context, CHANNEL_SOCIAL)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentTitle("✅ Solicitud aceptada")
+            .setContentText("$friend ya forma parte de tus amistades.")
+            .setStyle(
+                NotificationCompat.BigTextStyle().bigText(
+                    "$friend ha aceptado tu solicitud de amistad. " +
+                            "Ya podéis visitar salas personales y abrir chat privado."
+                )
+            )
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setContentIntent(pending)
+            .setAutoCancel(true)
+            .build()
+
+        context.getSystemService(NotificationManager::class.java)
+            .notify(notificationId, notification)
+    }
+
+    fun showPrivateMessageNotification(
+        context: Context,
+        senderName: String,
+        messagePreview: String,
+        notificationId: Int = 4200
+    ) {
+        val pending = pendingIntent(
+            context,
+            requestCode = 420 + notificationId,
+            intent = launchIntent(context)
+        )
+
+        val preview = messagePreview.take(120)
+        val notification = NotificationCompat.Builder(context, CHANNEL_SOCIAL)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentTitle("💬 Nuevo mensaje de $senderName")
+            .setContentText(preview)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(messagePreview))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setContentIntent(pending)
+            .setAutoCancel(true)
+            .build()
+
+        context.getSystemService(NotificationManager::class.java)
+            .notify(notificationId, notification)
+    }
+
+    fun showGuildBossWaitingRoomNotification(
+        context: Context,
+        guildName: String,
+        playerName: String,
+        notificationId: Int = 4300
+    ) {
+        val pending = pendingIntent(
+            context,
+            requestCode = 430 + notificationId,
+            intent = launchIntent(context)
+        )
+
+        val notification = NotificationCompat.Builder(context, CHANNEL_GUILD_RAID)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentTitle("🐉 Movimiento en la sala del jefe final")
+            .setContentText("$playerName se ha unido a la sala de espera de $guildName.")
+            .setStyle(
+                NotificationCompat.BigTextStyle().bigText(
+                    "$playerName se ha unido a la sala de espera del jefe final de $guildName. " +
+                            "Quizá sea un buen momento para preparar tu personaje y entrar."
+                )
+            )
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setContentIntent(pending)
+            .setAutoCancel(true)
+            .build()
+
+        context.getSystemService(NotificationManager::class.java)
+            .notify(notificationId, notification)
     }
 
     // ── Notificación: personaje desplazado del top 3 ─────────────────────────

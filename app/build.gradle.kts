@@ -60,6 +60,12 @@ android {
             "\"${localProps.getProperty("GOOGLE_WEB_CLIENT_ID", "")}\""
         )
 
+        buildConfigField(
+            "String",
+            "PUSH_GATEWAY_URL",
+            "\"${localProps.getProperty("PUSH_GATEWAY_URL", "")}\""
+        )
+
         ndk {
             abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86_64")
         }
@@ -183,4 +189,7 @@ dependencies {
     implementation("androidx.credentials:credentials:1.3.0")
     implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
     implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
+
+    // Notificaciones
+    implementation("com.google.firebase:firebase-messaging-ktx")
 }

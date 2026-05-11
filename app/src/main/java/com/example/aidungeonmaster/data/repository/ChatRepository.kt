@@ -1,5 +1,6 @@
 package com.example.aidungeonmaster.data.repository
 
+import android.util.Log
 import com.example.aidungeonmaster.data.model.ChatMessage
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -8,6 +9,8 @@ import kotlinx.coroutines.tasks.await
 
 // Repositorio que centraliza el acceso a datos de chat.
 class ChatRepository {
+
+    private val pushGatewayRepository = PushGatewayRepository()
 
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
@@ -43,11 +46,6 @@ class ChatRepository {
         val chatId = buildChatId(myUid, friendUid)
         val chatRef = db.collection("private_chats").document(chatId)
 
-        // IMPORTANTE:
-        // Firestore puede denegar el get() previo cuando el chat todavía no existe y ambos usuarios
-        // aún no son miembros del documento. Ese caso ocurre precisamente en el primer chat privado
-        // entre miembros del mismo gremio que no son amigos. Si la lectura falla, continuamos con
-        // la creación directa del chat en lugar de abortar con PERMISSION_DENIED.
         val existingChat = runCatching { chatRef.get().await() }.getOrNull()
         if (existingChat?.exists() == true) {
             return chatId
@@ -63,9 +61,6 @@ class ChatRepository {
             "lastSenderUid" to myUid
         )
 
-        // Solo los chats nacidos de una amistad llevan friendshipId persistido.
-        // En los chats habilitados por gremio no añadimos este campo para que las reglas
-        // opcionales sigan evaluando el caso de forma segura.
         access.friendshipId?.takeIf { it.isNotBlank() }?.let { chat["friendshipId"] = it }
         access.guildId?.takeIf { it.isNotBlank() }?.let { chat["guildId"] = it }
 
@@ -169,6 +164,22 @@ class ChatRepository {
                 )
             )
         }.await()
+
+        runCatching {
+            val otherUid = chatId.split("_").firstOrNull { it != myUid }.orEmpty()
+            val senderName = auth.currentUser?.displayName.orEmpty().ifBlank { "Aventurero" }
+
+            pushGatewayRepository.notifyChatMessage(
+                chatId = chatId,
+                targetUid = otherUid,
+                senderName = senderName,
+                messagePreview = preview,
+                eventId = messageRef.id,
+                sentAt = now
+            )
+        }.onFailure {
+            Log.e(TAG, "Falló el envío de la push de chat para chatId=$chatId", it)
+        }
     }
 
     // Marca como vistos los mensajes entrantes pendientes del usuario actual.
@@ -217,6 +228,10 @@ class ChatRepository {
 
                 onChange(messages)
             }
+    }
+
+    companion object {
+        private const val TAG = "ChatRepository"
     }
 }
 

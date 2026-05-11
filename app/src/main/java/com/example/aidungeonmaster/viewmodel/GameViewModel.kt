@@ -27,6 +27,9 @@ import java.util.Locale
 
 import com.example.aidungeonmaster.data.repository.CharacterDeletionRepository
 
+import com.example.aidungeonmaster.AIDungeonMasterApp
+import com.example.aidungeonmaster.utils.InactivityReminderScheduler
+
 // ── MODELOS DE DATOS ─────────────────────────────────────────────────────────
 
 data class Enemy(
@@ -474,8 +477,9 @@ Reglas:
                     "chatHistory"     to chatHistory.map { mapOf("role" to it.role, "content" to it.content) },
                     "lastOptions"     to _currentOptions.value,
                     "timestamp"       to now,
-                    "lastPlayed"      to now
+                    "lastPlayed"      to now,
                 )
+
                 repository.saveGame(currentGameId, data)
 
                 if (currentCharId.isNotBlank()) {
@@ -483,6 +487,12 @@ Reglas:
                         .update("lastPlayed", now)
                         .await()
                 }
+
+                try {
+                    InactivityReminderScheduler.rescheduleForCurrentUser(AIDungeonMasterApp.instance)
+                } catch (_: Exception) {
+                }
+
             } catch (e: Exception) {
                 Log.e("GM_SAVE", "Error guardando: ${e.message}")
             }

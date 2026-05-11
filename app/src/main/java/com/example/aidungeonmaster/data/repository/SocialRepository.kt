@@ -34,6 +34,8 @@ class SocialRepository {
     private val friendProfileListeners = mutableListOf<ListenerRegistration>()
     private val friendUnreadListeners = mutableListOf<ListenerRegistration>()
 
+    private val pushGatewayRepository = PushGatewayRepository()
+
     // Ejecuta la lógica de current uid.
     fun currentUid(): String? = auth.currentUser?.uid
 
@@ -113,7 +115,8 @@ class SocialRepository {
             updatedAt = now
         )
 
-        db.collection("friend_requests").add(payload).await()
+        val createdRequest = db.collection("friend_requests").add(payload).await()
+        runCatching { pushGatewayRepository.notifyFriendRequest(createdRequest.id) }
     }
 
     // Escucha incoming requests.
@@ -232,6 +235,14 @@ class SocialRepository {
                 batch.set(chatRef, chat)
             }
         }.await()
+
+        runCatching {
+            pushGatewayRepository.notifyFriendAccepted(
+                requestId = request.id,
+                targetUid = request.fromUid,       // notificar al que mandó la solicitud
+                senderName = myProfile.displayName  // nombre de quien la aceptó
+            )
+        }
     }
 
     // Ejecuta la lógica de reject friend request.

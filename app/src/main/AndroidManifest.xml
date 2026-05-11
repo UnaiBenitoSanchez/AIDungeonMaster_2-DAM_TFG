@@ -20,6 +20,9 @@
     <!-- AR -->
     <uses-feature android:name="android.hardware.camera.ar" android:required="false" />
 
+    <!-- Ignorar optimización de batería -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -46,6 +49,15 @@
         <meta-data
             android:name="com.google.ar.core"
             android:value="optional" />
+
+        <service
+            android:name=".services.AIDungeonFirebaseMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
     </application>
 
 </manifest>
