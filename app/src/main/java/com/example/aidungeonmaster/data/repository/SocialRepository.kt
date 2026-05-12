@@ -116,7 +116,6 @@ class SocialRepository {
         )
 
         val createdRequest = db.collection("friend_requests").add(payload).await()
-        runCatching { pushGatewayRepository.notifyFriendRequest(createdRequest.id) }
     }
 
     // Escucha incoming requests.
@@ -235,14 +234,6 @@ class SocialRepository {
                 batch.set(chatRef, chat)
             }
         }.await()
-
-        runCatching {
-            pushGatewayRepository.notifyFriendAccepted(
-                requestId = request.id,
-                targetUid = request.fromUid,       // notificar al que mandó la solicitud
-                senderName = myProfile.displayName  // nombre de quien la aceptó
-            )
-        }
     }
 
     // Ejecuta la lógica de reject friend request.

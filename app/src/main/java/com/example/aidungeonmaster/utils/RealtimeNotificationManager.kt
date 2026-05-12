@@ -3,12 +3,12 @@ package com.example.aidungeonmaster.utils
 import android.content.Context
 import android.content.SharedPreferences
 import com.example.aidungeonmaster.data.model.FriendRequest
-import com.example.aidungeonmaster.viewmodel.RankingCategory
+//import com.example.aidungeonmaster.viewmodel.RankingCategory
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
-import com.google.firebase.firestore.Query
+//import com.google.firebase.firestore.Query
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -37,8 +37,8 @@ class RealtimeNotificationManager(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val prefs: SharedPreferences =
         appContext.getSharedPreferences(PREFS_REALTIME, Context.MODE_PRIVATE)
-    private val rankingPrefs: SharedPreferences =
-        appContext.getSharedPreferences(PREFS_RANKING, Context.MODE_PRIVATE)
+//    private val rankingPrefs: SharedPreferences =
+//        appContext.getSharedPreferences(PREFS_RANKING, Context.MODE_PRIVATE)
 
     private var sessionUid: String? = null
     private var incomingRequestsListener: ListenerRegistration? = null
@@ -47,8 +47,8 @@ class RealtimeNotificationManager(
     private var userGuildsListener: ListenerRegistration? = null
 
     private val participantListeners = linkedMapOf<String, ListenerRegistration>()
-    private val rankingListeners = linkedMapOf<RankingCategory, ListenerRegistration>()
-    private val rankingInitialized = linkedMapOf<RankingCategory, Boolean>()
+//    private val rankingListeners = linkedMapOf<RankingCategory, ListenerRegistration>()
+//    private val rankingInitialized = linkedMapOf<RankingCategory, Boolean>()
     private val userDisplayNameCache = linkedMapOf<String, String>()
     private val guildNameCache = linkedMapOf<String, String>()
 
@@ -63,11 +63,11 @@ class RealtimeNotificationManager(
         stop()
         sessionUid = uid
 
-        startIncomingFriendRequestsListener(uid)
-        startAcceptedRequestsListener(uid)
-        startPrivateChatsListener(uid)
-        startGuildWaitingRoomsListener(uid)
-        startRankingListeners(uid)
+//        startIncomingFriendRequestsListener(uid)
+//        startAcceptedRequestsListener(uid)
+//        startPrivateChatsListener(uid)
+//        startGuildWaitingRoomsListener(uid)
+//        startRankingListeners(uid)
     }
 
     fun stop() {
@@ -84,9 +84,9 @@ class RealtimeNotificationManager(
         participantListeners.values.forEach { it.remove() }
         participantListeners.clear()
 
-        rankingListeners.values.forEach { it.remove() }
-        rankingListeners.clear()
-        rankingInitialized.clear()
+//        rankingListeners.values.forEach { it.remove() }
+//        rankingListeners.clear()
+//        rankingInitialized.clear()
 
         userDisplayNameCache.clear()
         guildNameCache.clear()
@@ -103,8 +103,9 @@ class RealtimeNotificationManager(
                 acceptedRequestsListener != null ||
                 privateChatsListener != null ||
                 userGuildsListener != null ||
-                participantListeners.isNotEmpty() ||
-                rankingListeners.isNotEmpty()
+                participantListeners.isNotEmpty()
+//                ||
+//                rankingListeners.isNotEmpty()
     }
 
     private fun startIncomingFriendRequestsListener(myUid: String) {
@@ -254,7 +255,7 @@ class RealtimeNotificationManager(
                         .orEmpty()
                         .ifBlank { "tu gremio" }
 
-                    attachParticipantListener(guildId, myUid)
+//                    attachParticipantListener(guildId, myUid)
                 }
             }
     }
@@ -299,103 +300,103 @@ class RealtimeNotificationManager(
             }
     }
 
-    private fun startRankingListeners(userId: String) {
-        RankingCategory.entries.forEach { category ->
-            rankingInitialized[category] = false
+//    private fun startRankingListeners(userId: String) {
+//        RankingCategory.entries.forEach { category ->
+//            rankingInitialized[category] = false
+//
+//            rankingListeners[category] = db.collection("ranking")
+//                .orderBy(category.field, Query.Direction.DESCENDING)
+//                .limit(10)
+//                .addSnapshotListener { snapshot, _ ->
+//                    val docs = snapshot?.documents.orEmpty()
+//                    val initialized = rankingInitialized[category] == true
+//
+//                    if (!initialized) {
+//                        persistCurrentRankingState(category, userId, docs)
+//                        rankingInitialized[category] = true
+//                        return@addSnapshotListener
+//                    }
+//
+//                    handleRankingUpdate(category, userId, docs)
+//                }
+//        }
+//    }
 
-            rankingListeners[category] = db.collection("ranking")
-                .orderBy(category.field, Query.Direction.DESCENDING)
-                .limit(10)
-                .addSnapshotListener { snapshot, _ ->
-                    val docs = snapshot?.documents.orEmpty()
-                    val initialized = rankingInitialized[category] == true
+//    private fun handleRankingUpdate(
+//        category: RankingCategory,
+//        userId: String,
+//        docs: List<DocumentSnapshot>
+//    ) {
+//        val top3Ids = docs.take(3).map { it.id }.toSet()
+//        val editor = rankingPrefs.edit()
+//
+//        docs.forEachIndexed { index, doc ->
+//            val charId = doc.id
+//            if (!charId.startsWith("${userId}_")) return@forEachIndexed
+//
+//            val charName = doc.getString("characterName")
+//                ?: charId.removePrefix("${userId}_")
+//
+//            val prefKey = prefKeyRankingPosition(category, charId)
+//            val previousPos = rankingPrefs.getInt(prefKey, POSITION_UNKNOWN)
+//            val wasInTop3 = previousPos in 0..2
+//            val isNowInTop3 = charId in top3Ids
+//
+//            if (wasInTop3 && !isNowInTop3) {
+//                NotificationHelper.showRankingLostNotification(
+//                    context = appContext,
+//                    characterName = charName,
+//                    categoryLabel = category.label,
+//                    previousPosition = previousPos,
+//                    newPosition = index,
+//                    notificationId = ("ranking|${category.name}|$charId").hashCode()
+//                )
+//            }
+//
+//            editor.putInt(prefKey, index)
+//        }
+//
+//        val existingKeys = rankingPrefs.all.keys.filter {
+//            it.startsWith("pos_${category.name}_${userId}_")
+//        }
+//
+//        existingKeys.forEach { key ->
+//            val charId = key.removePrefix("pos_${category.name}_")
+//            val appearsNow = docs.any { it.id == charId }
+//            if (!appearsNow) {
+//                val prevPos = rankingPrefs.getInt(key, POSITION_UNKNOWN)
+//                if (prevPos in 0..2) {
+//                    val charName = charId.removePrefix("${userId}_")
+//                    NotificationHelper.showRankingLostNotification(
+//                        context = appContext,
+//                        characterName = charName,
+//                        categoryLabel = category.label,
+//                        previousPosition = prevPos,
+//                        newPosition = POSITION_OUT_OF_TOP,
+//                        notificationId = ("ranking|${category.name}|$charId").hashCode()
+//                    )
+//                }
+//                editor.putInt(key, POSITION_UNKNOWN)
+//            }
+//        }
+//
+//        editor.apply()
+//    }
 
-                    if (!initialized) {
-                        persistCurrentRankingState(category, userId, docs)
-                        rankingInitialized[category] = true
-                        return@addSnapshotListener
-                    }
-
-                    handleRankingUpdate(category, userId, docs)
-                }
-        }
-    }
-
-    private fun handleRankingUpdate(
-        category: RankingCategory,
-        userId: String,
-        docs: List<DocumentSnapshot>
-    ) {
-        val top3Ids = docs.take(3).map { it.id }.toSet()
-        val editor = rankingPrefs.edit()
-
-        docs.forEachIndexed { index, doc ->
-            val charId = doc.id
-            if (!charId.startsWith("${userId}_")) return@forEachIndexed
-
-            val charName = doc.getString("characterName")
-                ?: charId.removePrefix("${userId}_")
-
-            val prefKey = prefKeyRankingPosition(category, charId)
-            val previousPos = rankingPrefs.getInt(prefKey, POSITION_UNKNOWN)
-            val wasInTop3 = previousPos in 0..2
-            val isNowInTop3 = charId in top3Ids
-
-            if (wasInTop3 && !isNowInTop3) {
-                NotificationHelper.showRankingLostNotification(
-                    context = appContext,
-                    characterName = charName,
-                    categoryLabel = category.label,
-                    previousPosition = previousPos,
-                    newPosition = index,
-                    notificationId = ("ranking|${category.name}|$charId").hashCode()
-                )
-            }
-
-            editor.putInt(prefKey, index)
-        }
-
-        val existingKeys = rankingPrefs.all.keys.filter {
-            it.startsWith("pos_${category.name}_${userId}_")
-        }
-
-        existingKeys.forEach { key ->
-            val charId = key.removePrefix("pos_${category.name}_")
-            val appearsNow = docs.any { it.id == charId }
-            if (!appearsNow) {
-                val prevPos = rankingPrefs.getInt(key, POSITION_UNKNOWN)
-                if (prevPos in 0..2) {
-                    val charName = charId.removePrefix("${userId}_")
-                    NotificationHelper.showRankingLostNotification(
-                        context = appContext,
-                        characterName = charName,
-                        categoryLabel = category.label,
-                        previousPosition = prevPos,
-                        newPosition = POSITION_OUT_OF_TOP,
-                        notificationId = ("ranking|${category.name}|$charId").hashCode()
-                    )
-                }
-                editor.putInt(key, POSITION_UNKNOWN)
-            }
-        }
-
-        editor.apply()
-    }
-
-    private fun persistCurrentRankingState(
-        category: RankingCategory,
-        userId: String,
-        docs: List<DocumentSnapshot>
-    ) {
-        val editor = rankingPrefs.edit()
-
-        docs.forEachIndexed { index, doc ->
-            if (!doc.id.startsWith("${userId}_")) return@forEachIndexed
-            editor.putInt(prefKeyRankingPosition(category, doc.id), index)
-        }
-
-        editor.apply()
-    }
+//    private fun persistCurrentRankingState(
+//        category: RankingCategory,
+//        userId: String,
+//        docs: List<DocumentSnapshot>
+//    ) {
+//        val editor = rankingPrefs.edit()
+//
+//        docs.forEachIndexed { index, doc ->
+//            if (!doc.id.startsWith("${userId}_")) return@forEachIndexed
+//            editor.putInt(prefKeyRankingPosition(category, doc.id), index)
+//        }
+//
+//        editor.apply()
+//    }
 
     private suspend fun resolveUserDisplayName(uid: String): String {
         userDisplayNameCache[uid]?.let { return it }
@@ -412,14 +413,14 @@ class RealtimeNotificationManager(
 
     private fun prefKeyChatTimestamp(chatId: String) = "chat_last_message_$chatId"
 
-    private fun prefKeyRankingPosition(category: RankingCategory, charId: String) =
-        "pos_${category.name}_$charId"
+//    private fun prefKeyRankingPosition(category: RankingCategory, charId: String) =
+//        "pos_${category.name}_$charId"
 
     companion object {
         private const val PREFS_REALTIME = "realtime_notification_prefs"
-        private const val PREFS_RANKING = "ranking_positions_prefs"
-        private const val POSITION_UNKNOWN = -1
-        private const val POSITION_OUT_OF_TOP = 999
+//        private const val PREFS_RANKING = "ranking_positions_prefs"
+//        private const val POSITION_UNKNOWN = -1
+//        private const val POSITION_OUT_OF_TOP = 999
         private const val KEY_LAST_INCOMING_REQUEST_BOOTSTRAP = "incoming_request_bootstrap"
     }
 }

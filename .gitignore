@@ -14,3 +14,10 @@
 .cxx
 local.properties
 .kotlin/errors
+
+# funciones de notificaciones
+.agents
+/functions
+.firebaserc
+firebase.json
+skills-lock.json

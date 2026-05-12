@@ -164,22 +164,6 @@ class ChatRepository {
                 )
             )
         }.await()
-
-        runCatching {
-            val otherUid = chatId.split("_").firstOrNull { it != myUid }.orEmpty()
-            val senderName = auth.currentUser?.displayName.orEmpty().ifBlank { "Aventurero" }
-
-            pushGatewayRepository.notifyChatMessage(
-                chatId = chatId,
-                targetUid = otherUid,
-                senderName = senderName,
-                messagePreview = preview,
-                eventId = messageRef.id,
-                sentAt = now
-            )
-        }.onFailure {
-            Log.e(TAG, "Falló el envío de la push de chat para chatId=$chatId", it)
-        }
     }
 
     // Marca como vistos los mensajes entrantes pendientes del usuario actual.
