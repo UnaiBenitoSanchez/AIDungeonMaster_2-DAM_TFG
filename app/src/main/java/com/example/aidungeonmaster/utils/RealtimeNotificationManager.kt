@@ -47,7 +47,7 @@ class RealtimeNotificationManager(
     private var userGuildsListener: ListenerRegistration? = null
 
     private val participantListeners = linkedMapOf<String, ListenerRegistration>()
-//    private val rankingListeners = linkedMapOf<RankingCategory, ListenerRegistration>()
+    //    private val rankingListeners = linkedMapOf<RankingCategory, ListenerRegistration>()
 //    private val rankingInitialized = linkedMapOf<RankingCategory, Boolean>()
     private val userDisplayNameCache = linkedMapOf<String, String>()
     private val guildNameCache = linkedMapOf<String, String>()
@@ -223,6 +223,7 @@ class RealtimeNotificationManager(
                             context = appContext,
                             senderName = senderName,
                             messagePreview = lastMessage,
+                            senderUid = lastSenderUid,
                             notificationId = ("private_chat|$chatId|$lastMessageAt").hashCode()
                         )
                     }
@@ -290,6 +291,7 @@ class RealtimeNotificationManager(
                         context = appContext,
                         guildName = guildNameCache[guildId].orEmpty().ifBlank { "tu gremio" },
                         playerName = playerName,
+                        guildId = guildId,
                         notificationId = (
                                 "boss_waiting_room|$guildId|$joinedUid|${
                                     change.document.getLong("joinedAt") ?: 0L
@@ -418,7 +420,7 @@ class RealtimeNotificationManager(
 
     companion object {
         private const val PREFS_REALTIME = "realtime_notification_prefs"
-//        private const val PREFS_RANKING = "ranking_positions_prefs"
+        //        private const val PREFS_RANKING = "ranking_positions_prefs"
 //        private const val POSITION_UNKNOWN = -1
 //        private const val POSITION_OUT_OF_TOP = 999
         private const val KEY_LAST_INCOMING_REQUEST_BOOTSTRAP = "incoming_request_bootstrap"

@@ -50,6 +50,7 @@ class AIDungeonFirebaseMessagingService : FirebaseMessagingService() {
                     context = applicationContext,
                     senderName = senderName,
                     messagePreview = messagePreview,
+                    senderUid = data[PushConstants.EXTRA_SENDER_UID].orEmpty(),
                     notificationId = buildChatNotificationId(data)
                 )
             }
@@ -85,6 +86,7 @@ class AIDungeonFirebaseMessagingService : FirebaseMessagingService() {
                     context = applicationContext,
                     guildName = data[PushConstants.EXTRA_GUILD_NAME].orEmpty(),
                     playerName = data[PushConstants.EXTRA_PLAYER_NAME].orEmpty(),
+                    guildId = data[PushConstants.EXTRA_GUILD_ID].orEmpty(),
                     notificationId = (
                             "push_guild_waiting|${data[PushConstants.EXTRA_GUILD_ID].orEmpty()}|${
                                 data[PushConstants.EXTRA_SENDER_UID].orEmpty()

@@ -241,7 +241,9 @@ sealed class Screen(val route: String) {
 // Ejecuta la lógica de app navigation.
 fun AppNavigation(
     navController: NavHostController,
-    onColorBlindChanged: (ColorBlindType) -> Unit = {}
+    onColorBlindChanged: (ColorBlindType) -> Unit = {},
+    pendingRoute: String? = null,
+    onRouteConsumed: () -> Unit = {}
 ) {
     val authViewModel: AuthViewModel = viewModel()
     val gameViewModel: GameViewModel = viewModel()
@@ -275,6 +277,20 @@ fun AppNavigation(
     }
     LaunchedEffect(Unit) {
         socialViewModel.startGuildsListener()
+    }
+
+    // ── Navegación procedente de notificación ─────────────────────────────────
+    // IMPORTANTE: usamos `backStackEntry` como segundo key para que el efecto
+    // se reejecute en cuanto el NavHost monta su primer destino.  Si sólo
+    // observamos `pendingRoute`, el navigate() se llama antes de que el grafo
+    // esté registrado y la llamada se pierde silenciosamente.
+    LaunchedEffect(pendingRoute, backStackEntry) {
+        val route = pendingRoute ?: return@LaunchedEffect
+        if (backStackEntry == null) return@LaunchedEffect   // NavHost aún no está listo
+        navController.navigate(route) {
+            launchSingleTop = true
+        }
+        onRouteConsumed()
     }
 
     Box(modifier = Modifier.fillMaxSize()) {

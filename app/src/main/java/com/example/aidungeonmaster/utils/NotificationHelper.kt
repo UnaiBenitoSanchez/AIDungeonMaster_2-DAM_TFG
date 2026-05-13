@@ -26,6 +26,16 @@ object NotificationHelper {
     const val CHANNEL_SOCIAL     = "social_channel"
     const val CHANNEL_GUILD_RAID = "guild_raid_channel"
 
+    // ── Extras de navegación (leídos en MainActivity) ─────────────────────────
+    const val EXTRA_NAV_TARGET      = "nav_target"
+    const val NAV_TARGET_CHAT       = "private_chat"
+    const val NAV_TARGET_FRIEND_REQ = "friend_requests"
+    const val NAV_TARGET_FRIENDS    = "friends_list"
+    const val NAV_TARGET_GUILD_BOSS = "guild_boss_battle"
+    const val EXTRA_NAV_SENDER_UID  = "nav_sender_uid"
+    const val EXTRA_NAV_SENDER_NAME = "nav_sender_name"
+    const val EXTRA_NAV_GUILD_ID    = "nav_guild_id"
+
     // ── Emojis de posición ────────────────────────────────────────────────────
 
     private fun positionEmoji(pos: Int) = when (pos) {
@@ -117,7 +127,9 @@ object NotificationHelper {
         val pending = pendingIntent(
             context,
             requestCode = 400 + notificationId,
-            intent = launchIntent(context)
+            intent = launchIntent(context).apply {
+                putExtra(EXTRA_NAV_TARGET, NAV_TARGET_FRIEND_REQ)
+            }
         )
 
         val notification = NotificationCompat.Builder(context, CHANNEL_SOCIAL)
@@ -149,7 +161,9 @@ object NotificationHelper {
         val pending = pendingIntent(
             context,
             requestCode = 410 + notificationId,
-            intent = launchIntent(context)
+            intent = launchIntent(context).apply {
+                putExtra(EXTRA_NAV_TARGET, NAV_TARGET_FRIENDS)
+            }
         )
 
         val notification = NotificationCompat.Builder(context, CHANNEL_SOCIAL)
@@ -175,12 +189,17 @@ object NotificationHelper {
         context: Context,
         senderName: String,
         messagePreview: String,
+        senderUid: String = "",
         notificationId: Int = 4200
     ) {
         val pending = pendingIntent(
             context,
             requestCode = 420 + notificationId,
-            intent = launchIntent(context)
+            intent = launchIntent(context).apply {
+                putExtra(EXTRA_NAV_TARGET, NAV_TARGET_CHAT)
+                putExtra(EXTRA_NAV_SENDER_UID, senderUid)
+                putExtra(EXTRA_NAV_SENDER_NAME, senderName)
+            }
         )
 
         val preview = messagePreview.take(120)
@@ -202,12 +221,16 @@ object NotificationHelper {
         context: Context,
         guildName: String,
         playerName: String,
+        guildId: String = "",
         notificationId: Int = 4300
     ) {
         val pending = pendingIntent(
             context,
             requestCode = 430 + notificationId,
-            intent = launchIntent(context)
+            intent = launchIntent(context).apply {
+                putExtra(EXTRA_NAV_TARGET, NAV_TARGET_GUILD_BOSS)
+                putExtra(EXTRA_NAV_GUILD_ID, guildId)
+            }
         )
 
         val notification = NotificationCompat.Builder(context, CHANNEL_GUILD_RAID)
@@ -373,7 +396,7 @@ object NotificationHelper {
 
     private fun launchIntent(context: Context) =
         Intent(context, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
         }
 
     // Ejecuta la lógica de pending intent.

@@ -44,6 +44,8 @@ import com.example.aidungeonmaster.utils.ColorBlindPreferencesManager
 import android.net.Uri
 import android.os.PowerManager
 import android.provider.Settings
+import com.example.aidungeonmaster.utils.NotificationHelper
+
 class MainActivity : ComponentActivity() {
 
     private val pendingPermissions = ArrayDeque<String>()
@@ -51,6 +53,9 @@ class MainActivity : ComponentActivity() {
     private var currentPermission by mutableStateOf<String?>(null)
 
     private var colorBlindType by mutableStateOf(ColorBlindType.NONE)
+
+    /** Ruta de navegación pendiente procedente de una notificación. */
+    private var pendingNavRoute by mutableStateOf<String?>(null)
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -127,7 +132,9 @@ class MainActivity : ComponentActivity() {
                                                 this@MainActivity,
                                                 newType
                                             )
-                                        }
+                                        },
+                                        pendingRoute = pendingNavRoute,
+                                        onRouteConsumed = { pendingNavRoute = null }
                                     )
                                 }
                             }
@@ -138,6 +145,41 @@ class MainActivity : ComponentActivity() {
         }
 
         launchPermissionFlowIfNeeded()
+        handleNotificationIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleNotificationIntent(intent)
+    }
+
+    /**
+     * Lee los extras de navegación que inserta [NotificationHelper] en el Intent
+     * y los convierte en la ruta de Compose Navigation correspondiente.
+     */
+    private fun handleNotificationIntent(intent: Intent?) {
+        val target = intent?.getStringExtra(NotificationHelper.EXTRA_NAV_TARGET) ?: return
+        intent.removeExtra(NotificationHelper.EXTRA_NAV_TARGET)
+
+        pendingNavRoute = when (target) {
+            NotificationHelper.NAV_TARGET_CHAT -> {
+                val uid  = intent.getStringExtra(NotificationHelper.EXTRA_NAV_SENDER_UID).orEmpty()
+                val name = intent.getStringExtra(NotificationHelper.EXTRA_NAV_SENDER_NAME).orEmpty()
+                if (uid.isNotBlank()) {
+                    "private_chat/${Uri.encode(uid)}/${Uri.encode(name.ifBlank { "Aventurero" })}"
+                } else null
+            }
+            NotificationHelper.NAV_TARGET_FRIEND_REQ -> "friend_requests"
+            NotificationHelper.NAV_TARGET_FRIENDS    -> "friends_list"
+            NotificationHelper.NAV_TARGET_GUILD_BOSS -> {
+                val guildId = intent.getStringExtra(NotificationHelper.EXTRA_NAV_GUILD_ID).orEmpty()
+                if (guildId.isNotBlank()) {
+                    "guild_details/${Uri.encode(guildId)}?tab=${Uri.encode("jefe_final")}"
+                } else null
+            }
+            else -> null
+        }
     }
 
     override fun onStart() {
