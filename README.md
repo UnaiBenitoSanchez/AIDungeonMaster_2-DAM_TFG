@@ -462,7 +462,6 @@ Proyecto académico de TFG orientado a la exploración de:
 - Carga completa de pueblos y asentamientos al entrar en ellos, con espacios navegables que incluyan tiendas, taberna, casas y otros puntos de interés.
 - Competiciones entre gremios basadas en peleas de jefes, con clasificaciones y recompensas para los participantes.
 - Sistema de mejoras de gremio que permita desbloquear capacidades colectivas, ventajas pasivas y mejoras progresivas para los miembros.
-- Notificaciones en tiempo real completamente funcionales para eventos sociales, combates de gremio y alertas de juego.
 - Control por voz con reconocimiento adaptado al idioma seleccionado en la aplicación, respondiendo también en ese mismo idioma.
 - Detección y escaneo contextual de peluquerías y farmacias cercanas, ampliando los tipos de establecimientos reales vinculados al juego.
 
